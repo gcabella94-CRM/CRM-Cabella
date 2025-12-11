@@ -1353,6 +1353,10 @@ function groupRubrica(data) {
     g.notizie = (notizie || []).filter(n => match(n, g.telefono, g.email));
     g.immobili = (immobili || []).filter(i => match(i, g.telefono, g.email));
 
+    // flag ruolo (acquirente / venditore) aggregati sul gruppo
+    g.isAcquirente = g.contatti.some(c => c && c.isAcquirente);
+    g.isVenditore = g.contatti.some(c => c && c.isVenditore);
+
     // timeline eventi + ultimo contatto
     const allEvents = [];
     let lastDate = null;
@@ -1397,15 +1401,22 @@ function renderRubrica() {
   if (!list) return;
 
   const ft = (document.getElementById('rubrica-filter')?.value || '').toLowerCase();
+  const activeTab = document.querySelector('.rubrica-subtab.active')?.dataset.sub || 'lista';
 
-  const groups = groupRubrica(contatti || []).filter(g =>
+  let groups = groupRubrica(contatti || []).filter(g =>
     g.nome.toLowerCase().includes(ft) ||
     (g.telefono && g.telefono.includes(ft)) ||
     (g.email && g.email.toLowerCase().includes(ft))
   );
 
+  if (activeTab === 'acquirenti') {
+    groups = groups.filter(g => g.isAcquirente);
+  } else if (activeTab === 'venditori') {
+    groups = groups.filter(g => g.isVenditore);
+  }
+
   if (!groups.length) {
-    list.innerHTML = `<div style="padding:10px;">Nessun contatto in rubrica.</div>`;
+    list.innerHTML = `<div style="padding:10px;">Nessun contatto in rubrica per questa vista.</div>`;
     return;
   }
 
@@ -1423,12 +1434,22 @@ function renderRubrica() {
         }).join('')
       : `<div class="muted" style="font-size:11px;">Nessun evento registrato.</div>`;
 
+    const ruoloParts = [];
+    if (g.isAcquirente) ruoloParts.push('Acquirente');
+    if (g.isVenditore) ruoloParts.push('Venditore');
+    const ruoloHtml = ruoloParts.length
+      ? `<div class="rubrica-roles">${ruoloParts.map(r => `<span class="tag tag-xs">${r}</span>`).join(' ')}</div>`
+      : '';
+
     return `
       <div class="rubrica-row">
         <div class="rubrica-summary">
           <button class="rubrica-toggle" data-key="${g.key}">▸</button>
           <div class="rubrica-summary-main">
-            <div><strong>${escapeHtml(g.nome)}</strong></div>
+            <div>
+              <strong>${escapeHtml(g.nome)}</strong>
+              ${ruoloHtml}
+            </div>
             <div>${escapeHtml(g.telefono || '')}</div>
             <div>${escapeHtml(g.email || '')}</div>
             <div>${last}</div>
@@ -1465,8 +1486,26 @@ function renderRubrica() {
   }).join('');
 }
 
+
 document.addEventListener('click', e => {
   const t = e.target;
+
+  // Sottosezioni Rubrica (lista / nuovo / acquirenti / venditori)
+  const tabBtn = t.closest('.rubrica-subtab');
+  if (tabBtn) {
+    const sub = tabBtn.dataset.sub || 'lista';
+    document.querySelectorAll('.rubrica-subtab').forEach(btn => {
+      btn.classList.toggle('active', btn === tabBtn);
+    });
+    if (sub === 'nuovo') {
+      const overlay = document.getElementById('rubrica-dialog-overlay');
+      if (overlay) overlay.style.display = 'flex';
+    } else {
+      renderRubrica();
+    }
+    return;
+  }
+
 
   // Toggle dettagli timeline
   if (t.classList.contains('rubrica-toggle')) {
@@ -1592,18 +1631,29 @@ document.getElementById('rubrica-form')?.addEventListener('submit', e => {
     return;
   }
 
+  const telefono = document.getElementById('rubrica-telefono')?.value.trim() || '';
+  const email = document.getElementById('rubrica-email')?.value.trim() || '';
+  const indirizzo = document.getElementById('rubrica-indirizzo')?.value.trim() || '';
+  const citta = document.getElementById('rubrica-citta')?.value.trim() || '';
+  const provincia = document.getElementById('rubrica-provincia')?.value.trim() || '';
+  const note = document.getElementById('rubrica-note')?.value.trim() || '';
+  const isAcquirente = !!document.getElementById('rubrica-flag-acq')?.checked;
+  const isVenditore = !!document.getElementById('rubrica-flag-vend')?.checked;
+
   const c = {
     id: genId('cont'),
     nome,
-    telefono: document.getElementById('rubrica-telefono').value.trim(),
-    email: document.getElementById('rubrica-email').value.trim(),
-    indirizzo: document.getElementById('rubrica-indirizzo').value.trim(),
-    citta: document.getElementById('rubrica-citta').value.trim(),
-    provincia: document.getElementById('rubrica-provincia').value.trim(),
-    note: document.getElementById('rubrica-note').value.trim(),
-    ultimoContatto: null,
-    origine: 'manuale',
-    eventi: []
+    telefono,
+    email,
+    indirizzo,
+    citta,
+    provincia,
+    note,
+    provenienza: note ? 'manuale' : 'manuale',
+    isAcquirente,
+    isVenditore,
+    eventi: [],
+    ultimoContatto: new Date().toISOString()
   };
 
   if (!Array.isArray(contatti)) contatti = [];
@@ -1613,8 +1663,8 @@ document.getElementById('rubrica-form')?.addEventListener('submit', e => {
   const overlay = document.getElementById('rubrica-dialog-overlay');
   if (overlay) overlay.style.display = 'none';
 
-  // reset form
-  document.getElementById('rubrica-form').reset();
+  const form = document.getElementById('rubrica-form');
+  if (form) form.reset();
 
   renderRubrica();
 });
@@ -2364,6 +2414,8 @@ function closeAppuntamentoDialog() {
         Nome: c.nome || '',
         Telefono: c.telefono || '',
         Email: c.email || '',
+        Acquirente: c.isAcquirente ? 'SI' : 'NO',
+        Venditore: c.isVenditore ? 'SI' : 'NO',
         Provenienza: c.provenienza || '',
         Note: c.note || ''
       }));

@@ -762,7 +762,7 @@
       <div>
         <div class="card-title">📇 Rubrica Contatti</div>
         <div class="card-subtitle">
-          Proprietari & collegamenti con notizie e immobili
+          Proprietari & collegamenti con notizie e immobili. Sottosezioni: lista contatti, acquirenti, venditori.
         </div>
       </div>
       <div class="card-actions">
@@ -772,6 +772,22 @@
     </div>
 
     <div class="card-body">
+
+      <!-- Sottosezioni Rubrica: lista contatti / inserisci / acquirenti / venditori -->
+      <div class="rubrica-subnav">
+        <button type="button" class="btn btn-xs rubrica-subtab active" data-sub="lista">
+          Lista contatti
+        </button>
+        <button type="button" class="btn btn-xs rubrica-subtab" data-sub="nuovo">
+          Inserisci contatto
+        </button>
+        <button type="button" class="btn btn-xs rubrica-subtab" data-sub="acquirenti">
+          Lista acquirenti
+        </button>
+        <button type="button" class="btn btn-xs rubrica-subtab" data-sub="venditori">
+          Lista venditori
+        </button>
+      </div>
 
       <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;">
         <input id="rubrica-filter" class="search-input" placeholder="Filtra per nome / telefono / email">
@@ -783,6 +799,7 @@
     </div>
   </div>
 </section>
+
 
 
 <!-- MODALE NUOVO CONTATTO -->
@@ -804,7 +821,7 @@
         </div>
         <div class="form-group">
           <label>Telefono</label>
-          <input id="rubrica-telefono" type="tel">
+          <input id="rubrica-telefono" type="tel" placeholder="+39 ...">
         </div>
         <div class="form-group">
           <label>Email</label>
@@ -822,11 +839,25 @@
           <label>Provincia</label>
           <input id="rubrica-provincia">
         </div>
-      </div>
 
-      <div class="form-group">
-        <label>Note</label>
-        <textarea id="rubrica-note" rows="2"></textarea>
+        <div class="form-group" style="grid-column:1 / -1;">
+          <label>Ruolo del contatto</label>
+          <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+            <label style="display:flex;align-items:center;gap:4px;font-size:12px;">
+              <input type="checkbox" id="rubrica-flag-acq">
+              <span>Acquirente</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:12px;">
+              <input type="checkbox" id="rubrica-flag-vend">
+              <span>Venditore</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="form-group" style="grid-column:1 / -1;">
+          <label>Note / provenienza contatto</label>
+          <textarea id="rubrica-note" rows="2" placeholder="Note su come hai ottenuto il contatto, interessi, ecc."></textarea>
+        </div>
       </div>
 
       <div style="display:flex;justify-content:flex-end;gap:8px;">
@@ -837,6 +868,7 @@
 
   </div>
 </div>
+
 
 <!-- ATTIVITÀ -->
           <section class="view" id="view-attivita">
