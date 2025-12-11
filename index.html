@@ -97,6 +97,46 @@
           </div>
         </div>
 
+        <!-- Sottosezioni Rubrica (appaiono quando Rubrica è attiva) -->
+        <div class="nav-subgroup nav-sub-rubrica" id="rubrica-submenu" style="display:none;margin-left:16px;">
+          <div class="nav-item nav-item-sub" data-rubrica-sub="lista">
+            <div class="nav-item-main">
+              <div class="nav-icon">📋</div>
+              <div>
+                <div class="nav-label-title">Lista contatti</div>
+                <div class="nav-label-sub">Vista principale</div>
+              </div>
+            </div>
+          </div>
+          <div class="nav-item nav-item-sub" data-rubrica-sub="nuovo">
+            <div class="nav-item-main">
+              <div class="nav-icon">➕</div>
+              <div>
+                <div class="nav-label-title">Inserisci contatto</div>
+                <div class="nav-label-sub">Nuovo contatto rubrica</div>
+              </div>
+            </div>
+          </div>
+          <div class="nav-item nav-item-sub" data-rubrica-sub="acquirenti">
+            <div class="nav-item-main">
+              <div class="nav-icon">🏡</div>
+              <div>
+                <div class="nav-label-title">Lista acquirenti</div>
+                <div class="nav-label-sub">Contatti compratori</div>
+              </div>
+            </div>
+          </div>
+          <div class="nav-item nav-item-sub" data-rubrica-sub="venditori">
+            <div class="nav-item-main">
+              <div class="nav-icon">🏠</div>
+              <div>
+                <div class="nav-label-title">Lista venditori</div>
+                <div class="nav-label-sub">Contatti proprietari</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div class="nav-item" data-view="attivita">
           <div class="nav-item-main">
             <div class="nav-icon">📌</div>
@@ -764,6 +804,9 @@
         <div class="card-subtitle">
           Proprietari & collegamenti con notizie e immobili. Sottosezioni: lista contatti, acquirenti, venditori.
         </div>
+        <div class="muted" id="rubrica-counter" style="margin-top:4px;font-size:12px;">
+          <!-- Contatore contatti aggiornato da JS -->
+        </div>
       </div>
       <div class="card-actions">
         <button class="btn btn-sm" id="rubrica-new-btn">Nuovo contatto</button>
@@ -850,6 +893,14 @@
             <label style="display:flex;align-items:center;gap:4px;font-size:12px;">
               <input type="checkbox" id="rubrica-flag-vend">
               <span>Venditore</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:12px;">
+              <input type="checkbox" id="rubrica-flag-coll">
+              <span>Collaboratore</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:12px;">
+              <input type="checkbox" id="rubrica-flag-altro">
+              <span>Altro</span>
             </label>
           </div>
         </div>
