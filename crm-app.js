@@ -748,130 +748,60 @@ function renderAgendaMonth() {
       const first = new Date(year, month, 1);
       const last = new Date(year, month + 1, 0);
 
-      // offset lunedì=0 ... domenica=6
       let startOffset = first.getDay() - 1;
       if (startOffset < 0) startOffset = 6;
 
       const daysInMonth = last.getDate();
       const totalCells = Math.ceil((startOffset + daysInMonth) / 7) * 7;
-      const weeks = totalCells / 7;
 
-      // Wrapper tabellare: colonne = giorni, righe = settimane
-      const table = document.createElement("table");
-      table.className = "agenda-month-table";
-      table.style.width = "100%";
-      table.style.borderCollapse = "separate";
-      table.style.borderSpacing = "6px";
-      table.style.tableLayout = "fixed";
+      const grid = document.createElement("div");
+      grid.className = "agenda-month-grid";
+      grid.style.display = "grid";
+      grid.style.gridTemplateColumns = "repeat(7, 1fr)";
+      grid.style.gap = "6px";
 
-      const thead = document.createElement("thead");
-      const trHead = document.createElement("tr");
-      const dayNames = ["Lun", "Mar", "Mer", "Gio", "Ven", "Sab", "Dom"];
+      for (let i = 0; i < totalCells; i++) {
+        const cell = document.createElement("div");
 
-      dayNames.forEach(name => {
-        const th = document.createElement("th");
-        th.className = "muted";
-        th.style.fontSize = "11px";
-        th.style.fontWeight = "600";
-        th.style.textTransform = "uppercase";
-        th.style.letterSpacing = "0.08em";
-        th.style.padding = "0 6px";
-        th.style.textAlign = "left";
-        th.textContent = name;
-        trHead.appendChild(th);
-      });
+        cell.className = "metric agenda-month-day";
+        cell.style.minHeight = "70px";
+        cell.style.borderRadius = "6px";
+        cell.style.display = "flex";
+        cell.style.flexDirection = "column";
+        cell.style.justifyContent = "flex-start";
+        cell.style.padding = "4px 6px";
 
-      thead.appendChild(trHead);
-      table.appendChild(thead);
+        const dayNum = i - startOffset + 1;
 
-      const tbody = document.createElement("tbody");
+        if (dayNum > 0 && dayNum <= daysInMonth) {
+          const d = new Date(year, month, dayNum);
 
-      for (let w = 0; w < weeks; w++) {
-        const tr = document.createElement("tr");
+          const num = document.createElement("div");
+          num.textContent = dayNum;
+          num.style.fontWeight = "600";
+          num.style.marginBottom = "4px";
+          cell.appendChild(num);
 
-        for (let d = 0; d < 7; d++) {
-          const td = document.createElement("td");
-          td.style.verticalAlign = "top";
-          td.style.padding = "0";
+          cell.addEventListener("click", () => {
+            agendaWeekAnchor = startOfWeek(d);
+            setView("agenda");
 
-          const cell = document.createElement("div");
-          cell.className = "metric agenda-month-day";
-          cell.style.minHeight = "80px";
-          cell.style.borderRadius = "6px";
-          cell.style.display = "flex";
-          cell.style.flexDirection = "column";
-          cell.style.justifyContent = "flex-start";
-          cell.style.padding = "6px 8px";
-          cell.style.cursor = "pointer";
-
-          const i = w * 7 + d;
-          const dayNum = i - startOffset + 1;
-
-          if (dayNum > 0 && dayNum <= daysInMonth) {
-            const dateObj = new Date(year, month, dayNum);
-            const iso = dateObj.toISOString().slice(0, 10);
-
-            // numero giorno
-            const num = document.createElement("div");
-            num.textContent = dayNum;
-            num.style.fontWeight = "700";
-            num.style.marginBottom = "6px";
-            cell.appendChild(num);
-
-            // contatore appuntamenti del giorno
-            const count = (attivita || []).filter(a => a && a.tipo === "appuntamento" && a.data === iso).length;
-
-            const counter = document.createElement("div");
-            counter.style.marginTop = "auto";
-            counter.style.display = "flex";
-            counter.style.justifyContent = "flex-end";
-
-            if (count > 0) {
-              const badge = document.createElement("span");
-              badge.className = "tag";
-              badge.style.borderColor = "rgba(34,197,94,0.35)";
-              badge.style.background = "rgba(34,197,94,0.10)";
-              badge.style.color = "var(--text-main)";
-              badge.textContent = `${count} app.`;
-              counter.appendChild(badge);
-            } else {
-              const muted = document.createElement("span");
-              muted.className = "muted";
-              muted.style.fontSize = "11px";
-              muted.textContent = "0 app.";
-              counter.appendChild(muted);
+            const gridWeekly = document.getElementById("agenda-week-grid");
+            if (gridWeekly) {
+              gridWeekly.scrollIntoView({ behavior: "smooth", block: "start" });
             }
-            cell.appendChild(counter);
 
-            // click: vai alla settimana del giorno
-            cell.addEventListener("click", () => {
-              agendaWeekAnchor = startOfWeek(dateObj);
-              setView("agenda");
-
-              const gridWeekly = document.getElementById("agenda-week-grid");
-              if (gridWeekly) {
-                gridWeekly.scrollIntoView({ behavior: "smooth", block: "start" });
-              }
-
-              cell.classList.add("agenda-month-day-click");
-              setTimeout(() => cell.classList.remove("agenda-month-day-click"), 180);
-            });
-          } else {
-            cell.style.opacity = "0.25";
-            cell.style.cursor = "default";
-            // celle vuote: nessuna azione
-            cell.addEventListener("click", (e) => e.preventDefault());
-          }
-
-          td.appendChild(cell);
-          tr.appendChild(td);
+            cell.classList.add("agenda-month-day-click");
+            setTimeout(() => cell.classList.remove("agenda-month-day-click"), 180);
+          });
+        } else {
+          cell.style.opacity = "0.25";
         }
 
-        tbody.appendChild(tr);
+        grid.appendChild(cell);
       }
 
-      table.appendChild(tbody);
-      cont.appendChild(table);
+      cont.appendChild(grid);
     }
 
 
@@ -4411,4 +4341,519 @@ document.addEventListener('DOMContentLoaded', () => {
   // Also run once if rubrica already visible
   upgradeDashboardMarkup();
   renderActions();
+})();
+
+
+
+/* ====== RUBRICA PRO (ADD-ON) ======
+   Obiettivo: aggiungere funzioni "pro" SENZA modificare la struttura/HTML esistente.
+   - Non tocca renderRubrica internamente: la wrappa e poi arricchisce il DOM.
+   - Salva le preferenze su ciascun contatto (campo: proPrefs) per il gruppo (buildKey).
+   - Matching semplice contatto->immobili (città/zona/tipo/operazione/budget/mq).
+*/
+(function(){
+  try {
+    const RUBRICA_PRO_ENABLED = true;
+    if (!RUBRICA_PRO_ENABLED) return;
+
+    // Evita doppio wrap
+    if (typeof renderRubrica === 'function' && !renderRubrica.__rubricaProWrapped) {
+      const _orig = renderRubrica;
+      const wrapped = function() {
+        _orig();
+        try { rubricaProEnhanceDOM(); } catch(e) { console.warn('[RUBRICA PRO] enhance err', e); }
+      };
+      wrapped.__rubricaProWrapped = true;
+      renderRubrica = wrapped;
+    }
+
+    // CSS minimale (solo per modale + badge + bottone)
+    if (!document.getElementById('rubrica-pro-style')) {
+      const st = document.createElement('style');
+      st.id = 'rubrica-pro-style';
+      st.textContent = `
+        .rubrica-pro-badge{display:inline-flex;align-items:center;gap:6px;padding:2px 8px;border-radius:999px;border:1px solid rgba(255,255,255,.12);font-size:11px;line-height:18px;margin-left:8px}
+        .rubrica-pro-badge.warn{border-color:rgba(245,158,11,.45);background:rgba(245,158,11,.08)}
+        .rubrica-pro-badge.ok{border-color:rgba(34,197,94,.35);background:rgba(34,197,94,.06)}
+        .rubrica-pro-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;z-index:9999;padding:18px}
+        .rubrica-pro-modal{width:min(980px,100%);max-height:min(90vh,860px);overflow:auto;background:#0b1220;border:1px solid rgba(255,255,255,.10);border-radius:16px;box-shadow:0 20px 50px rgba(0,0,0,.45)}
+        .rubrica-pro-modal header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:16px 16px 10px;border-bottom:1px solid rgba(255,255,255,.08)}
+        .rubrica-pro-modal h3{margin:0;font-size:18px}
+        .rubrica-pro-modal .sub{color:rgba(255,255,255,.70);font-size:12px;margin-top:4px}
+        .rubrica-pro-modal .body{padding:14px 16px 16px}
+        .rubrica-pro-grid{display:grid;grid-template-columns: 1fr 1fr;gap:14px}
+        .rubrica-pro-card{border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:12px;background:rgba(255,255,255,.03)}
+        .rubrica-pro-card h4{margin:0 0 8px;font-size:13px;color:rgba(255,255,255,.82)}
+        .rubrica-pro-fields{display:grid;grid-template-columns: 1fr 1fr;gap:10px}
+        .rubrica-pro-fields .full{grid-column:1 / -1}
+        .rubrica-pro-modal label{display:block;font-size:11px;color:rgba(255,255,255,.70);margin:0 0 4px}
+        .rubrica-pro-modal input,.rubrica-pro-modal select,.rubrica-pro-modal textarea{
+          width:100%;box-sizing:border-box;background:#0a162a;border:1px solid rgba(255,255,255,.10);color:#fff;
+          border-radius:10px;padding:9px 10px;font-size:12px;outline:none
+        }
+        .rubrica-pro-modal textarea{min-height:86px;resize:vertical}
+        .rubrica-pro-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+        .rubrica-pro-actions .btn{border-radius:10px}
+        .rubrica-pro-list{margin:0;padding:0;list-style:none}
+        .rubrica-pro-list li{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:8px 10px;border:1px solid rgba(255,255,255,.08);border-radius:12px;margin-bottom:8px;background:rgba(255,255,255,.02)}
+        .rubrica-pro-list small{color:rgba(255,255,255,.65)}
+        .rubrica-pro-pill{font-size:11px;padding:2px 8px;border:1px solid rgba(255,255,255,.10);border-radius:999px;color:rgba(255,255,255,.78)}
+      `;
+      document.head.appendChild(st);
+    }
+
+    // Modale (creato on-demand)
+    function ensureModal() {
+      let ov = document.getElementById('rubrica-pro-overlay');
+      if (ov) return ov;
+
+      ov = document.createElement('div');
+      ov.id = 'rubrica-pro-overlay';
+      ov.className = 'rubrica-pro-modal-overlay';
+      ov.innerHTML = `
+        <div class="rubrica-pro-modal" role="dialog" aria-modal="true">
+          <header>
+            <div>
+              <h3 id="rubrica-pro-title">Scheda Contatto</h3>
+              <div class="sub" id="rubrica-pro-sub">—</div>
+            </div>
+            <div class="rubrica-pro-actions">
+              <button class="btn btn-xs" id="rubrica-pro-call">📞 Chiama</button>
+              <button class="btn btn-xs" id="rubrica-pro-wa">💬 WhatsApp</button>
+              <button class="btn btn-xs" id="rubrica-pro-mail">✉️ Email</button>
+              <button class="btn btn-xs" id="rubrica-pro-close">✕</button>
+            </div>
+          </header>
+          <div class="body">
+            <div class="rubrica-pro-grid">
+              <div class="rubrica-pro-card">
+                <h4>Profilo & Priorità</h4>
+                <div class="rubrica-pro-fields">
+                  <div>
+                    <label>Stato contatto</label>
+                    <select id="rp-stato">
+                      <option value="">—</option>
+                      <option value="lead">Lead</option>
+                      <option value="qualificato">Qualificato</option>
+                      <option value="attivo">Attivo</option>
+                      <option value="freddo">Freddo</option>
+                      <option value="chiuso">Chiuso</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label>Priorità</label>
+                    <select id="rp-priority">
+                      <option value="">—</option>
+                      <option value="alta">Alta</option>
+                      <option value="media">Media</option>
+                      <option value="bassa">Bassa</option>
+                    </select>
+                  </div>
+                  <div class="full">
+                    <label>Note interne</label>
+                    <textarea id="rp-note" placeholder="Es. preferisce trilocale, cash buyer, urgenza 60gg..."></textarea>
+                  </div>
+                </div>
+              </div>
+
+              <div class="rubrica-pro-card">
+                <h4>Preferenze (Acquirente/Conduttore)</h4>
+                <div class="rubrica-pro-fields">
+                  <div>
+                    <label>Operazione</label>
+                    <select id="rp-op">
+                      <option value="">—</option>
+                      <option value="vendita">Vendita</option>
+                      <option value="affitto">Affitto</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label>Tipologia</label>
+                    <input id="rp-tipo" placeholder="Es. appartamento, villa, ufficio..."/>
+                  </div>
+                  <div>
+                    <label>Città</label>
+                    <input id="rp-citta" placeholder="Es. Milano"/>
+                  </div>
+                  <div>
+                    <label>Zona</label>
+                    <input id="rp-zona" placeholder="Es. Brera, Crocetta..."/>
+                  </div>
+                  <div>
+                    <label>Budget min</label>
+                    <input id="rp-bmin" type="number" min="0" step="1000" placeholder="€"/>
+                  </div>
+                  <div>
+                    <label>Budget max</label>
+                    <input id="rp-bmax" type="number" min="0" step="1000" placeholder="€"/>
+                  </div>
+                  <div>
+                    <label>Mq min</label>
+                    <input id="rp-mmin" type="number" min="0" step="1" placeholder="mq"/>
+                  </div>
+                  <div>
+                    <label>Mq max</label>
+                    <input id="rp-mmax" type="number" min="0" step="1" placeholder="mq"/>
+                  </div>
+                </div>
+              </div>
+
+              <div class="rubrica-pro-card">
+                <h4>Matching immobili (compatibili)</h4>
+                <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
+                  <span class="rubrica-pro-pill" id="rp-match-count">0 match</span>
+                  <button class="btn btn-xs" id="rp-refresh">↻ Aggiorna</button>
+                  <button class="btn btn-xs" id="rp-save">💾 Salva</button>
+                </div>
+                <ul class="rubrica-pro-list" id="rp-match-list"></ul>
+                <div class="muted" style="font-size:11px" id="rp-match-empty">Nessun match con i criteri attuali.</div>
+              </div>
+
+              <div class="rubrica-pro-card">
+                <h4>Follow-up</h4>
+                <div class="muted" style="font-size:12px;margin-bottom:8px" id="rp-follow">—</div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap">
+                  <button class="btn btn-xs" id="rp-touch">📌 Segna contatto</button>
+                  <button class="btn btn-xs" id="rp-logcall">☎️ Log telefonata</button>
+                  <button class="btn btn-xs" id="rp-logmail">✉️ Log email</button>
+                  <button class="btn btn-xs" id="rp-logvisit">🏠 Log visita</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(ov);
+
+      // chiusura
+      ov.addEventListener('click', (e) => {
+        if (e.target === ov) closeModal();
+      });
+      ov.querySelector('#rubrica-pro-close')?.addEventListener('click', closeModal);
+
+      return ov;
+    }
+
+    function closeModal() {
+      const ov = document.getElementById('rubrica-pro-overlay');
+      if (ov) ov.style.display = 'none';
+      document.body.style.overflow = '';
+    }
+
+    function openModal() {
+      const ov = ensureModal();
+      ov.style.display = 'flex';
+      document.body.style.overflow = 'hidden';
+    }
+
+    function normStr(s){ return (s || '').toString().trim().toLowerCase(); }
+    function toNum(v){
+      const n = Number((v ?? '').toString().replace(/[^\d.]/g,''));
+      return isFinite(n) ? n : null;
+    }
+
+    function getGroupByKey(key) {
+      const groups = (typeof groupRubrica === 'function') ? groupRubrica(contatti || []) : [];
+      return (groups || []).find(g => g && g.key === key) || null;
+    }
+
+    function getPrefsForKey(key) {
+      const c = (contatti || []).find(x => x && typeof buildKey==='function' && buildKey(x) === key);
+      return (c && c.proPrefs) ? c.proPrefs : {};
+    }
+
+    function setPrefsForKey(key, prefs) {
+      (contatti || []).forEach(c => {
+        if (typeof buildKey === 'function' && buildKey(c) === key) {
+          c.proPrefs = Object.assign({}, c.proPrefs || {}, prefs || {});
+        }
+      });
+      saveList(STORAGE_KEYS.contatti, contatti);
+    }
+
+    function daysSince(isoOrNull) {
+      if (!isoOrNull) return null;
+      const d = new Date(isoOrNull);
+      if (isNaN(d)) return null;
+      const diff = Date.now() - d.getTime();
+      return Math.floor(diff / (1000*60*60*24));
+    }
+
+    function findImmobileFields(i){
+      // Tenta di capire i campi in modo robusto (il tuo modello potrebbe cambiare).
+      const op = normStr(i?.operazione || i?.tipoOperazione || i?.venditaAffitto || i?.contratto);
+      const citta = i?.citta || i?.comune || '';
+      const zona = i?.zona || i?.quartiere || i?.localita || '';
+      const tipo = i?.tipologia || i?.tipo || i?.categoria || '';
+      const prezzo = toNum(i?.prezzo || i?.prezzoVendita || i?.canone || i?.affitto || i?.valore);
+      const mq = toNum(i?.mq || i?.superficie || i?.metriQuadri);
+      return { op, citta, zona, tipo, prezzo, mq };
+    }
+
+    function isMatchImm(i, prefs) {
+      const f = findImmobileFields(i);
+      const opPref = normStr(prefs.op || '');
+      const tipoPref = normStr(prefs.tipo || '');
+      const cittaPref = normStr(prefs.citta || '');
+      const zonaPref = normStr(prefs.zona || '');
+
+      if (opPref && f.op && !f.op.includes(opPref)) return false;
+
+      if (cittaPref) {
+        const ic = normStr(f.citta);
+        if (ic && !ic.includes(cittaPref)) return false;
+      }
+      if (zonaPref) {
+        const iz = normStr(f.zona);
+        if (iz && !iz.includes(zonaPref)) return false;
+      }
+      if (tipoPref) {
+        const it = normStr(f.tipo);
+        if (it && !it.includes(tipoPref)) return false;
+      }
+
+      const bmin = toNum(prefs.bmin); const bmax = toNum(prefs.bmax);
+      if (f.prezzo != null) {
+        if (bmin != null && f.prezzo < bmin) return false;
+        if (bmax != null && f.prezzo > bmax) return false;
+      }
+
+      const mmin = toNum(prefs.mmin); const mmax = toNum(prefs.mmax);
+      if (f.mq != null) {
+        if (mmin != null && f.mq < mmin) return false;
+        if (mmax != null && f.mq > mmax) return false;
+      }
+
+      return true;
+    }
+
+    function computeMatches(prefs) {
+      const arr = (immobili || []).filter(i => i && isMatchImm(i, prefs));
+      // ordina: prima quelli con città/zona ok + prezzo presente
+      return arr.slice(0, 50);
+    }
+
+    function setMatchList(items) {
+      const ul = document.getElementById('rp-match-list');
+      const empty = document.getElementById('rp-match-empty');
+      const badge = document.getElementById('rp-match-count');
+      if (!ul || !badge || !empty) return;
+
+      ul.innerHTML = '';
+      badge.textContent = `${items.length} match`;
+      empty.style.display = items.length ? 'none' : 'block';
+
+      items.forEach(i => {
+        const f = findImmobileFields(i);
+        const li = document.createElement('li');
+        const title = (i.titolo || i.nome || i.indirizzo || ('Immobile ' + (i.id || ''))) + '';
+        const meta = [
+          f.citta || '',
+          f.zona ? ('· ' + f.zona) : '',
+          f.prezzo != null ? ('· €' + f.prezzo.toLocaleString('it-IT')) : '',
+          f.mq != null ? ('· ' + f.mq + ' mq') : ''
+        ].join(' ');
+        li.innerHTML = `
+          <div style="min-width:0">
+            <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(title)}</div>
+            <small>${escapeHtml(meta)}</small>
+          </div>
+          <button class="btn btn-xs" data-pro-open-imm="${escapeHtml(i.id || '')}">Apri</button>
+        `;
+        ul.appendChild(li);
+      });
+    }
+
+    function openRubricaPro(key) {
+      const g = getGroupByKey(key);
+      if (!g) return;
+
+      const prefs = Object.assign({
+        stato: '', priority: '', note: '',
+        op: '', tipo: '', citta: '', zona: '',
+        bmin: '', bmax: '', mmin: '', mmax: ''
+      }, getPrefsForKey(key));
+
+      openModal();
+
+      // header
+      const titleEl = document.getElementById('rubrica-pro-title');
+      const subEl = document.getElementById('rubrica-pro-sub');
+      if (titleEl) titleEl.textContent = g.nome || 'Scheda Contatto';
+      const subParts = [];
+      if (g.telefono) subParts.push(g.telefono);
+      if (g.email) subParts.push(g.email);
+      if (g.citta || g.provincia) subParts.push([g.citta, g.provincia].filter(Boolean).join(' '));
+      if (subEl) subEl.textContent = subParts.join(' · ') || '—';
+
+      // fill fields
+      const $ = (id) => document.getElementById(id);
+      if ($('rp-stato')) $('rp-stato').value = prefs.stato || '';
+      if ($('rp-priority')) $('rp-priority').value = prefs.priority || '';
+      if ($('rp-note')) $('rp-note').value = prefs.note || '';
+      if ($('rp-op')) $('rp-op').value = prefs.op || '';
+      if ($('rp-tipo')) $('rp-tipo').value = prefs.tipo || '';
+      if ($('rp-citta')) $('rp-citta').value = prefs.citta || '';
+      if ($('rp-zona')) $('rp-zona').value = prefs.zona || '';
+      if ($('rp-bmin')) $('rp-bmin').value = prefs.bmin || '';
+      if ($('rp-bmax')) $('rp-bmax').value = prefs.bmax || '';
+      if ($('rp-mmin')) $('rp-mmin').value = prefs.mmin || '';
+      if ($('rp-mmax')) $('rp-mmax').value = prefs.mmax || '';
+
+      // follow-up
+      const days = daysSince(g.ultimoContatto);
+      const follow = $('rp-follow');
+      if (follow) {
+        follow.textContent = (days == null)
+          ? 'Nessun contatto registrato. Suggerimento: logga un evento o usa 📌 Segna contatto.'
+          : (days <= 3 ? `Ultimo contatto: ${days} gg fa (ok).` : `Ultimo contatto: ${days} gg fa → follow-up consigliato.`);
+      }
+
+      // call/wa/mail actions
+      const callBtn = $('rubrica-pro-call');
+      const waBtn = $('rubrica-pro-wa');
+      const mailBtn = $('rubrica-pro-mail');
+      const tel = (g.telefono || '').replace(/\s+/g,'');
+      const mail = (g.email || '').trim();
+
+      if (callBtn) callBtn.onclick = () => { if (tel) window.location.href = 'tel:' + tel; };
+      if (waBtn) waBtn.onclick = () => { if (tel) window.open('https://wa.me/' + tel.replace(/^\+/,''), '_blank'); };
+      if (mailBtn) mailBtn.onclick = () => { if (mail) window.location.href = 'mailto:' + mail; };
+
+      // refresh/save/match
+      const refresh = $('rp-refresh');
+      const saveBtn = $('rp-save');
+
+      const readPrefsFromUI = () => ({
+        stato: $('rp-stato')?.value || '',
+        priority: $('rp-priority')?.value || '',
+        note: $('rp-note')?.value || '',
+        op: $('rp-op')?.value || '',
+        tipo: $('rp-tipo')?.value || '',
+        citta: $('rp-citta')?.value || '',
+        zona: $('rp-zona')?.value || '',
+        bmin: $('rp-bmin')?.value || '',
+        bmax: $('rp-bmax')?.value || '',
+        mmin: $('rp-mmin')?.value || '',
+        mmax: $('rp-mmax')?.value || ''
+      });
+
+      const doRefresh = () => {
+        const p = readPrefsFromUI();
+        const matches = computeMatches(p);
+        setMatchList(matches);
+      };
+
+      if (refresh) refresh.onclick = doRefresh;
+      if (saveBtn) saveBtn.onclick = () => {
+        const p = readPrefsFromUI();
+        setPrefsForKey(key, p);
+        doRefresh();
+        // riflette badge/indicatori in lista
+        if (typeof renderRubrica === 'function') renderRubrica();
+      };
+
+      // log helpers
+      const touchBtn = $('rp-touch');
+      const logCall = $('rp-logcall');
+      const logMail = $('rp-logmail');
+      const logVisit = $('rp-logvisit');
+
+      function pushEvent(tipo, nota){
+        const nowIso = new Date().toISOString();
+        (contatti || []).forEach(c => {
+          if (typeof buildKey === 'function' && buildKey(c) === key) {
+            if (!Array.isArray(c.eventi)) c.eventi = [];
+            c.eventi.push({ id: (typeof genId==='function' ? genId('evt') : ('evt_' + Date.now())), data: nowIso, tipo, nota: nota || '' });
+            c.ultimoContatto = nowIso;
+          }
+        });
+        saveList(STORAGE_KEYS.contatti, contatti);
+        if (typeof renderRubrica === 'function') renderRubrica();
+      }
+
+      if (touchBtn) touchBtn.onclick = () => { pushEvent('touch', 'Segnato come contatto effettuato dalla scheda PRO.'); doRefresh(); };
+      if (logCall) logCall.onclick = () => {
+        const nota = prompt('Nota telefonata (facoltativa):', '');
+        if (nota === null) return;
+        pushEvent('telefonata', (nota || '').trim());
+        doRefresh();
+      };
+      if (logMail) logMail.onclick = () => {
+        const nota = prompt('Nota email (facoltativa):', '');
+        if (nota === null) return;
+        pushEvent('email', (nota || '').trim());
+        doRefresh();
+      };
+      if (logVisit) logVisit.onclick = () => {
+        const nota = prompt('Nota visita (facoltativa):', '');
+        if (nota === null) return;
+        pushEvent('visita', (nota || '').trim());
+        doRefresh();
+      };
+
+      // prima render match
+      doRefresh();
+    }
+
+    // Arricchimento DOM lista rubrica: badge follow-up + bottone ⚡
+    function rubricaProEnhanceDOM() {
+      const container = document.getElementById('rubrica-list');
+      if (!container) return;
+
+      const rows = container.querySelectorAll('.rubrica-row');
+      if (!rows.length) return;
+
+      rows.forEach(row => {
+        const actions = row.querySelector('.rubrica-actions');
+        const main = row.querySelector('.rubrica-summary-main > div'); // blocco nome/ruoli
+        const keyBtn = row.querySelector('.rubrica-toggle');
+        const key = keyBtn?.dataset?.key || keyBtn?.getAttribute?.('data-key') || null;
+        if (!key || !actions || !main) return;
+
+        // bottone PRO (aggiunto una sola volta)
+        if (!actions.querySelector('[data-pro-open]')) {
+          const b = document.createElement('button');
+          b.className = 'btn btn-xs';
+          b.textContent = '⚡';
+          b.title = 'Apri scheda PRO';
+          b.setAttribute('data-pro-open', key);
+          actions.insertBefore(b, actions.firstChild);
+        }
+
+        // badge follow-up (aggiunto una sola volta)
+        if (!main.querySelector('.rubrica-pro-badge')) {
+          const g = getGroupByKey(key);
+          const days = g ? daysSince(g.ultimoContatto) : null;
+
+          const badge = document.createElement('span');
+          badge.className = 'rubrica-pro-badge ' + ((days == null || days > 7) ? 'warn' : 'ok');
+          badge.innerHTML = (days == null)
+            ? 'Follow-up: mai'
+            : `Follow-up: ${days}gg`;
+          main.appendChild(badge);
+        }
+      });
+    }
+
+    // Click handler (delegato): apre modale, apre immobile da match
+    document.addEventListener('click', (e) => {
+      const t = e.target;
+      const proBtn = t.closest('[data-pro-open]');
+      if (proBtn) {
+        const key = proBtn.getAttribute('data-pro-open');
+        if (key) openRubricaPro(key);
+        return;
+      }
+      const openImm = t.closest('[data-pro-open-imm]');
+      if (openImm) {
+        const id = openImm.getAttribute('data-pro-open-imm');
+        if (id && typeof openSchedaImmobile === 'function') openSchedaImmobile(id);
+        return;
+      }
+    });
+
+  } catch(err) {
+    console.warn('[RUBRICA PRO] init error', err);
+  }
 })();
