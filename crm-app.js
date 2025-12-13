@@ -10,6 +10,11 @@
     intestazioni: 'crm10_intestazioni' // archivio header+footer per documenti IA
   };
 
+  // ====== FEATURE FLAGS ======
+  // Disattiva la Rubrica legacy (submenu laterale + storage 'rubrica') e usa solo la Rubrica avanzata (crm10_contatti)
+  const ENABLE_LEGACY_RUBRICA = false;
+
+
   let immobili = [];
   let notizie = [];
   let attivita = [];
@@ -3829,75 +3834,78 @@ document.addEventListener('DOMContentLoaded', init);
 /* ====== RUBRICA MENU LATERALE & FILTRI ====== */
 const ENABLE_LEGACY_RUBRICA = false;
 if (ENABLE_LEGACY_RUBRICA) {
-document.addEventListener('DOMContentLoaded', () => {
-  const rubricaMenu = document.querySelector('.nav-item[data-view="rubrica"]');
-  const rubricaSub = document.getElementById('rubrica-submenu');
-  const rubricaList = document.getElementById('rubrica-list');
-  const counter = document.getElementById('rubrica-counter');
+  if (ENABLE_LEGACY_RUBRICA) {
+  document.addEventListener('DOMContentLoaded', () => {
+    const rubricaMenu = document.querySelector('.nav-item[data-view="rubrica"]');
+    const rubricaSub = document.getElementById('rubrica-submenu');
+    const rubricaList = document.getElementById('rubrica-list');
+    const counter = document.getElementById('rubrica-counter');
 
-  if (!rubricaMenu || !rubricaSub) return;
+    if (!rubricaMenu || !rubricaSub) return;
 
-  // espansione menu laterale
-  rubricaMenu.addEventListener('click', () => {
-    rubricaSub.style.display = 'block';
-    showRubrica('lista');
-  });
-
-  // click sottosezioni
-  rubricaSub.querySelectorAll('.nav-item-sub').forEach(item => {
-    item.addEventListener('click', e => {
-      e.stopPropagation();
-      const sub = item.getAttribute('data-rubrica-sub');
-      showRubrica(sub);
+    // espansione menu laterale
+    rubricaMenu.addEventListener('click', () => {
+      rubricaSub.style.display = 'block';
+      showRubrica('lista');
     });
+
+    // click sottosezioni
+    rubricaSub.querySelectorAll('.nav-item-sub').forEach(item => {
+      item.addEventListener('click', e => {
+        e.stopPropagation();
+        const sub = item.getAttribute('data-rubrica-sub');
+        showRubrica(sub);
+      });
+    });
+
+    function getContacts() {
+      try {
+        return JSON.parse(localStorage.getItem('rubrica') || '[]');
+      } catch {
+        return [];
+      }
+    }
+
+    function showRubrica(mode) {
+      const all = getContacts();
+      let filtered = all;
+
+      if (mode === 'acquirenti') {
+        filtered = all.filter(c => c.acquirente);
+      } else if (mode === 'venditori') {
+        filtered = all.filter(c => c.venditore);
+      } else if (mode === 'nuovo') {
+        document.getElementById('rubrica-dialog-overlay').style.display = 'flex';
+        return;
+      }
+
+      renderList(filtered);
+      updateCounter(all);
+    }
+
+    function renderList(list) {
+      if (!rubricaList) return;
+      rubricaList.innerHTML = list.map(c => `
+        <div class="rubrica-row">
+          <strong>${c.nome || ''}</strong>
+          <span>${c.telefono || ''}</span>
+          <span>${c.email || ''}</span>
+        </div>
+      `).join('');
+    }
+
+    function updateCounter(all) {
+      const acq = all.filter(c => c.acquirente).length;
+      const ven = all.filter(c => c.venditore).length;
+      counter.textContent = `Totale: ${all.length} · Acquirenti: ${acq} · Venditori: ${ven}`;
+    }
+
+    // inizializza
+    updateCounter(getContacts());
   });
-
-  function getContacts() {
-    try {
-      return JSON.parse(localStorage.getItem('rubrica') || '[]');
-    } catch {
-      return [];
-    }
   }
 
-  function showRubrica(mode) {
-    const all = getContacts();
-    let filtered = all;
-
-    if (mode === 'acquirenti') {
-      filtered = all.filter(c => c.acquirente);
-    } else if (mode === 'venditori') {
-      filtered = all.filter(c => c.venditore);
-    } else if (mode === 'nuovo') {
-      document.getElementById('rubrica-dialog-overlay').style.display = 'flex';
-      return;
-    }
-
-    renderList(filtered);
-    updateCounter(all);
   }
-
-  function renderList(list) {
-    if (!rubricaList) return;
-    rubricaList.innerHTML = list.map(c => `
-      <div class="rubrica-row">
-        <strong>${c.nome || ''}</strong>
-        <span>${c.telefono || ''}</span>
-        <span>${c.email || ''}</span>
-      </div>
-    `).join('');
-  }
-
-  function updateCounter(all) {
-    const acq = all.filter(c => c.acquirente).length;
-    const ven = all.filter(c => c.venditore).length;
-    counter.textContent = `Totale: ${all.length} · Acquirenti: ${acq} · Venditori: ${ven}`;
-  }
-
-  // inizializza
-  updateCounter(getContacts());
-});
-}
 
 
 
