@@ -5084,4 +5084,119 @@ document.addEventListener('DOMContentLoaded', () => {
   } catch(err) {
     console.warn('[RUBRICA PRO] init error', err);
   }
+  /* ======================================================
+   MAPPA ADDON – STABILITÀ + RICERCA + SATELLITE
+   NON modifica altre sezioni del CRM
+====================================================== */
+
+(function () {
+
+  // Stato interno mappa (non globale invasivo)
+  const MAP_ADDON_STATE = {
+    initialized: false,
+    streetLayer: null,
+    satelliteLayer: null,
+    searchMarker: null
+  };
+
+  // salva riferimento all'init originale se esiste
+  const _initMappaOriginal = window.initMappa;
+
+  // override controllato
+  window.initMappa = function () {
+
+    // prima esegui init originale (marker, filtri, ecc.)
+    if (typeof _initMappaOriginal === 'function') {
+      _initMappaOriginal();
+    }
+
+    if (!window.MAP_STATE || !MAP_STATE.map) return;
+
+    // evita doppia inizializzazione
+    if (MAP_ADDON_STATE.initialized) {
+      MAP_STATE.map.invalidateSize();
+      return;
+    }
+
+    /* ===== BASE LAYERS ===== */
+
+    MAP_ADDON_STATE.streetLayer = L.tileLayer(
+      'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+      {
+        maxZoom: 19,
+        attribution: '© OpenStreetMap'
+      }
+    );
+
+    MAP_ADDON_STATE.satelliteLayer = L.tileLayer(
+      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      {
+        maxZoom: 19,
+        attribution: 'Tiles © Esri'
+      }
+    );
+
+    // aggiungi controllo layer solo una volta
+    L.control.layers(
+      {
+        'Strade': MAP_ADDON_STATE.streetLayer,
+        'Satellite': MAP_ADDON_STATE.satelliteLayer
+      },
+      {}
+    ).addTo(MAP_STATE.map);
+
+    /* ===== RICERCA INDIRIZZO ===== */
+
+    const searchControl = L.control({ position: 'topright' });
+
+    searchControl.onAdd = function () {
+      const div = L.DomUtil.create('div', 'leaflet-bar');
+      div.style.background = '#020617';
+      div.style.padding = '6px';
+
+      div.innerHTML = `
+        <input id="map-address-search"
+               type="text"
+               placeholder="Cerca indirizzo…"
+               style="width:180px;padding:4px;border-radius:6px;border:1px solid #374151;">
+      `;
+
+      L.DomEvent.disableClickPropagation(div);
+      return div;
+    };
+
+    searchControl.addTo(MAP_STATE.map);
+
+    document
+      .getElementById('map-address-search')
+      .addEventListener('keydown', function (e) {
+        if (e.key !== 'Enter') return;
+
+        const q = e.target.value.trim();
+        if (!q) return;
+
+        fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}`)
+          .then(r => r.json())
+          .then(res => {
+            if (!res || !res.length) return;
+
+            const lat = parseFloat(res[0].lat);
+            const lon = parseFloat(res[0].lon);
+
+            if (MAP_ADDON_STATE.searchMarker) {
+              MAP_STATE.map.removeLayer(MAP_ADDON_STATE.searchMarker);
+            }
+
+            MAP_ADDON_STATE.searchMarker = L.marker([lat, lon])
+              .addTo(MAP_STATE.map)
+              .bindPopup(q)
+              .openPopup();
+
+            MAP_STATE.map.setView([lat, lon], 16);
+          });
+      });
+
+    MAP_ADDON_STATE.initialized = true;
+  };
+
 })();
