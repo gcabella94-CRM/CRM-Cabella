@@ -4095,3 +4095,64 @@ document.addEventListener('DOMContentLoaded', () => {
   document.querySelector('.nav-item[data-view="rubrica"]')
     ?.addEventListener('click',()=>showRubrica('lista'));
 })();
+
+
+
+/* ====== RUBRICA DASHBOARD FORCE RENDER ====== */
+(function(){
+  const rubricaView = document.getElementById('view-rubrica');
+  if(!rubricaView) return;
+
+  let dash = document.getElementById('rubrica-dashboard-forced');
+  if(!dash){
+    dash = document.createElement('div');
+    dash.id = 'rubrica-dashboard-forced';
+    dash.style.marginBottom = '16px';
+    const counter = document.getElementById('rubrica-counter');
+    if(counter){
+      counter.replaceWith(dash);
+    } else {
+      rubricaView.prepend(dash);
+    }
+  }
+
+  function getContacts(){
+    try { return JSON.parse(localStorage.getItem('rubrica')||'[]'); }
+    catch { return []; }
+  }
+
+  function render(mode){
+    const a = getContacts();
+    const s = {
+      all:a.length,
+      acq:a.filter(c=>c.acquirente).length,
+      ven:a.filter(c=>c.venditore).length,
+      coll:a.filter(c=>c.collaboratore).length,
+      other:a.filter(c=>c.altro).length
+    };
+    dash.innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;">
+        ${card('Tutti i contatti',s.all,'lista')}
+        ${card('Acquirenti',s.acq,'acquirenti')}
+        ${card('Venditori',s.ven,'venditori')}
+        ${card('Collaboratori',s.coll,'collaboratori')}
+        ${card('Altro',s.other,'altro')}
+      </div>
+    `;
+    dash.querySelectorAll('[data-go]').forEach(c=>{
+      c.onclick = ()=>window.showRubrica(c.dataset.go);
+    });
+  }
+
+  function card(title,val,go){
+    return `<div data-go="${go}" style="
+      background:#111827;border:1px solid #1f2937;border-radius:12px;
+      padding:14px;cursor:pointer">
+      <div style="font-size:12px;color:#9ca3af">${title}</div>
+      <div style="font-size:22px;font-weight:600">${val}</div>
+    </div>`;
+  }
+
+  const nav = document.querySelector('.nav-item[data-view="rubrica"]');
+  nav && nav.addEventListener('click',()=>render('lista'));
+})();
