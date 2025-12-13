@@ -3898,69 +3898,200 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-/* ====== RUBRICA CRUSCOTTO + COLLABORATORI ====== */
-document.addEventListener('DOMContentLoaded', () => {
-  const rubricaList = document.getElementById('rubrica-list');
-  const counterBox = document.getElementById('rubrica-counter');
+/* ====== RUBRICA: CRUSCOTTO HOME + COLLABORATORI (FIX DEFINITIVO) ====== */
+(function(){
+  function qs(id){ return document.getElementById(id); }
 
-  if (!counterBox) return;
+  const rubricaView = qs('view-rubrica');
+  if (!rubricaView) return;
 
-  function getContacts() {
-    try {
-      return JSON.parse(localStorage.getItem('rubrica') || '[]');
-    } catch {
-      return [];
-    }
+  const counter = qs('rubrica-counter');
+  const list = qs('rubrica-list');
+  const submenu = qs('rubrica-submenu');
+
+  // aggiunge voce Collaboratori al menu laterale se manca
+  if (submenu && !submenu.querySelector('[data-rubrica-sub="collaboratori"]')) {
+    const div = document.createElement('div');
+    div.className = 'nav-item nav-item-sub';
+    div.dataset.rubricaSub = 'collaboratori';
+    div.innerHTML = `
+      <div class="nav-item-main">
+        <div class="nav-icon">🤝</div>
+        <div>
+          <div class="nav-label-title">Lista collaboratori</div>
+          <div class="nav-label-sub">Contatti collaboratori</div>
+        </div>
+      </div>`;
+    submenu.appendChild(div);
   }
 
-  function buildDashboard() {
+  function getContacts(){
+    try { return JSON.parse(localStorage.getItem('rubrica')||'[]'); }
+    catch { return []; }
+  }
+
+  function renderDashboard(){
+    if (!counter) return;
     const all = getContacts();
     const stats = {
       all: all.length,
-      acq: all.filter(c => c.acquirente).length,
-      ven: all.filter(c => c.venditore).length,
-      coll: all.filter(c => c.collaboratore).length,
-      other: all.filter(c => c.altro).length
+      acq: all.filter(c=>c.acquirente).length,
+      ven: all.filter(c=>c.venditore).length,
+      coll: all.filter(c=>c.collaboratore).length,
+      other: all.filter(c=>c.altro).length
     };
-
-    counterBox.innerHTML = `
+    counter.innerHTML = `
       <div class="rubrica-dashboard">
         <div class="rubrica-kpi" data-go="lista">👥 Tutti<br><strong>${stats.all}</strong></div>
         <div class="rubrica-kpi" data-go="acquirenti">🏡 Acquirenti<br><strong>${stats.acq}</strong></div>
         <div class="rubrica-kpi" data-go="venditori">🏠 Venditori<br><strong>${stats.ven}</strong></div>
         <div class="rubrica-kpi" data-go="collaboratori">🤝 Collaboratori<br><strong>${stats.coll}</strong></div>
         <div class="rubrica-kpi" data-go="altro">📌 Altro<br><strong>${stats.other}</strong></div>
-      </div>
-    `;
-
-    counterBox.querySelectorAll('.rubrica-kpi').forEach(kpi => {
-      kpi.addEventListener('click', () => {
-        showRubrica(kpi.dataset.go);
-      });
+      </div>`;
+    counter.querySelectorAll('.rubrica-kpi').forEach(k=>{
+      k.addEventListener('click', ()=>showRubrica(k.dataset.go));
     });
   }
 
-  // estendo la funzione showRubrica esistente
-  const originalShow = window.showRubrica;
-  window.showRubrica = function(mode) {
+  window.showRubrica = function(mode){
     const all = getContacts();
     let filtered = all;
+    if (mode==='acquirenti') filtered = all.filter(c=>c.acquirente);
+    if (mode==='venditori') filtered = all.filter(c=>c.venditore);
+    if (mode==='collaboratori') filtered = all.filter(c=>c.collaboratore);
+    if (mode==='altro') filtered = all.filter(c=>c.altro);
 
-    if (mode === 'acquirenti') filtered = all.filter(c => c.acquirente);
-    else if (mode === 'venditori') filtered = all.filter(c => c.venditore);
-    else if (mode === 'collaboratori') filtered = all.filter(c => c.collaboratore);
-    else if (mode === 'altro') filtered = all.filter(c => c.altro);
-
-    if (rubricaList && filtered) {
-      rubricaList.innerHTML = filtered.map(c => `
+    if (list){
+      list.innerHTML = filtered.map(c=>`
         <div class="rubrica-row">
-          <strong>${c.nome || ''}</strong>
-          <span>${c.telefono || ''}</span>
-          <span>${c.email || ''}</span>
+          <strong>${c.nome||''}</strong>
+          <span>${c.telefono||''}</span>
+          <span>${c.email||''}</span>
+        </div>`).join('');
+    }
+    renderDashboard();
+  };
+
+  // inizializzazione quando si entra in Rubrica
+  document.querySelector('.nav-item[data-view="rubrica"]')
+    ?.addEventListener('click', ()=>{ showRubrica('lista'); });
+
+})();
+
+
+
+/* ====== RUBRICA: CRUSCOTTO HOME (DESIGN) ====== */
+(function(){
+  const view = document.getElementById('view-rubrica');
+  if(!view) return;
+
+  const counter = document.getElementById('rubrica-counter');
+  const list = document.getElementById('rubrica-list');
+
+  function getContacts(){
+    try { return JSON.parse(localStorage.getItem('rubrica')||'[]'); }
+    catch { return []; }
+  }
+
+  function stats(){
+    const a = getContacts();
+    return {
+      all: a.length,
+      acq: a.filter(c=>c.acquirente).length,
+      ven: a.filter(c=>c.venditore).length,
+      coll: a.filter(c=>c.collaboratore).length,
+      other: a.filter(c=>c.altro).length
+    };
+  }
+
+  function renderDashboard(){
+    if(!counter) return;
+    const s = stats();
+    counter.innerHTML = `
+      <div class="rubrica-dashboard-grid">
+        <div class="rubrica-card" data-go="lista">
+          <div class="rubrica-card-title">Tutti i contatti</div>
+          <div class="rubrica-card-value">${s.all}</div>
+        </div>
+        <div class="rubrica-card" data-go="acquirenti">
+          <div class="rubrica-card-title">Acquirenti</div>
+          <div class="rubrica-card-value">${s.acq}</div>
+        </div>
+        <div class="rubrica-card" data-go="venditori">
+          <div class="rubrica-card-title">Venditori</div>
+          <div class="rubrica-card-value">${s.ven}</div>
+        </div>
+        <div class="rubrica-card" data-go="collaboratori">
+          <div class="rubrica-card-title">Collaboratori</div>
+          <div class="rubrica-card-value">${s.coll}</div>
+        </div>
+        <div class="rubrica-card" data-go="altro">
+          <div class="rubrica-card-title">Altro</div>
+          <div class="rubrica-card-value">${s.other}</div>
+        </div>
+      </div>
+    `;
+    counter.querySelectorAll('.rubrica-card').forEach(c=>{
+      c.addEventListener('click',()=>showRubrica(c.dataset.go));
+    });
+  }
+
+  window.showRubrica = function(mode){
+    const all = getContacts();
+    let f = all;
+    if(mode==='acquirenti') f = all.filter(c=>c.acquirente);
+    if(mode==='venditori') f = all.filter(c=>c.venditore);
+    if(mode==='collaboratori') f = all.filter(c=>c.collaboratore);
+    if(mode==='altro') f = all.filter(c=>c.altro);
+
+    if(list){
+      list.innerHTML = f.map(c=>`
+        <div class="rubrica-row">
+          <strong>${c.nome||''}</strong>
+          <span>${c.telefono||''}</span>
+          <span>${c.email||''}</span>
         </div>
       `).join('');
     }
+    renderDashboard();
   };
 
-  buildDashboard();
-});
+  // inject minimal CSS once
+  if(!document.getElementById('rubrica-dashboard-style')){
+    const style = document.createElement('style');
+    style.id = 'rubrica-dashboard-style';
+    style.innerHTML = `
+      .rubrica-dashboard-grid{
+        display:grid;
+        grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+        gap:12px;
+        margin-bottom:14px;
+      }
+      .rubrica-card{
+        background:#111827;
+        border:1px solid #1f2937;
+        border-radius:12px;
+        padding:14px;
+        cursor:pointer;
+        transition:all .15s ease;
+      }
+      .rubrica-card:hover{
+        transform:translateY(-2px);
+        border-color:#3b82f6;
+      }
+      .rubrica-card-title{
+        font-size:12px;
+        color:#9ca3af;
+        margin-bottom:6px;
+      }
+      .rubrica-card-value{
+        font-size:22px;
+        font-weight:600;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  document.querySelector('.nav-item[data-view="rubrica"]')
+    ?.addEventListener('click',()=>showRubrica('lista'));
+})();
