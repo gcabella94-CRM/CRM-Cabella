@@ -3378,9 +3378,122 @@ ${footerHtml}
     let mappaUserInteracted = false;
     let mappaAutoFitted = false;
     let mappaLastFitSig = '';
+
+
+    // Marker ricerca indirizzo (Nominatim)
+    let mappaSearchMarker = null;
+
+    function ensureMappaSearchUI() {
+      const actions = document.querySelector('#view-mappa .card .card-header .card-actions');
+      if (!actions) return;
+
+      // Evita duplicati
+      if (document.getElementById('mappa-address-search')) return;
+
+      const wrap = document.createElement('div');
+      wrap.className = 'form-group';
+      wrap.id = 'mappa-address-search';
+      wrap.style.minWidth = '260px';
+
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.id = 'mappa-search';
+      input.placeholder = 'Cerca indirizzo…';
+      input.style.width = '100%';
+
+      const btnRow = document.createElement('div');
+      btnRow.style.display = 'flex';
+      btnRow.style.gap = '6px';
+      btnRow.style.marginTop = '4px';
+
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn btn-sm';
+      btn.id = 'mappa-search-btn';
+      btn.textContent = 'Cerca';
+
+      const btnClear = document.createElement('button');
+      btnClear.type = 'button';
+      btnClear.className = 'btn btn-sm btn-ghost';
+      btnClear.id = 'mappa-search-clear';
+      btnClear.textContent = 'Pulisci';
+
+      btnRow.appendChild(btn);
+      btnRow.appendChild(btnClear);
+
+      wrap.appendChild(input);
+      wrap.appendChild(btnRow);
+
+      // Inserisci all'inizio dei controlli per non spostare troppo la UI
+      actions.insertBefore(wrap, actions.firstChild);
+
+      const run = () => {
+        const q = (input.value || '').trim();
+        if (!q) return;
+        searchAddressOnMap(q);
+      };
+
+      btn.addEventListener('click', run);
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          run();
+        }
+      });
+
+      btnClear.addEventListener('click', () => {
+        input.value = '';
+        if (mappaSearchMarker && mappa) {
+          try { mappa.removeLayer(mappaSearchMarker); } catch {}
+        }
+        mappaSearchMarker = null;
+      });
+    }
+
+    async function searchAddressOnMap(query) {
+      if (!mappa) return;
+      const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&addressdetails=1&q=' + encodeURIComponent(query);
+
+      try {
+        // Nota: Nominatim ha policy anti-abuso; evitiamo chiamate ripetute inutili
+        const res = await fetch(url, { method: 'GET' });
+        const data = await res.json();
+        if (!Array.isArray(data) || !data.length) {
+          alert('Nessun risultato trovato per: ' + query);
+          return;
+        }
+        const hit = data[0];
+        const lat = Number(hit.lat);
+        const lon = Number(hit.lon);
+        if (!isFinite(lat) || !isFinite(lon)) {
+          alert('Risultato non valido.');
+          return;
+        }
+
+        const label = hit.display_name || query;
+
+        if (mappaSearchMarker) {
+          try { mappa.removeLayer(mappaSearchMarker); } catch {}
+          mappaSearchMarker = null;
+        }
+
+        mappaSearchMarker = L.marker([lat, lon], { title: label });
+        mappaSearchMarker.addTo(mappa);
+        mappaSearchMarker.bindPopup('<strong>📍 Ricerca</strong><br>' + escapeHtml(label)).openPopup();
+
+        // Centra con un po' di zoom
+        mappa.setView([lat, lon], Math.max(14, mappa.getZoom() || 14), { animate: true });
+      } catch (e) {
+        console.warn('[MAPPA] Errore ricerca indirizzo', e);
+        alert('Errore durante la ricerca indirizzo. Controlla la connessione.');
+      }
+    }
+
 function initMappa() {
       const mapEl = document.getElementById('map');
       if (!mapEl) return;
+      // UI ricerca indirizzo
+      ensureMappaSearchUI();
 
       // Se la mappa esiste già: evita re-init e forza ricalcolo dimensioni (Leaflet in tab nascosti fa spesso “mappa grigia”)
       if (mappa) {
