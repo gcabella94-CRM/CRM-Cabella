@@ -4156,3 +4156,185 @@ document.addEventListener('DOMContentLoaded', () => {
   const nav = document.querySelector('.nav-item[data-view="rubrica"]');
   nav && nav.addEventListener('click',()=>render('lista'));
 })();
+
+
+
+/* ====== RUBRICA DASHBOARD: UX MIGLIORATA (CLICK, 1 RIGA, AZIONI SOTTO) ====== */
+(function(){
+  const rubricaView = document.getElementById('view-rubrica');
+  if(!rubricaView) return;
+
+  // Inject CSS once
+  if(!document.getElementById('rubrica-dashboard-ux-style')){
+    const style = document.createElement('style');
+    style.id = 'rubrica-dashboard-ux-style';
+    style.textContent = `
+      /* Nasconde i bottoni lista/nuovo/acq/vend sotto il cruscotto (tabs) */
+      .rubrica-subnav{ display:none !important; }
+
+      /* Cruscotto: una riga sola */
+      #rubrica-dashboard-forced .rb-row{
+        display:flex;
+        gap:10px;
+        flex-wrap:nowrap;
+        overflow-x:auto;
+        padding-bottom:2px;
+        -webkit-overflow-scrolling:touch;
+      }
+      #rubrica-dashboard-forced .rb-card{
+        flex:1 0 140px;
+        min-width:140px;
+        background:#111827;
+        border:1px solid #1f2937;
+        border-radius:12px;
+        padding:10px 12px;
+        cursor:pointer;
+        user-select:none;
+        transition:transform .12s ease, border-color .12s ease, box-shadow .12s ease;
+      }
+      #rubrica-dashboard-forced .rb-card:hover{
+        border-color:#334155;
+      }
+      #rubrica-dashboard-forced .rb-card:active{
+        transform:scale(.98);
+      }
+      #rubrica-dashboard-forced .rb-card.rb-active{
+        border-color:#3b82f6;
+        box-shadow:0 0 0 3px rgba(59,130,246,.18);
+      }
+      #rubrica-dashboard-forced .rb-title{
+        font-size:11px;
+        color:#9ca3af;
+        margin-bottom:6px;
+        white-space:nowrap;
+        overflow:hidden;
+        text-overflow:ellipsis;
+      }
+      #rubrica-dashboard-forced .rb-value{
+        font-size:18px;
+        font-weight:700;
+        line-height:1.1;
+      }
+
+      /* Barra azioni sotto il cruscotto */
+      #rubrica-dashboard-actions{
+        display:flex;
+        gap:10px;
+        align-items:center;
+        flex-wrap:wrap;
+        margin:10px 0 12px 0;
+      }
+      #rubrica-dashboard-actions .search-input{
+        flex:1 1 260px;
+        min-width:220px;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  const dash = document.getElementById('rubrica-dashboard-forced');
+  if(!dash) return;
+
+  // Create/ensure actions bar right under dashboard
+  let actions = document.getElementById('rubrica-dashboard-actions');
+  if(!actions){
+    actions = document.createElement('div');
+    actions.id = 'rubrica-dashboard-actions';
+    dash.insertAdjacentElement('afterend', actions);
+  }
+
+  // Move search + clear under dashboard (keep same elements, so listeners remain)
+  const search = document.getElementById('rubrica-filter');
+  const clear = document.getElementById('rubrica-filter-clear');
+
+  // Create a "Nuovo contatto" button under dashboard that triggers the existing one
+  let newBtn = document.getElementById('rubrica-new-btn');
+  if(newBtn){
+    // Hide the header button to avoid duplicates
+    newBtn.style.display = 'none';
+  }
+
+  let newBtnProxy = document.getElementById('rubrica-new-btn-proxy');
+  if(!newBtnProxy){
+    newBtnProxy = document.createElement('button');
+    newBtnProxy.id = 'rubrica-new-btn-proxy';
+    newBtnProxy.className = 'btn btn-sm btn-primary';
+    newBtnProxy.textContent = '+ Nuovo contatto';
+    newBtnProxy.addEventListener('click', () => {
+      // Open the existing dialog directly (robusto anche se il bottone originale è nascosto)
+      const overlay = document.getElementById('rubrica-dialog-overlay');
+      if(overlay) overlay.style.display = 'flex';
+      // Focus sul primo campo
+      setTimeout(()=>document.getElementById('rubrica-nome')?.focus(), 50);
+    });
+  }
+
+  // Rebuild actions bar
+  function renderActions(){
+    actions.innerHTML = '';
+    if(search) actions.appendChild(search);
+    if(clear) actions.appendChild(clear);
+    actions.appendChild(newBtnProxy);
+  }
+
+  // Enhance dashboard rendering with active click effect
+  const originalShow = window.showRubrica;
+  window.showRubrica = function(mode){
+    // call existing behavior if present
+    if(typeof originalShow === 'function'){
+      originalShow(mode);
+    }
+    // set active on cards
+    dash.querySelectorAll('.rb-card').forEach(el=>{
+      el.classList.toggle('rb-active', el.dataset.go === mode || (mode==='lista' && el.dataset.go==='lista'));
+    });
+    renderActions();
+  };
+
+  // Patch the card markup produced by the FORCE renderer: upgrade classnames if needed
+  function upgradeDashboardMarkup(){
+    // if current markup doesn't have rb-row/rb-card, rewrite it based on current numbers
+    const a = (function(){
+      try { return JSON.parse(localStorage.getItem('rubrica')||'[]'); } catch { return []; }
+    })();
+    const s = {
+      all:a.length,
+      acq:a.filter(c=>c.acquirente).length,
+      ven:a.filter(c=>c.venditore).length,
+      coll:a.filter(c=>c.collaboratore).length,
+      other:a.filter(c=>c.altro).length
+    };
+    dash.innerHTML = `
+      <div class="rb-row">
+        ${card('Tutti i contatti',s.all,'lista')}
+        ${card('Acquirenti',s.acq,'acquirenti')}
+        ${card('Venditori',s.ven,'venditori')}
+        ${card('Collaboratori',s.coll,'collaboratori')}
+        ${card('Altro',s.other,'altro')}
+      </div>
+    `;
+    dash.querySelectorAll('.rb-card').forEach(c=>{
+      c.addEventListener('click',()=>window.showRubrica(c.dataset.go));
+    });
+  }
+
+  function card(title,val,go){
+    return `<div class="rb-card" data-go="${go}">
+      <div class="rb-title">${title}</div>
+      <div class="rb-value">${val}</div>
+    </div>`;
+  }
+
+  // Ensure markup upgraded when entering rubrica
+  const nav = document.querySelector('.nav-item[data-view="rubrica"]');
+  if(nav){
+    nav.addEventListener('click', ()=>{
+      upgradeDashboardMarkup();
+      window.showRubrica('lista');
+    });
+  }
+
+  // Also run once if rubrica already visible
+  upgradeDashboardMarkup();
+  renderActions();
+})();
