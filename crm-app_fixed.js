@@ -7,7 +7,7 @@
     staff: 'crm10_staff',
     omi: 'crm10_omi',
     contatti: 'crm10_contatti',      // rubrica contatti proprietari
-    intestazioni: 'crm10_intestazioni' // archivio header+footer per documenti IA
+    intestazioni: 'crm10_intestazioni',  // archivio header+footer per documenti IA
     poligoni: 'crm10_mappa_poligoni' // aree ricerca + condomini (poligoni)
   };
 
