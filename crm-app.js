@@ -3825,4 +3825,16 @@ document.addEventListener('DOMContentLoaded', init);
       highlightRowById('notizie', id);
     }
 
-// (Rubrica legacy menu laterale rimosso: unificato su crm10_contatti)
+
+
+
+
+
+/* ====== RUBRICA: CRUSCOTTO HOME + COLLABORATORI (FIX DEFINITIVO) ====== */
+
+
+/* ====== RUBRICA: CRUSCOTTO HOME (DESIGN) ====== */
+
+
+
+
