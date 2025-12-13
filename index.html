@@ -531,6 +531,11 @@
                       <input type="text" id="imm-provincia" placeholder="Es. MI">
                     </div>
 
+<div class="form-group">
+  <label>Condominio (nome)</label>
+  <input type="text" id="imm-condominio" placeholder="Es. Condominio Via Roma 12">
+</div>
+
                     <!-- Tipologia / categoria -->
                     <div class="form-group">
                       <label>Tipologia contratto</label>
@@ -1043,6 +1048,12 @@
                   </div>
                   <button class="btn btn-sm" id="mappa-geocode-imm">Geocod. immobili</button>
                   <button class="btn btn-sm" id="mappa-geocode-not">Geocod. notizie</button>
+
+<div class="form-group" style="min-width:150px;font-size:11px;">
+  <label><input type="checkbox" id="mappa-poligoni-toggle" checked> Mostra poligoni</label>
+</div>
+<button class="btn btn-sm" id="mappa-draw-area" title="Disegna un poligono per delimitare un'area di ricerca">✏️ Area ricerca</button>
+<button class="btn btn-sm" id="mappa-draw-condominio" title="Disegna un poligono-condominio e assegnagli un nome">🏢 Nuovo condominio</button>
                 <div id="mappa-poligoni-controls-anchor"></div>
 </div>
               </div>
@@ -1068,8 +1079,30 @@
                     <span class="map-legend-dot" style="background:#f97316;"></span>
                     <span>Notizie</span>
                   </div>
-                </div>
+                
+</div>
 
+<!-- Pannello condomini -->
+<div id="mappa-condomini-panel" class="mappa-condomini-panel">
+  <div class="mappa-condomini-header">
+    <strong>🏢 Condomini</strong>
+    <span class="muted" style="font-size:11px;">(clicca per zoom)</span>
+  </div>
+  <div id="mappa-condomini-list" class="mappa-condomini-list"></div>
+</div>
+
+<div id="mappa-condominio-detail" class="mappa-condominio-detail hidden">
+  <div class="mappa-condominio-detail-header">
+    <div>
+      <div id="mappa-condominio-title" style="font-weight:700;">Condominio</div>
+      <div id="mappa-condominio-sub" class="muted" style="font-size:12px;"></div>
+    </div>
+    <button class="btn btn-ghost btn-sm" id="mappa-condominio-close">✕</button>
+  </div>
+  <div id="mappa-condominio-body" class="mappa-condominio-body"></div>
+</div>
+
+<!-- Pannello dettaglio -->
                 <!-- Pannello dettaglio -->
                 <div id="map-detail-panel" class="map-detail-panel hidden">
                   <div class="map-detail-header">
@@ -1357,7 +1390,7 @@
             
 
 
-<script src="crm-app_fixed.js"></script>
+<script src="crm-app.js"></script>
 
 </body>
 </html>

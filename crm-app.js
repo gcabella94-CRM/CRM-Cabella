@@ -7,7 +7,7 @@
     staff: 'crm10_staff',
     omi: 'crm10_omi',
     contatti: 'crm10_contatti',      // rubrica contatti proprietari
-    intestazioni: 'crm10_intestazioni',  // archivio header+footer per documenti IA
+    intestazioni: 'crm10_intestazioni', // archivio header+footer per documenti IA
     poligoni: 'crm10_mappa_poligoni' // aree ricerca + condomini (poligoni)
   };
 
@@ -3764,6 +3764,15 @@ ${footerHtml}
     // Marker ricerca indirizzo (Nominatim)
     let mappaSearchMarker = null;
 
+    // Poligoni: Aree ricerca + Condomini
+    let mappaPoligoniLayer = null;
+    let mappaPoligoniVisible = true;
+    let mappaDrawMode = null; // 'area' | 'condominio' | null
+    let mappaDrawPoints = [];
+    let mappaDrawTemp = null;
+    let mappaSelectedCondominio = null;
+
+
     function ensureMappaSearchUI() {
       const actions = document.querySelector('#view-mappa .card .card-header .card-actions');
       if (!actions) return;
@@ -3980,6 +3989,265 @@ function initMappa() {
       renderCondominiList();
     }
 
+
+/* ====== MAPPA: POLIGONI (AREE RICERCA + CONDOMINI) ====== */
+
+function initMappaPoligoni() {
+  if (!mappa) return;
+
+  // layer poligoni (una sola volta)
+  if (!mappaPoligoniLayer) {
+    mappaPoligoniLayer = L.layerGroup();
+    mappaPoligoniLayer.addTo(mappa);
+  }
+
+  // UI listeners (una sola volta)
+  const toggle = document.getElementById('mappa-poligoni-toggle');
+  if (toggle && !toggle.__bound_change) {
+    toggle.addEventListener('change', () => {
+      mappaPoligoniVisible = !!toggle.checked;
+      if (!mappaPoligoniLayer) return;
+      if (mappaPoligoniVisible) mappaPoligoniLayer.addTo(mappa);
+      else mappa.removeLayer(mappaPoligoniLayer);
+    });
+    toggle.__bound_change = true;
+  }
+
+  const btnArea = document.getElementById('mappa-draw-area');
+  if (btnArea && !btnArea.__bound_click) {
+    btnArea.addEventListener('click', () => startDrawPolygon('area'));
+    btnArea.__bound_click = true;
+  }
+  const btnCondo = document.getElementById('mappa-draw-condominio');
+  if (btnCondo && !btnCondo.__bound_click) {
+    btnCondo.addEventListener('click', () => startDrawPolygon('condominio'));
+    btnCondo.__bound_click = true;
+  }
+
+  const closeCondo = document.getElementById('mappa-condominio-close');
+  if (closeCondo && !closeCondo.__bound_click) {
+    closeCondo.addEventListener('click', () => hideCondominioDetail());
+    closeCondo.__bound_click = true;
+  }
+
+  // disegno: click aggiunge vertice, doppio click chiude
+  if (!mappa.__bound_poligoni_click) {
+    mappa.on('click', (ev) => {
+      if (!mappaDrawMode) return;
+      mappaDrawPoints.push([ev.latlng.lat, ev.latlng.lng]);
+      updateDrawTemp();
+    });
+    mappa.on('dblclick', (ev) => {
+      if (!mappaDrawMode) return;
+      // evita zoom su dblclick mentre disegno
+      try { L.DomEvent.stop(ev); } catch {}
+      finalizeDrawPolygon();
+    });
+    mappa.__bound_poligoni_click = true;
+  }
+
+  renderMappaPoligoni();
+  renderMappaCondominiList();
+}
+
+function startDrawPolygon(mode) {
+  if (!mappa) return;
+  mappaDrawMode = mode;
+  mappaDrawPoints = [];
+  if (mappaDrawTemp) {
+    try { mappa.removeLayer(mappaDrawTemp); } catch {}
+    mappaDrawTemp = null;
+  }
+  hideCondominioDetail();
+  alert(mode === 'area'
+    ? 'Disegno AREA DI RICERCA: clicca per aggiungere punti, doppio click per chiudere.'
+    : 'Disegno CONDOMINIO: clicca per aggiungere punti, doppio click per chiudere e inserire il nome.');
+}
+
+function updateDrawTemp() {
+  if (!mappa) return;
+  if (mappaDrawTemp) {
+    try { mappa.removeLayer(mappaDrawTemp); } catch {}
+    mappaDrawTemp = null;
+  }
+  if (mappaDrawPoints.length < 2) return;
+  mappaDrawTemp = L.polyline(mappaDrawPoints, { weight: 2, dashArray: '6,6' }).addTo(mappa);
+}
+
+function finalizeDrawPolygon() {
+  if (!mappa) return;
+  if (mappaDrawPoints.length < 3) {
+    alert('Servono almeno 3 punti per creare un poligono.');
+    return;
+  }
+
+  const mode = mappaDrawMode;
+  mappaDrawMode = null;
+
+  if (mappaDrawTemp) {
+    try { mappa.removeLayer(mappaDrawTemp); } catch {}
+    mappaDrawTemp = null;
+  }
+
+  let nome = '';
+  if (mode === 'condominio') {
+    nome = (prompt('Nome condominio:', '') || '').trim();
+    if (!nome) {
+      alert('Nome condominio non valido. Poligono non salvato.');
+      mappaDrawPoints = [];
+      return;
+    }
+  }
+
+  const poly = {
+    id: genId('poly'),
+    tipo: mode, // 'area' | 'condominio'
+    nome: nome,
+    latlngs: mappaDrawPoints.slice(0),
+    createdAt: new Date().toISOString()
+  };
+
+  if (!Array.isArray(mappaPoligoni)) mappaPoligoni = [];
+  mappaPoligoni.push(poly);
+  saveList(STORAGE_KEYS.poligoni || 'crm10_mappa_poligoni', mappaPoligoni);
+
+  mappaDrawPoints = [];
+  renderMappaPoligoni();
+  renderMappaCondominiList();
+}
+
+function renderMappaPoligoni() {
+  if (!mappa || !mappaPoligoniLayer) return;
+
+  mappaPoligoniLayer.clearLayers();
+
+  (mappaPoligoni || []).forEach(poly => {
+    const isCondo = poly.tipo === 'condominio';
+    const color = isCondo ? '#38bdf8' : '#a78bfa';
+
+    const leafletPoly = L.polygon(poly.latlngs || [], {
+      color,
+      weight: 2,
+      fillColor: color,
+      fillOpacity: isCondo ? 0.18 : 0.08
+    });
+
+    leafletPoly.on('click', () => {
+      if (isCondo) {
+        openCondominioDetail(poly);
+      } else {
+        hideCondominioDetail();
+      }
+    });
+
+    const label = isCondo ? `🏢 ${poly.nome || 'Condominio'}` : '✏️ Area ricerca';
+    leafletPoly.bindTooltip(label, { sticky: true });
+
+    leafletPoly.addTo(mappaPoligoniLayer);
+  });
+
+  // rispetta toggle visibilità
+  if (!mappaPoligoniVisible) {
+    try { mappa.removeLayer(mappaPoligoniLayer); } catch {}
+  } else {
+    try { mappaPoligoniLayer.addTo(mappa); } catch {}
+  }
+}
+
+function renderMappaCondominiList() {
+  const listEl = document.getElementById('mappa-condomini-list');
+  if (!listEl) return;
+
+  const condos = (mappaPoligoni || []).filter(p => p.tipo === 'condominio');
+  if (!condos.length) {
+    listEl.innerHTML = '<div class="muted" style="font-size:12px;">Nessun condominio censito.</div>';
+    return;
+  }
+
+  listEl.innerHTML = condos.map(c => {
+    const count = countImmobiliInCondominio(c.nome);
+    return `
+      <div class="mappa-condomini-item" data-condo="${escapeHtml(c.id)}">
+        <div>
+          <div style="font-weight:700;">${escapeHtml(c.nome || 'Condominio')}</div>
+          <small>${count} immobili associati</small>
+        </div>
+        <div style="opacity:.85;">↗</div>
+      </div>
+    `;
+  }).join('');
+
+  listEl.querySelectorAll('.mappa-condomini-item').forEach(el => {
+    el.addEventListener('click', () => {
+      const id = el.getAttribute('data-condo');
+      const poly = (mappaPoligoni || []).find(p => p.id === id);
+      if (!poly || !mappa) return;
+      try {
+        const bounds = L.polygon(poly.latlngs || []).getBounds();
+        if (bounds && bounds.isValid && bounds.isValid()) mappa.fitBounds(bounds, { padding: [40, 40] });
+      } catch {}
+      openCondominioDetail(poly);
+    });
+  });
+}
+
+function countImmobiliInCondominio(nomeCondo) {
+  if (!nomeCondo) return 0;
+  return (immobili || []).filter(i => (i.condominio || '').trim().toLowerCase() === nomeCondo.trim().toLowerCase()).length;
+}
+
+function getImmobiliInCondominio(nomeCondo) {
+  if (!nomeCondo) return [];
+  const key = nomeCondo.trim().toLowerCase();
+  return (immobili || []).filter(i => (i.condominio || '').trim().toLowerCase() === key);
+}
+
+function openCondominioDetail(poly) {
+  mappaSelectedCondominio = poly;
+
+  const panel = document.getElementById('mappa-condominio-detail');
+  const title = document.getElementById('mappa-condominio-title');
+  const sub = document.getElementById('mappa-condominio-sub');
+  const body = document.getElementById('mappa-condominio-body');
+  if (!panel || !title || !sub || !body) return;
+
+  const list = getImmobiliInCondominio(poly.nome || '');
+  title.textContent = `🏢 ${poly.nome || 'Condominio'}`;
+  sub.textContent = `${list.length} immobili associati (campo “Condominio” nella scheda immobile)`;
+
+  if (!list.length) {
+    body.innerHTML = '<div class="muted" style="font-size:12px;">Nessun immobile associato. Inserisci il nome condominio nella scheda immobile.</div>';
+  } else {
+    body.innerHTML = list.map(imm => {
+      const ind = [imm.indirizzo || '', imm.citta || '', imm.provincia || ''].filter(Boolean).join(', ');
+      return `
+        <div class="mappa-condominio-imm">
+          <div class="title">${escapeHtml(imm.rif || 'Immobile')}</div>
+          <div class="row"><span>${escapeHtml(ind || '—')}</span><span>${imm.prezzo ? formatEuro(imm.prezzo) : ''}</span></div>
+          <div style="display:flex;justify-content:flex-end;margin-top:6px;">
+            <button class="btn btn-xs" data-open-imm="${escapeHtml(imm.id)}">Apri</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+    body.querySelectorAll('[data-open-imm]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.getAttribute('data-open-imm');
+        try { openSchedaImmobile(id); } catch {}
+      });
+    });
+  }
+
+  panel.classList.remove('hidden');
+}
+
+function hideCondominioDetail() {
+  const panel = document.getElementById('mappa-condominio-detail');
+  if (panel) panel.classList.add('hidden');
+  mappaSelectedCondominio = null;
+}
+
+
     function hideMapDetail() {
       const panel = document.getElementById('map-detail-panel');
       if (panel) panel.classList.add('hidden');
@@ -4186,6 +4454,7 @@ function initMappa() {
 
       alert(`Geocodifica completata: aggiornati ${count} ${isImmobili ? 'immobili' : 'notizie'}.`);
       renderMappa();
+      initMappaPoligoni();
     }
 
     // Eventi filtri mappa
@@ -4215,6 +4484,7 @@ function initMappa() {
     omi = loadList(STORAGE_KEYS.omi);
     contatti = loadList(STORAGE_KEYS.contatti);
     intestazioni = loadList(STORAGE_KEYS.intestazioni || 'crm10_intestazioni');
+    mappaPoligoni = loadList(STORAGE_KEYS.poligoni || 'crm10_mappa_poligoni');
     mappaPoligoni = loadList(STORAGE_KEYS.poligoni || 'crm10_mappa_poligoni');
   }
 
