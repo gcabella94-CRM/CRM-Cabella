@@ -5111,7 +5111,9 @@ document.addEventListener('DOMContentLoaded', () => {
   } catch(err) {
     console.warn('[RUBRICA PRO] init error', err);
   }
-  /* ======================================================
+  })();
+
+/* ======================================================
    MAPPA ADDON – STABILITÀ + RICERCA + SATELLITE
    NON modifica altre sezioni del CRM
 ====================================================== */
