@@ -3372,6 +3372,10 @@ ${footerHtml}
     let mappa = null;
     let mappaCluster = null;
     let mappaSelectedItem = null;
+    let mappaBaseStreet = null;
+    let mappaBaseSatellite = null;
+    let mappaLayerControl = null;
+
 
     // Stato interno mappa (evita doppie inizializzazioni / fitBounds aggressivi)
     let mappaUiBound = false;
@@ -3505,10 +3509,33 @@ function initMappa() {
       // Prima inizializzazione
       mappa = L.map('map', { preferCanvas: true }).setView([45.0703, 7.6869], 8); // Nord Ovest Italia
 
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      // Base layers (Strade / Satellite)
+      mappaBaseStreet = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
         attribution: '© OpenStreetMap'
-      }).addTo(mappa);
+      });
+
+      // Satellite (Esri World Imagery) – no API key
+      mappaBaseSatellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        maxZoom: 19,
+        attribution: 'Tiles © Esri'
+      });
+
+      // Default: Strade
+      mappaBaseStreet.addTo(mappa);
+
+      // Toggle layer control (added once)
+      if (!mappaLayerControl) {
+        try {
+          mappaLayerControl = L.control.layers(
+            { 'Strade': mappaBaseStreet, 'Satellite': mappaBaseSatellite },
+            {},
+            { position: 'topright' }
+          ).addTo(mappa);
+        } catch (e) {
+          console.warn('[MAPPA] Layer control non disponibile:', e);
+        }
+      }
 
       mappaCluster = L.markerClusterGroup();
       mappa.addLayer(mappaCluster);
