@@ -518,6 +518,11 @@
                     </div>
 
                     <div class="form-group">
+                      <label>Condominio</label>
+                      <input type="text" id="imm-condominio" placeholder="Es. Condominio 'Aurora'">
+                    </div>
+
+                    <div class="form-group">
                       <label>Città</label>
                       <input type="text" id="imm-citta" placeholder="Città">
                     </div>
@@ -1038,12 +1043,22 @@
                   </div>
                   <button class="btn btn-sm" id="mappa-geocode-imm">Geocod. immobili</button>
                   <button class="btn btn-sm" id="mappa-geocode-not">Geocod. notizie</button>
-                </div>
+                <div id="mappa-poligoni-controls-anchor"></div>
+</div>
               </div>
 
               <div class="card-body" style="padding:0;">
                 <div id="map" style="width:100%;height:480px;border-radius:0 0 8px 8px;"></div>
 
+
+                <!-- Pannello condomini (poligoni-condominio) -->
+                <div id="mappa-condomini-panel" class="mappa-condomini-panel hidden">
+                  <div class="mappa-condomini-header">
+                    <div><strong>📂 Lista condomini</strong></div>
+                    <button class="btn btn-xs btn-ghost" id="mappa-condomini-close">✕</button>
+                  </div>
+                  <div id="mappa-condomini-list" class="mappa-condomini-list"></div>
+                </div>
                 <div class="map-legend">
                   <div class="map-legend-row">
                     <span class="map-legend-dot" style="background:#22c55e;"></span>
