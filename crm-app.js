@@ -10,47 +10,6 @@
     intestazioni: 'crm10_intestazioni' // archivio header+footer per documenti IA
   };
 
-  // ====== RUBRICA: modalità unica (avanzata) ======
-  // La Rubrica legacy (localStorage key 'rubrica' + submenu laterale) è disattivata per evitare conflitti.
-  const ENABLE_LEGACY_RUBRICA = false;
-
-  // Migrazione 1-shot: se esiste la rubrica legacy ma la rubrica avanzata è vuota, importa i contatti.
-  function migrateLegacyRubricaToAdvancedIfNeeded() {
-    try {
-      const legacyRaw = localStorage.getItem('rubrica');
-      if (!legacyRaw) return;
-      const legacy = JSON.parse(legacyRaw || '[]');
-      if (!Array.isArray(legacy) || legacy.length === 0) return;
-
-      const advancedRaw = localStorage.getItem(STORAGE_KEYS.contatti);
-      const advanced = advancedRaw ? JSON.parse(advancedRaw) : [];
-      if (Array.isArray(advanced) && advanced.length > 0) return;
-
-      const migrated = legacy.map(c => ({
-        id: (c.id && String(c.id)) || genId('cont'),
-        nome: (c.nome || c.nominativo || '').toString().trim() || 'Contatto',
-        telefono: (c.telefono || c.tel || '').toString().trim(),
-        email: (c.email || '').toString().trim(),
-        indirizzo: (c.indirizzo || '').toString().trim(),
-        citta: (c.citta || '').toString().trim(),
-        provincia: (c.provincia || '').toString().trim(),
-        note: (c.note || '').toString().trim(),
-        provenienza: 'legacy',
-        isAcquirente: !!(c.acquirente || c.isAcquirente),
-        isVenditore: !!(c.venditore || c.isVenditore),
-        isCollaboratore: !!(c.collaboratore || c.isCollaboratore),
-        isAltro: !!(c.altro || c.isAltro)
-      }));
-
-      localStorage.setItem(STORAGE_KEYS.contatti, JSON.stringify(migrated));
-      // NON cancelliamo la key 'rubrica' per sicurezza; ma la legacy UI è disattivata.
-    } catch (e) {
-      console.warn('Migrazione rubrica legacy fallita:', e);
-    }
-  }
-
-
-
   let immobili = [];
   let notizie = [];
   let attivita = [];
@@ -133,7 +92,13 @@
       });
       document.querySelectorAll('.nav-item').forEach(item => {
         item.classList.toggle('active', item.dataset.view === viewId);
-      }); 
+      });
+
+      // mostra/nasconde il submenu Rubrica
+      const subMenu = document.getElementById('rubrica-submenu');
+      if (subMenu) {
+        subMenu.style.display = (viewId === 'rubrica') ? 'block' : 'none';
+      }
 
       const titleEl = document.getElementById('topbar-title');
       const subEl = document.getElementById('topbar-sub');
@@ -3600,7 +3565,6 @@ document.getElementById('mappa-solo-caldo')?.addEventListener('change', renderMa
   /* ====== INIT ====== */
 
   function initData() {
-    migrateLegacyRubricaToAdvancedIfNeeded();
     immobili = loadList(STORAGE_KEYS.immobili);
     notizie = loadList(STORAGE_KEYS.notizie);
     attivita = loadList(STORAGE_KEYS.attivita);
@@ -3863,80 +3827,81 @@ document.addEventListener('DOMContentLoaded', init);
 
 
 /* ====== RUBRICA MENU LATERALE & FILTRI ====== */
+const ENABLE_LEGACY_RUBRICA = false;
+if (ENABLE_LEGACY_RUBRICA) {
 document.addEventListener('DOMContentLoaded', () => {
-  if (ENABLE_LEGACY_RUBRICA) {
   const rubricaMenu = document.querySelector('.nav-item[data-view="rubrica"]');
-    const rubricaSub = document.getElementById('rubrica-submenu');
-    const rubricaList = document.getElementById('rubrica-list');
-    const counter = document.getElementById('rubrica-counter');
-  
-    if (!rubricaMenu || !rubricaSub) return;
-  
-    // espansione menu laterale
-    rubricaMenu.addEventListener('click', () => {
-      rubricaSub.style.display = 'block';
-      showRubrica('lista');
-    });
-  
-    // click sottosezioni
-    rubricaSub.querySelectorAll('.nav-item-sub').forEach(item => {
-      item.addEventListener('click', e => {
-        e.stopPropagation();
-        const sub = item.getAttribute('data-rubrica-sub');
-        showRubrica(sub);
-      });
-    });
-  
-    function getContacts() {
-      try {
-        return JSON.parse(localStorage.getItem('rubrica') || '[]');
-      } catch {
-        return [];
-      }
-    }
-  
-    function showRubrica(mode) {
-      const all = getContacts();
-      let filtered = all;
-  
-      if (mode === 'acquirenti') {
-        filtered = all.filter(c => c.acquirente);
-      } else if (mode === 'venditori') {
-        filtered = all.filter(c => c.venditore);
-      } else if (mode === 'nuovo') {
-        document.getElementById('rubrica-dialog-overlay').style.display = 'flex';
-        return;
-      }
-  
-      renderList(filtered);
-      updateCounter(all);
-    }
-  
-    function renderList(list) {
-      if (!rubricaList) return;
-      rubricaList.innerHTML = list.map(c => `
-        <div class="rubrica-row">
-          <strong>${c.nome || ''}</strong>
-          <span>${c.telefono || ''}</span>
-          <span>${c.email || ''}</span>
-        </div>
-      `).join('');
-    }
-  
-    function updateCounter(all) {
-      const acq = all.filter(c => c.acquirente).length;
-      const ven = all.filter(c => c.venditore).length;
-      counter.textContent = `Totale: ${all.length} · Acquirenti: ${acq} · Venditori: ${ven}`;
-    }
-  
-    // inizializza
-    updateCounter(getContacts());
+  const rubricaSub = document.getElementById('rubrica-submenu');
+  const rubricaList = document.getElementById('rubrica-list');
+  const counter = document.getElementById('rubrica-counter');
+
+  if (!rubricaMenu || !rubricaSub) return;
+
+  // espansione menu laterale
+  rubricaMenu.addEventListener('click', () => {
+    rubricaSub.style.display = 'block';
+    showRubrica('lista');
   });
-  
-  
-  
-  
+
+  // click sottosezioni
+  rubricaSub.querySelectorAll('.nav-item-sub').forEach(item => {
+    item.addEventListener('click', e => {
+      e.stopPropagation();
+      const sub = item.getAttribute('data-rubrica-sub');
+      showRubrica(sub);
+    });
+  });
+
+  function getContacts() {
+    try {
+      return JSON.parse(localStorage.getItem('rubrica') || '[]');
+    } catch {
+      return [];
+    }
+  }
+
+  function showRubrica(mode) {
+    const all = getContacts();
+    let filtered = all;
+
+    if (mode === 'acquirenti') {
+      filtered = all.filter(c => c.acquirente);
+    } else if (mode === 'venditori') {
+      filtered = all.filter(c => c.venditore);
+    } else if (mode === 'nuovo') {
+      document.getElementById('rubrica-dialog-overlay').style.display = 'flex';
+      return;
+    }
+
+    renderList(filtered);
+    updateCounter(all);
+  }
+
+  function renderList(list) {
+    if (!rubricaList) return;
+    rubricaList.innerHTML = list.map(c => `
+      <div class="rubrica-row">
+        <strong>${c.nome || ''}</strong>
+        <span>${c.telefono || ''}</span>
+        <span>${c.email || ''}</span>
+      </div>
+    `).join('');
+  }
+
+  function updateCounter(all) {
+    const acq = all.filter(c => c.acquirente).length;
+    const ven = all.filter(c => c.venditore).length;
+    counter.textContent = `Totale: ${all.length} · Acquirenti: ${acq} · Venditori: ${ven}`;
+  }
+
+  // inizializza
+  updateCounter(getContacts());
+});
 }
+
+
+
+
 /* ====== RUBRICA: CRUSCOTTO HOME + COLLABORATORI (FIX DEFINITIVO) ====== */
 (function(){
   function qs(id){ return document.getElementById(id); }
