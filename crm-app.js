@@ -748,60 +748,130 @@ function renderAgendaMonth() {
       const first = new Date(year, month, 1);
       const last = new Date(year, month + 1, 0);
 
+      // offset lunedì=0 ... domenica=6
       let startOffset = first.getDay() - 1;
       if (startOffset < 0) startOffset = 6;
 
       const daysInMonth = last.getDate();
       const totalCells = Math.ceil((startOffset + daysInMonth) / 7) * 7;
+      const weeks = totalCells / 7;
 
-      const grid = document.createElement("div");
-      grid.className = "agenda-month-grid";
-      grid.style.display = "grid";
-      grid.style.gridTemplateColumns = "repeat(7, 1fr)";
-      grid.style.gap = "6px";
+      // Wrapper tabellare: colonne = giorni, righe = settimane
+      const table = document.createElement("table");
+      table.className = "agenda-month-table";
+      table.style.width = "100%";
+      table.style.borderCollapse = "separate";
+      table.style.borderSpacing = "6px";
+      table.style.tableLayout = "fixed";
 
-      for (let i = 0; i < totalCells; i++) {
-        const cell = document.createElement("div");
+      const thead = document.createElement("thead");
+      const trHead = document.createElement("tr");
+      const dayNames = ["Lun", "Mar", "Mer", "Gio", "Ven", "Sab", "Dom"];
 
-        cell.className = "metric agenda-month-day";
-        cell.style.minHeight = "70px";
-        cell.style.borderRadius = "6px";
-        cell.style.display = "flex";
-        cell.style.flexDirection = "column";
-        cell.style.justifyContent = "flex-start";
-        cell.style.padding = "4px 6px";
+      dayNames.forEach(name => {
+        const th = document.createElement("th");
+        th.className = "muted";
+        th.style.fontSize = "11px";
+        th.style.fontWeight = "600";
+        th.style.textTransform = "uppercase";
+        th.style.letterSpacing = "0.08em";
+        th.style.padding = "0 6px";
+        th.style.textAlign = "left";
+        th.textContent = name;
+        trHead.appendChild(th);
+      });
 
-        const dayNum = i - startOffset + 1;
+      thead.appendChild(trHead);
+      table.appendChild(thead);
 
-        if (dayNum > 0 && dayNum <= daysInMonth) {
-          const d = new Date(year, month, dayNum);
+      const tbody = document.createElement("tbody");
 
-          const num = document.createElement("div");
-          num.textContent = dayNum;
-          num.style.fontWeight = "600";
-          num.style.marginBottom = "4px";
-          cell.appendChild(num);
+      for (let w = 0; w < weeks; w++) {
+        const tr = document.createElement("tr");
 
-          cell.addEventListener("click", () => {
-            agendaWeekAnchor = startOfWeek(d);
-            setView("agenda");
+        for (let d = 0; d < 7; d++) {
+          const td = document.createElement("td");
+          td.style.verticalAlign = "top";
+          td.style.padding = "0";
 
-            const gridWeekly = document.getElementById("agenda-week-grid");
-            if (gridWeekly) {
-              gridWeekly.scrollIntoView({ behavior: "smooth", block: "start" });
+          const cell = document.createElement("div");
+          cell.className = "metric agenda-month-day";
+          cell.style.minHeight = "80px";
+          cell.style.borderRadius = "6px";
+          cell.style.display = "flex";
+          cell.style.flexDirection = "column";
+          cell.style.justifyContent = "flex-start";
+          cell.style.padding = "6px 8px";
+          cell.style.cursor = "pointer";
+
+          const i = w * 7 + d;
+          const dayNum = i - startOffset + 1;
+
+          if (dayNum > 0 && dayNum <= daysInMonth) {
+            const dateObj = new Date(year, month, dayNum);
+            const iso = dateObj.toISOString().slice(0, 10);
+
+            // numero giorno
+            const num = document.createElement("div");
+            num.textContent = dayNum;
+            num.style.fontWeight = "700";
+            num.style.marginBottom = "6px";
+            cell.appendChild(num);
+
+            // contatore appuntamenti del giorno
+            const count = (attivita || []).filter(a => a && a.tipo === "appuntamento" && a.data === iso).length;
+
+            const counter = document.createElement("div");
+            counter.style.marginTop = "auto";
+            counter.style.display = "flex";
+            counter.style.justifyContent = "flex-end";
+
+            if (count > 0) {
+              const badge = document.createElement("span");
+              badge.className = "tag";
+              badge.style.borderColor = "rgba(34,197,94,0.35)";
+              badge.style.background = "rgba(34,197,94,0.10)";
+              badge.style.color = "var(--text-main)";
+              badge.textContent = `${count} app.`;
+              counter.appendChild(badge);
+            } else {
+              const muted = document.createElement("span");
+              muted.className = "muted";
+              muted.style.fontSize = "11px";
+              muted.textContent = "0 app.";
+              counter.appendChild(muted);
             }
+            cell.appendChild(counter);
 
-            cell.classList.add("agenda-month-day-click");
-            setTimeout(() => cell.classList.remove("agenda-month-day-click"), 180);
-          });
-        } else {
-          cell.style.opacity = "0.25";
+            // click: vai alla settimana del giorno
+            cell.addEventListener("click", () => {
+              agendaWeekAnchor = startOfWeek(dateObj);
+              setView("agenda");
+
+              const gridWeekly = document.getElementById("agenda-week-grid");
+              if (gridWeekly) {
+                gridWeekly.scrollIntoView({ behavior: "smooth", block: "start" });
+              }
+
+              cell.classList.add("agenda-month-day-click");
+              setTimeout(() => cell.classList.remove("agenda-month-day-click"), 180);
+            });
+          } else {
+            cell.style.opacity = "0.25";
+            cell.style.cursor = "default";
+            // celle vuote: nessuna azione
+            cell.addEventListener("click", (e) => e.preventDefault());
+          }
+
+          td.appendChild(cell);
+          tr.appendChild(td);
         }
 
-        grid.appendChild(cell);
+        tbody.appendChild(tr);
       }
 
-      cont.appendChild(grid);
+      table.appendChild(tbody);
+      cont.appendChild(table);
     }
 
 
@@ -1327,398 +1397,6 @@ function escapeHtml(str) {
     .replace(/>/g, '&gt;');
 }
 
-
-/* ====== RUBRICA PRO (match acquirenti ↔ immobili + scheda contatto) ====== */
-(function(){
-  // Non rompe nulla: aggiunge solo funzioni e UI. Dati salvati dentro contatti (STORAGE_KEYS.contatti).
-  const RUBRICA_PRO_ENABLED = true;
-  if (!RUBRICA_PRO_ENABLED) return;
-
-  function normPhone(p){
-    const s = (p||'').toString().trim();
-    if(!s) return '';
-    const plus = s.startsWith('+') ? '+' : '';
-    const digits = s.replace(/[^0-9]/g,'');
-    return plus + digits;
-  }
-  function normEmail(e){
-    return (e||'').toString().trim().toLowerCase();
-  }
-  function safeNum(v){
-    const n = Number((v||'').toString().replace('.', '').replace(',', '.'));
-    return isNaN(n) ? null : n;
-  }
-  function getGroupPrimaryContact(g){
-    return (g && g.contatti && g.contatti[0]) ? g.contatti[0] : null;
-  }
-  function getPrefsFromGroup(g){
-    const c = getGroupPrimaryContact(g) || {};
-    // Preferenze acquirente/conduttore (tutto opzionale)
-    return {
-      ruolo: (c.pro_ruolo || '').trim(),              // 'acquirente' | 'venditore' | ...
-      tipo: (c.pro_tipo || '').trim(),                // 'vendita' | 'affitto'
-      citta: (c.pro_citta || '').trim(),
-      zona: (c.pro_zona || '').trim(),
-      tipologia: (c.pro_tipologia || '').trim(),      // es. 'bilocale', 'villa', ...
-      budgetMin: safeNum(c.pro_budgetMin),
-      budgetMax: safeNum(c.pro_budgetMax),
-      mqMin: safeNum(c.pro_mqMin),
-      mqMax: safeNum(c.pro_mqMax),
-      note: (c.pro_note || '').trim()
-    };
-  }
-  function setPrefsForGroupKey(key, prefs){
-    (contatti || []).forEach(c=>{
-      if (typeof buildKey === 'function' && buildKey(c) === key) {
-        c.pro_ruolo = prefs.ruolo || '';
-        c.pro_tipo = prefs.tipo || '';
-        c.pro_citta = prefs.citta || '';
-        c.pro_zona = prefs.zona || '';
-        c.pro_tipologia = prefs.tipologia || '';
-        c.pro_budgetMin = (prefs.budgetMin ?? '');
-        c.pro_budgetMax = (prefs.budgetMax ?? '');
-        c.pro_mqMin = (prefs.mqMin ?? '');
-        c.pro_mqMax = (prefs.mqMax ?? '');
-        c.pro_note = prefs.note || '';
-      }
-    });
-    if (typeof saveList === 'function') saveList(STORAGE_KEYS.contatti, contatti);
-  }
-
-  function immPrice(imm){
-    const p = imm?.prezzo;
-    if (typeof p === 'number') return p;
-    return safeNum(p);
-  }
-  function immMq(imm){
-    const m = imm?.mq;
-    if (typeof m === 'number') return m;
-    return safeNum(m);
-  }
-  function immTipo(imm){
-    // nel form immobile: imm-tipologia default 'vendita'
-    return (imm?.tipologia || '').toString().trim().toLowerCase();
-  }
-  function matchImmToPrefs(imm, prefs){
-    if(!imm || !prefs) return false;
-
-    // tipo contratto (vendita/affitto)
-    if (prefs.tipo) {
-      const t = immTipo(imm);
-      if (t && t !== prefs.tipo.toLowerCase()) return false;
-    }
-
-    // città / zona (contiene)
-    const city = (imm.citta || '').toString().toLowerCase();
-    const addr = (imm.indirizzo || '').toString().toLowerCase();
-    if (prefs.citta) {
-      if (!city.includes(prefs.citta.toLowerCase())) return false;
-    }
-    if (prefs.zona) {
-      const z = prefs.zona.toLowerCase();
-      if (!addr.includes(z) && !city.includes(z)) return false;
-    }
-
-    // tipologia/categoria (contiene)
-    if (prefs.tipologia) {
-      const tip = (imm.categoria || imm.tipologia || '').toString().toLowerCase();
-      if (tip && !tip.includes(prefs.tipologia.toLowerCase())) return false;
-    }
-
-    // budget
-    const price = immPrice(imm);
-    if (prefs.budgetMin != null && price != null && price < prefs.budgetMin) return false;
-    if (prefs.budgetMax != null && price != null && price > prefs.budgetMax) return false;
-
-    // mq
-    const mq = immMq(imm);
-    if (prefs.mqMin != null && mq != null && mq < prefs.mqMin) return false;
-    if (prefs.mqMax != null && mq != null && mq > prefs.mqMax) return false;
-
-    // stato: escludi conclusi
-    const stato = (imm.stato || '').toString().toLowerCase();
-    if (stato.includes('conclus') || stato.includes('vendut') || stato.includes('affitt')) return false;
-
-    return true;
-  }
-
-  function computeMatchesForGroup(g){
-    const prefs = getPrefsFromGroup(g);
-    // solo se è acquirente o se ruolo impostato a acquirente
-    const isBuyer = !!g?.isAcquirente || (prefs.ruolo.toLowerCase()==='acquirente');
-    if (!isBuyer) return {count:0, ids:[], prefs};
-    const ids = (immobili || [])
-      .filter(i => matchImmToPrefs(i, prefs))
-      .map(i => i.id)
-      .slice(0, 200);
-    return {count: ids.length, ids, prefs};
-  }
-
-  function daysSince(iso){
-    if(!iso) return null;
-    const d = new Date(iso);
-    if(isNaN(d)) return null;
-    const diff = Date.now() - d.getTime();
-    return Math.floor(diff / (1000*60*60*24));
-  }
-
-  // UI: modale scheda contatto PRO
-  function ensureRubricaProModal(){
-    if(document.getElementById('rubrica-pro-overlay')) return;
-    const overlay = document.createElement('div');
-    overlay.id = 'rubrica-pro-overlay';
-    overlay.style.display = 'none';
-    overlay.innerHTML = `
-      <div class="dialog-overlay" style="display:flex;">
-        <div class="dialog" style="max-width:860px;width:92vw;">
-          <div class="dialog-header">
-            <div>
-              <div class="dialog-title">📇 Scheda Contatto PRO</div>
-              <div class="dialog-subtitle" id="rubrica-pro-sub">—</div>
-            </div>
-            <button class="btn btn-sm" id="rubrica-pro-close">✕</button>
-          </div>
-
-          <div class="dialog-body">
-            <input type="hidden" id="rubrica-pro-key" value="">
-            <div class="grid-2" style="gap:12px;">
-              <div class="card" style="margin:0;">
-                <div class="card-header" style="padding:10px 12px;">
-                  <div>
-                    <div class="card-title">🎯 Preferenze (acquirente/conduttore)</div>
-                    <div class="card-subtitle">Sono il “cuore” del matching automatico.</div>
-                  </div>
-                </div>
-                <div class="card-body">
-                  <div class="form-grid-2">
-                    <div class="form-group">
-                      <label>Ruolo (opzionale)</label>
-                      <select id="rubrica-pro-ruolo">
-                        <option value="">—</option>
-                        <option value="acquirente">Acquirente</option>
-                        <option value="venditore">Venditore</option>
-                        <option value="collaboratore">Collaboratore</option>
-                        <option value="altro">Altro</option>
-                      </select>
-                    </div>
-                    <div class="form-group">
-                      <label>Tipo (vendita/affitto)</label>
-                      <select id="rubrica-pro-tipo">
-                        <option value="">—</option>
-                        <option value="vendita">Vendita</option>
-                        <option value="affitto">Affitto</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div class="form-grid-2">
-                    <div class="form-group">
-                      <label>Città</label>
-                      <input id="rubrica-pro-citta" placeholder="Es. Milano">
-                    </div>
-                    <div class="form-group">
-                      <label>Zona / quartiere</label>
-                      <input id="rubrica-pro-zona" placeholder="Es. De Angeli / Porta Nuova">
-                    </div>
-                  </div>
-
-                  <div class="form-group">
-                    <label>Tipologia (testo libero)</label>
-                    <input id="rubrica-pro-tipologia" placeholder="Es. bilocale, villa, ufficio…">
-                  </div>
-
-                  <div class="form-grid-2">
-                    <div class="form-group">
-                      <label>Budget min (€)</label>
-                      <input id="rubrica-pro-budgetMin" inputmode="decimal" placeholder="Es. 300000">
-                    </div>
-                    <div class="form-group">
-                      <label>Budget max (€)</label>
-                      <input id="rubrica-pro-budgetMax" inputmode="decimal" placeholder="Es. 500000">
-                    </div>
-                  </div>
-
-                  <div class="form-grid-2">
-                    <div class="form-group">
-                      <label>Mq min</label>
-                      <input id="rubrica-pro-mqMin" inputmode="decimal" placeholder="Es. 60">
-                    </div>
-                    <div class="form-group">
-                      <label>Mq max</label>
-                      <input id="rubrica-pro-mqMax" inputmode="decimal" placeholder="Es. 120">
-                    </div>
-                  </div>
-
-                  <div class="form-group">
-                    <label>Note (interessi / vincoli)</label>
-                    <textarea id="rubrica-pro-note" rows="2" placeholder="Es. solo piano alto, balcone, no case da ristrutturare…"></textarea>
-                  </div>
-                </div>
-              </div>
-
-              <div class="card" style="margin:0;">
-                <div class="card-header" style="padding:10px 12px;">
-                  <div>
-                    <div class="card-title">⚡ Matching automatico</div>
-                    <div class="card-subtitle">Immobili compatibili trovati nel gestionale.</div>
-                  </div>
-                </div>
-                <div class="card-body">
-                  <div id="rubrica-pro-match" class="muted">—</div>
-                  <div style="margin-top:10px;" id="rubrica-pro-match-list"></div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="dialog-footer">
-            <div class="muted" style="font-size:12px;">Suggerimento: compila almeno città + budget (o mq) per ottenere match utili.</div>
-            <div style="display:flex;gap:8px;">
-              <button class="btn btn-secondary" id="rubrica-pro-cancel">Annulla</button>
-              <button class="btn btn-primary" id="rubrica-pro-save">Salva</button>
-            </div>
-          </div>
-        </div>
-      </div>
-    `;
-    document.body.appendChild(overlay);
-
-    // Stili minimi (non toccano il tuo css esistente)
-    if(!document.getElementById('rubrica-pro-style')){
-      const st = document.createElement('style');
-      st.id = 'rubrica-pro-style';
-      st.textContent = `
-        .rubrica-pill{display:inline-flex;align-items:center;gap:6px;padding:2px 8px;border-radius:999px;border:1px solid #1f2937;background:#0b1220;color:#e5e7eb;font-size:11px;}
-        .rubrica-pill .muted{color:#9ca3af;}
-        .rubrica-pro-open{cursor:pointer;}
-        .rubrica-badges{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}
-      `;
-      document.head.appendChild(st);
-    }
-
-    function close(){
-      overlay.style.display = 'none';
-    }
-    overlay.querySelector('#rubrica-pro-close')?.addEventListener('click', close);
-    overlay.querySelector('#rubrica-pro-cancel')?.addEventListener('click', close);
-
-    overlay.querySelector('#rubrica-pro-save')?.addEventListener('click', () => {
-      const key = overlay.querySelector('#rubrica-pro-key')?.value || '';
-      if(!key) return close();
-
-      const prefs = {
-        ruolo: overlay.querySelector('#rubrica-pro-ruolo')?.value || '',
-        tipo: overlay.querySelector('#rubrica-pro-tipo')?.value || '',
-        citta: overlay.querySelector('#rubrica-pro-citta')?.value || '',
-        zona: overlay.querySelector('#rubrica-pro-zona')?.value || '',
-        tipologia: overlay.querySelector('#rubrica-pro-tipologia')?.value || '',
-        budgetMin: safeNum(overlay.querySelector('#rubrica-pro-budgetMin')?.value),
-        budgetMax: safeNum(overlay.querySelector('#rubrica-pro-budgetMax')?.value),
-        mqMin: safeNum(overlay.querySelector('#rubrica-pro-mqMin')?.value),
-        mqMax: safeNum(overlay.querySelector('#rubrica-pro-mqMax')?.value),
-        note: overlay.querySelector('#rubrica-pro-note')?.value || ''
-      };
-      setPrefsForGroupKey(key, prefs);
-      if (typeof renderRubrica === 'function') renderRubrica();
-      close();
-    });
-  }
-
-  function openRubricaProForKey(key){
-    ensureRubricaProModal();
-    const overlay = document.getElementById('rubrica-pro-overlay');
-    if(!overlay) return;
-
-    // ricostruisci groups per avere g aggiornato
-    const groups = (typeof groupRubrica === 'function') ? groupRubrica(contatti || []) : [];
-    const g = (groups || []).find(x=>x && x.key===key);
-    if(!g) return;
-
-    const prefs = getPrefsFromGroup(g);
-    const m = computeMatchesForGroup(g);
-
-    overlay.querySelector('#rubrica-pro-key').value = key;
-    overlay.querySelector('#rubrica-pro-sub').textContent = `${g.nome || 'Contatto'} · ${g.telefono || ''} ${g.email || ''}`;
-
-    overlay.querySelector('#rubrica-pro-ruolo').value = prefs.ruolo || '';
-    overlay.querySelector('#rubrica-pro-tipo').value = prefs.tipo || '';
-    overlay.querySelector('#rubrica-pro-citta').value = prefs.citta || '';
-    overlay.querySelector('#rubrica-pro-zona').value = prefs.zona || '';
-    overlay.querySelector('#rubrica-pro-tipologia').value = prefs.tipologia || '';
-    overlay.querySelector('#rubrica-pro-budgetMin').value = prefs.budgetMin ?? '';
-    overlay.querySelector('#rubrica-pro-budgetMax').value = prefs.budgetMax ?? '';
-    overlay.querySelector('#rubrica-pro-mqMin').value = prefs.mqMin ?? '';
-    overlay.querySelector('#rubrica-pro-mqMax').value = prefs.mqMax ?? '';
-    overlay.querySelector('#rubrica-pro-note').value = prefs.note || '';
-
-    const matchEl = overlay.querySelector('#rubrica-pro-match');
-    const listEl = overlay.querySelector('#rubrica-pro-match-list');
-    if(matchEl) matchEl.innerHTML = `<strong>${m.count}</strong> immobile/i compatibile/i.`;
-    if(listEl){
-      const items = (immobili || []).filter(i=>m.ids.includes(i.id)).slice(0, 12);
-      listEl.innerHTML = items.length ? items.map(i=>`
-        <div class="metric" style="margin-bottom:8px;">
-          <div style="display:flex;justify-content:space-between;gap:10px;">
-            <div>
-              <div style="font-weight:600;">${escapeHtml(i.indirizzo||'(senza indirizzo)')}</div>
-              <div class="muted" style="font-size:12px;">${escapeHtml(i.citta||'')} · ${escapeHtml(i.categoria||'')} · ${i.mq? escapeHtml(i.mq+' mq') : ''}</div>
-            </div>
-            <div style="text-align:right;min-width:120px;">
-              <div style="font-weight:600;">${i.prezzo ? (typeof formatEuro==='function'? formatEuro(i.prezzo) : i.prezzo) : '—'}</div>
-              <button class="btn btn-xs" data-open-imm="${escapeHtml(i.id||'')}">Apri</button>
-            </div>
-          </div>
-        </div>
-      `).join('') : `<div class="muted">Nessun match (prova a compilare città + budget oppure mq).</div>`;
-    }
-
-    overlay.style.display = 'block';
-  }
-
-  // eventi globali: apri scheda pro e apri immobile da match
-  document.addEventListener('click', (e)=>{
-    const t = e.target;
-    const open = t.closest('[data-rubrica-pro]');
-    if(open){
-      openRubricaProForKey(open.getAttribute('data-rubrica-pro'));
-      return;
-    }
-    const openImm = t.closest('[data-open-imm]');
-    if(openImm){
-      const id = openImm.getAttribute('data-open-imm') || '';
-      if(!id) return;
-      // usa la tua funzione esistente di apertura scheda immobile, se disponibile
-      if (typeof openSchedaImmobile === 'function') {
-        openSchedaImmobile(id);
-      } else {
-        setView('immobili');
-        if (typeof highlightRowById === 'function') highlightRowById('immobili', id);
-      }
-    }
-  });
-
-  // Hook: estende groupRubrica senza rompere (aggiunge g.pro + g.match)
-  const _origGroup = window.groupRubrica;
-  if (typeof _origGroup === 'function' && !_origGroup.__rubricaProWrapped) {
-    const wrapped = function(data){
-      const groups = _origGroup(data);
-      (groups||[]).forEach(g=>{
-        try{
-          g.pro = getPrefsFromGroup(g);
-          g.match = computeMatchesForGroup(g);
-          g.followUpDays = daysSince(g.ultimoContatto);
-          g.needsFollowUp = (g.followUpDays != null && g.followUpDays >= 7);
-        }catch(_){}
-      });
-      return groups;
-    };
-    wrapped.__rubricaProWrapped = true;
-    window.groupRubrica = wrapped;
-  }
-
-})();
-
-
 function groupRubrica(data) {
   const map = new Map();
 
@@ -1862,11 +1540,9 @@ function renderRubrica() {
           <button class="rubrica-toggle" data-key="${g.key}">▸</button>
           <div class="rubrica-summary-main">
             <div>
-              <strong class="rubrica-pro-open" data-rubrica-pro="${g.key}">${escapeHtml(g.nome)}</strong>
+              <strong>${escapeHtml(g.nome)}</strong>
               ${ruoloHtml}
             </div>
-              ${g.match && g.match.count ? `<div class=\"rubrica-badges\"><span class=\"rubrica-pill\">⚡ Match: <strong>${g.match.count}</strong></span></div>` : ''}
-              ${g.needsFollowUp ? `<div class=\"rubrica-badges\"><span class=\"rubrica-pill\">⏰ Follow-up <span class=\"muted\">(${g.followUpDays} gg)</span></span></div>` : ''}
             <div>${escapeHtml(g.telefono || '')}</div>
             <div>${escapeHtml(g.email || '')}</div>
             <div>${last}</div>
@@ -1875,18 +1551,12 @@ function renderRubrica() {
           </div>
           <div class="rubrica-actions">
             <button class="btn btn-xs" data-edit="${g.key}" title="Modifica nome">✏️</button>
-            <button class="btn btn-xs" data-rubrica-pro="${g.key}" title="Scheda PRO (match)">⚡</button>
             <button class="btn btn-xs" data-touch="${g.key}" title="Segna contatto effettuato">📌</button>
             <button class="btn btn-xs" data-delete="${g.key}" title="Elimina contatto">🗑️</button>
           </div>
         </div>
 
         <div class="rubrica-details hidden">
-          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px;">
-            <div class="muted" style="font-size:12px;">Scheda completa, timeline e matching.</div>
-            <button class="btn btn-xs" data-rubrica-pro="${g.key}">Apri scheda PRO</button>
-          </div>
-          ${g.match && g.match.count ? `<div style="margin-bottom:8px;"><strong>Match immobili compatibili:</strong> ${g.match.count}</div>` : ``}
           <div style="margin-bottom:4px;">
             <strong>Notizie collegate:</strong> ${g.notizie.length}
             ${g.notizie.length ? `<button class="badge-link" data-go="not" data-phone="${escapeHtml(g.telefono || '')}" data-email="${escapeHtml(g.email || '')}"><span>Apri lista notizie</span></button>` : ''}
@@ -4303,7 +3973,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 /* ====== RUBRICA: CRUSCOTTO HOME + COLLABORATORI (FIX DEFINITIVO) ====== */
-if (typeof ENABLE_LEGACY_RUBRICA !== 'undefined' && ENABLE_LEGACY_RUBRICA) {
 (function(){
   function qs(id){ return document.getElementById(id); }
 
@@ -4381,9 +4050,7 @@ if (typeof ENABLE_LEGACY_RUBRICA !== 'undefined' && ENABLE_LEGACY_RUBRICA) {
   document.querySelector('.nav-item[data-view="rubrica"]')
     ?.addEventListener('click', ()=>{ showRubrica('lista'); });
 
-})()
-}
-;
+})();
 
 
 
@@ -4506,7 +4173,6 @@ if (typeof ENABLE_LEGACY_RUBRICA !== 'undefined' && ENABLE_LEGACY_RUBRICA) {
 
 
 /* ====== RUBRICA DASHBOARD FORCE RENDER ====== */
-if (typeof ENABLE_LEGACY_RUBRICA !== 'undefined' && ENABLE_LEGACY_RUBRICA) {
 (function(){
   const rubricaView = document.getElementById('view-rubrica');
   if(!rubricaView) return;
@@ -4563,9 +4229,7 @@ if (typeof ENABLE_LEGACY_RUBRICA !== 'undefined' && ENABLE_LEGACY_RUBRICA) {
 
   const nav = document.querySelector('.nav-item[data-view="rubrica"]');
   nav && nav.addEventListener('click',()=>render('lista'));
-})()
-}
-;
+})();
 
 
 
