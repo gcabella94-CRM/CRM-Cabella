@@ -3367,49 +3367,94 @@ ${footerHtml}
 
   document.getElementById('ai-pdf-btn')?.addEventListener('click', aiExportPdf);
 
-// Eventi per filtri mappa
-document.getElementById('mappa-filter')?.addEventListener('change', renderMappa);
-document.getElementById('mappa-tipologia')?.addEventListener('change', renderMappa);
-document.getElementById('mappa-solo-caldo')?.addEventListener('change', renderMappa);
-
     /* ====== MAPPA (immobili + notizie) ====== */
 
     let mappa = null;
     let mappaCluster = null;
     let mappaSelectedItem = null;
 
-    function initMappa() {
+    // Stato interno mappa (evita doppie inizializzazioni / fitBounds aggressivi)
+    let mappaUiBound = false;
+    let mappaUserInteracted = false;
+    let mappaAutoFitted = false;
+    let mappaLastFitSig = '';
+function initMappa() {
       const mapEl = document.getElementById('map');
       if (!mapEl) return;
 
-      if (!mappa) {
-        mappa = L.map('map').setView([45.0703, 7.6869], 8); // Nord Ovest Italia
+      // Se la mappa esiste già: evita re-init e forza ricalcolo dimensioni (Leaflet in tab nascosti fa spesso “mappa grigia”)
+      if (mappa) {
+        setTimeout(() => { try { mappa.invalidateSize(true); } catch {} }, 120);
+        renderMappa();
+        return;
+      }
 
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          maxZoom: 19,
-          attribution: '© OpenStreetMap'
-        }).addTo(mappa);
+      // Prima inizializzazione
+      mappa = L.map('map', { preferCanvas: true }).setView([45.0703, 7.6869], 8); // Nord Ovest Italia
 
-        mappaCluster = L.markerClusterGroup();
-        mappa.addLayer(mappaCluster);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '© OpenStreetMap'
+      }).addTo(mappa);
 
+      mappaCluster = L.markerClusterGroup();
+      mappa.addLayer(mappaCluster);
+
+      // Traccia interazioni utente: se l’utente ha mosso/zoomato, non rifacciamo fitBounds a ogni filtro
+      mappa.on('movestart', () => { mappaUserInteracted = true; });
+      mappa.on('zoomstart', () => { mappaUserInteracted = true; });
+
+      // Bind UI una sola volta
+      if (!mappaUiBound) {
         const closeBtn = document.getElementById('map-detail-close');
-        if (closeBtn) {
-          closeBtn.addEventListener('click', hideMapDetail);
-        }
+        if (closeBtn) closeBtn.addEventListener('click', hideMapDetail);
+
         const openBtn = document.getElementById('map-detail-open-btn');
         if (openBtn) {
           openBtn.addEventListener('click', () => {
             if (!mappaSelectedItem) return;
-            if (mappaSelectedItem.tipo === 'immobile') {
-              openSchedaImmobile(mappaSelectedItem.id);
-            } else if (mappaSelectedItem.tipo === 'notizia') {
-              openSchedaNotizia(mappaSelectedItem.id);
-            }
+            if (mappaSelectedItem.tipo === 'immobile') openSchedaImmobile(mappaSelectedItem.id);
+            else if (mappaSelectedItem.tipo === 'notizia') openSchedaNotizia(mappaSelectedItem.id);
           });
         }
+
+        // Eventi filtri: de-dup (alcuni listener erano duplicati nel file)
+        const bind = (id, ev) => {
+          const el = document.getElementById(id);
+          if (!el) return;
+          const key = `__bound_${id}_${ev}`;
+          if (el[key]) return;
+          el.addEventListener(ev, () => {
+            // quando si cambia filtro, permettiamo un fit (una tantum) se l’utente non ha ancora interagito
+            mappaAutoFitted = false;
+            renderMappa();
+          });
+          el[key] = true;
+        };
+        bind('mappa-filter', 'change');
+        bind('mappa-tipologia', 'change');
+        bind('mappa-stato', 'change');
+        bind('mappa-solo-caldo', 'change');
+        bind('mappa-prezzo-min', 'input');
+        bind('mappa-prezzo-max', 'input');
+        bind('mappa-mq-min', 'input');
+        bind('mappa-mq-max', 'input');
+
+        const btnImm = document.getElementById('mappa-geocode-imm');
+        if (btnImm && !btnImm.__bound_click) {
+          btnImm.addEventListener('click', () => geocodeMancanti('immobili'));
+          btnImm.__bound_click = true;
+        }
+        const btnNot = document.getElementById('mappa-geocode-not');
+        if (btnNot && !btnNot.__bound_click) {
+          btnNot.addEventListener('click', () => geocodeMancanti('notizie'));
+          btnNot.__bound_click = true;
+        }
+
+        mappaUiBound = true;
       }
 
+      setTimeout(() => { try { mappa.invalidateSize(true); } catch {} }, 120);
       renderMappa();
     }
 
@@ -3490,6 +3535,9 @@ document.getElementById('mappa-solo-caldo')?.addEventListener('change', renderMa
     function renderMappa() {
       if (!mappa || !mappaCluster) return;
 
+      // Evita render mentre Leaflet non ha ancora calcolato dimensioni (es. view appena aperta)
+      try { mappa.invalidateSize(false); } catch {}
+
       mappaCluster.clearLayers();
       hideMapDetail();
 
@@ -3500,11 +3548,7 @@ document.getElementById('mappa-solo-caldo')?.addEventListener('change', renderMa
       if (filters.fTipo !== 'notizie') {
         (immobili || []).forEach(imm => {
           if (imm.lat != null && imm.lng != null) {
-            items.push({
-              ...imm,
-              tipo: 'immobile',
-              id: imm.id
-            });
+            items.push({ ...imm, tipo: 'immobile', id: imm.id });
           }
         });
       }
@@ -3513,11 +3557,7 @@ document.getElementById('mappa-solo-caldo')?.addEventListener('change', renderMa
       if (filters.fTipo !== 'immobili') {
         (notizie || []).forEach(n => {
           if (n.lat != null && n.lng != null) {
-            items.push({
-              ...n,
-              tipo: 'notizia',
-              id: n.id
-            });
+            items.push({ ...n, tipo: 'notizia', id: n.id });
           }
         });
       }
@@ -3546,18 +3586,22 @@ document.getElementById('mappa-solo-caldo')?.addEventListener('change', renderMa
         });
 
         const marker = L.marker([item.lat, item.lng], { icon });
-
-        marker.on('click', () => {
-          showMapDetail(item);
-        });
-
+        marker.on('click', () => showMapDetail(item));
         mappaCluster.addLayer(marker);
       });
 
+      // FitBounds “intelligente”: non resettiamo la mappa a ogni filtro se l’utente sta navigando
       if (filtered.length > 0) {
         const bounds = mappaCluster.getBounds();
-        if (bounds && bounds.isValid && bounds.isValid()) {
-          mappa.fitBounds(bounds, { padding: [40, 40] });
+        const sig = `${filtered.length}:${filters.fTipo}:${filters.fTipologia}:${filters.fStato}:${filters.fCaldo}:${filters.fPrezzoMin ?? ''}-${filters.fPrezzoMax ?? ''}:${filters.fMqMin ?? ''}-${filters.fMqMax ?? ''}`;
+        const shouldFit = (!mappaUserInteracted) && (!mappaAutoFitted || sig !== mappaLastFitSig);
+
+        if (shouldFit && bounds && bounds.isValid && bounds.isValid()) {
+          try {
+            mappa.fitBounds(bounds, { padding: [40, 40] });
+            mappaAutoFitted = true;
+            mappaLastFitSig = sig;
+          } catch {}
         }
       }
     }
@@ -3672,6 +3716,7 @@ document.getElementById('mappa-solo-caldo')?.addEventListener('change', renderMa
         cloudSync.subscribe(STORAGE_KEYS.notizie, data => {
           notizie = data || [];
           renderNotizie();
+        renderMappa();
         });
         cloudSync.subscribe(STORAGE_KEYS.attivita, data => {
           attivita = data || [];
