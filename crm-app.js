@@ -748,60 +748,130 @@ function renderAgendaMonth() {
       const first = new Date(year, month, 1);
       const last = new Date(year, month + 1, 0);
 
+      // offset lunedì=0 ... domenica=6
       let startOffset = first.getDay() - 1;
       if (startOffset < 0) startOffset = 6;
 
       const daysInMonth = last.getDate();
       const totalCells = Math.ceil((startOffset + daysInMonth) / 7) * 7;
+      const weeks = totalCells / 7;
 
-      const grid = document.createElement("div");
-      grid.className = "agenda-month-grid";
-      grid.style.display = "grid";
-      grid.style.gridTemplateColumns = "repeat(7, 1fr)";
-      grid.style.gap = "6px";
+      // Wrapper tabellare: colonne = giorni, righe = settimane
+      const table = document.createElement("table");
+      table.className = "agenda-month-table";
+      table.style.width = "100%";
+      table.style.borderCollapse = "separate";
+      table.style.borderSpacing = "6px";
+      table.style.tableLayout = "fixed";
 
-      for (let i = 0; i < totalCells; i++) {
-        const cell = document.createElement("div");
+      const thead = document.createElement("thead");
+      const trHead = document.createElement("tr");
+      const dayNames = ["Lun", "Mar", "Mer", "Gio", "Ven", "Sab", "Dom"];
 
-        cell.className = "metric agenda-month-day";
-        cell.style.minHeight = "70px";
-        cell.style.borderRadius = "6px";
-        cell.style.display = "flex";
-        cell.style.flexDirection = "column";
-        cell.style.justifyContent = "flex-start";
-        cell.style.padding = "4px 6px";
+      dayNames.forEach(name => {
+        const th = document.createElement("th");
+        th.className = "muted";
+        th.style.fontSize = "11px";
+        th.style.fontWeight = "600";
+        th.style.textTransform = "uppercase";
+        th.style.letterSpacing = "0.08em";
+        th.style.padding = "0 6px";
+        th.style.textAlign = "left";
+        th.textContent = name;
+        trHead.appendChild(th);
+      });
 
-        const dayNum = i - startOffset + 1;
+      thead.appendChild(trHead);
+      table.appendChild(thead);
 
-        if (dayNum > 0 && dayNum <= daysInMonth) {
-          const d = new Date(year, month, dayNum);
+      const tbody = document.createElement("tbody");
 
-          const num = document.createElement("div");
-          num.textContent = dayNum;
-          num.style.fontWeight = "600";
-          num.style.marginBottom = "4px";
-          cell.appendChild(num);
+      for (let w = 0; w < weeks; w++) {
+        const tr = document.createElement("tr");
 
-          cell.addEventListener("click", () => {
-            agendaWeekAnchor = startOfWeek(d);
-            setView("agenda");
+        for (let d = 0; d < 7; d++) {
+          const td = document.createElement("td");
+          td.style.verticalAlign = "top";
+          td.style.padding = "0";
 
-            const gridWeekly = document.getElementById("agenda-week-grid");
-            if (gridWeekly) {
-              gridWeekly.scrollIntoView({ behavior: "smooth", block: "start" });
+          const cell = document.createElement("div");
+          cell.className = "metric agenda-month-day";
+          cell.style.minHeight = "80px";
+          cell.style.borderRadius = "6px";
+          cell.style.display = "flex";
+          cell.style.flexDirection = "column";
+          cell.style.justifyContent = "flex-start";
+          cell.style.padding = "6px 8px";
+          cell.style.cursor = "pointer";
+
+          const i = w * 7 + d;
+          const dayNum = i - startOffset + 1;
+
+          if (dayNum > 0 && dayNum <= daysInMonth) {
+            const dateObj = new Date(year, month, dayNum);
+            const iso = dateObj.toISOString().slice(0, 10);
+
+            // numero giorno
+            const num = document.createElement("div");
+            num.textContent = dayNum;
+            num.style.fontWeight = "700";
+            num.style.marginBottom = "6px";
+            cell.appendChild(num);
+
+            // contatore appuntamenti del giorno
+            const count = (attivita || []).filter(a => a && a.tipo === "appuntamento" && a.data === iso).length;
+
+            const counter = document.createElement("div");
+            counter.style.marginTop = "auto";
+            counter.style.display = "flex";
+            counter.style.justifyContent = "flex-end";
+
+            if (count > 0) {
+              const badge = document.createElement("span");
+              badge.className = "tag";
+              badge.style.borderColor = "rgba(34,197,94,0.35)";
+              badge.style.background = "rgba(34,197,94,0.10)";
+              badge.style.color = "var(--text-main)";
+              badge.textContent = `${count} app.`;
+              counter.appendChild(badge);
+            } else {
+              const muted = document.createElement("span");
+              muted.className = "muted";
+              muted.style.fontSize = "11px";
+              muted.textContent = "0 app.";
+              counter.appendChild(muted);
             }
+            cell.appendChild(counter);
 
-            cell.classList.add("agenda-month-day-click");
-            setTimeout(() => cell.classList.remove("agenda-month-day-click"), 180);
-          });
-        } else {
-          cell.style.opacity = "0.25";
+            // click: vai alla settimana del giorno
+            cell.addEventListener("click", () => {
+              agendaWeekAnchor = startOfWeek(dateObj);
+              setView("agenda");
+
+              const gridWeekly = document.getElementById("agenda-week-grid");
+              if (gridWeekly) {
+                gridWeekly.scrollIntoView({ behavior: "smooth", block: "start" });
+              }
+
+              cell.classList.add("agenda-month-day-click");
+              setTimeout(() => cell.classList.remove("agenda-month-day-click"), 180);
+            });
+          } else {
+            cell.style.opacity = "0.25";
+            cell.style.cursor = "default";
+            // celle vuote: nessuna azione
+            cell.addEventListener("click", (e) => e.preventDefault());
+          }
+
+          td.appendChild(cell);
+          tr.appendChild(td);
         }
 
-        grid.appendChild(cell);
+        tbody.appendChild(tr);
       }
 
-      cont.appendChild(grid);
+      table.appendChild(tbody);
+      cont.appendChild(table);
     }
 
 
