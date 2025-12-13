@@ -10,11 +10,6 @@
     intestazioni: 'crm10_intestazioni' // archivio header+footer per documenti IA
   };
 
-  // ====== FEATURE FLAGS ======
-  // Disattiva la Rubrica legacy (submenu laterale + storage 'rubrica') e usa solo la Rubrica avanzata (crm10_contatti)
-  const ENABLE_LEGACY_RUBRICA = false;
-
-
   let immobili = [];
   let notizie = [];
   let attivita = [];
@@ -741,73 +736,112 @@ function creaNuovoAppuntamentoDaBottone() {
     }
 
 function renderAgendaMonth() {
-      const cont = document.getElementById("agenda-month-summary");
-      if (!cont) return;
+  const cont = document.getElementById("agenda-month-summary");
+  if (!cont) return;
 
-      cont.innerHTML = "";
+  cont.innerHTML = "";
 
-      const oggi = new Date();
-      const year = oggi.getFullYear();
-      const month = oggi.getMonth();
+  const oggi = new Date();
+  const year = oggi.getFullYear();
+  const month = oggi.getMonth();
 
-      const first = new Date(year, month, 1);
-      const last = new Date(year, month + 1, 0);
+  const first = new Date(year, month, 1);
+  const last = new Date(year, month + 1, 0);
 
-      let startOffset = first.getDay() - 1;
-      if (startOffset < 0) startOffset = 6;
+  // Offset con settimana che parte da Lunedì (Lun=0 ... Dom=6)
+  let startOffset = first.getDay() - 1;
+  if (startOffset < 0) startOffset = 6;
 
-      const daysInMonth = last.getDate();
-      const totalCells = Math.ceil((startOffset + daysInMonth) / 7) * 7;
+  const daysInMonth = last.getDate();
+  const totalCells = Math.ceil((startOffset + daysInMonth) / 7) * 7;
+  const weeks = totalCells / 7;
 
-      const grid = document.createElement("div");
-      grid.className = "agenda-month-grid";
-      grid.style.display = "grid";
-      grid.style.gridTemplateColumns = "repeat(7, 1fr)";
-      grid.style.gap = "6px";
+  const dayNames = ["Lun","Mar","Mer","Gio","Ven","Sab","Dom"];
 
-      for (let i = 0; i < totalCells; i++) {
-        const cell = document.createElement("div");
+  // Tabella mese (colonne = giorni, righe = settimane)
+  const table = document.createElement("table");
+  table.className = "agenda-month-table";
+  table.style.width = "100%";
+  table.style.borderCollapse = "separate";
+  table.style.borderSpacing = "6px";
+  table.style.tableLayout = "fixed";
 
-        cell.className = "metric agenda-month-day";
-        cell.style.minHeight = "70px";
-        cell.style.borderRadius = "6px";
-        cell.style.display = "flex";
-        cell.style.flexDirection = "column";
-        cell.style.justifyContent = "flex-start";
-        cell.style.padding = "4px 6px";
+  const thead = document.createElement("thead");
+  const headRow = document.createElement("tr");
+  dayNames.forEach((dn) => {
+    const th = document.createElement("th");
+    th.textContent = dn;
+    th.style.fontSize = "11px";
+    th.style.fontWeight = "600";
+    th.style.color = "#9ca3af";
+    th.style.textAlign = "center";
+    th.style.padding = "2px 0";
+    th.style.userSelect = "none";
+    headRow.appendChild(th);
+  });
+  thead.appendChild(headRow);
+  table.appendChild(thead);
 
-        const dayNum = i - startOffset + 1;
+  const tbody = document.createElement("tbody");
 
-        if (dayNum > 0 && dayNum <= daysInMonth) {
-          const d = new Date(year, month, dayNum);
+  let cellIndex = 0;
+  for (let w = 0; w < weeks; w++) {
+    const tr = document.createElement("tr");
 
-          const num = document.createElement("div");
-          num.textContent = dayNum;
-          num.style.fontWeight = "600";
-          num.style.marginBottom = "4px";
-          cell.appendChild(num);
+    for (let c = 0; c < 7; c++) {
+      const td = document.createElement("td");
+      td.style.padding = "0";
+      td.style.verticalAlign = "top";
 
-          cell.addEventListener("click", () => {
-            agendaWeekAnchor = startOfWeek(d);
-            setView("agenda");
+      const cell = document.createElement("div");
+      cell.className = "metric agenda-month-day";
+      cell.style.minHeight = "70px";
+      cell.style.borderRadius = "6px";
+      cell.style.display = "flex";
+      cell.style.flexDirection = "column";
+      cell.style.justifyContent = "flex-start";
+      cell.style.padding = "4px 6px";
+      cell.style.cursor = "pointer";
 
-            const gridWeekly = document.getElementById("agenda-week-grid");
-            if (gridWeekly) {
-              gridWeekly.scrollIntoView({ behavior: "smooth", block: "start" });
-            }
+      const dayNum = cellIndex - startOffset + 1;
 
-            cell.classList.add("agenda-month-day-click");
-            setTimeout(() => cell.classList.remove("agenda-month-day-click"), 180);
-          });
-        } else {
-          cell.style.opacity = "0.25";
-        }
+      if (dayNum > 0 && dayNum <= daysInMonth) {
+        const d = new Date(year, month, dayNum);
 
-        grid.appendChild(cell);
+        const num = document.createElement("div");
+        num.textContent = dayNum;
+        num.style.fontWeight = "600";
+        num.style.marginBottom = "4px";
+        cell.appendChild(num);
+
+        cell.addEventListener("click", () => {
+          agendaWeekAnchor = startOfWeek(d);
+          setView("agenda");
+
+          const gridWeekly = document.getElementById("agenda-week-grid");
+          if (gridWeekly) {
+            gridWeekly.scrollIntoView({ behavior: "smooth", block: "start" });
+          }
+
+          cell.classList.add("agenda-month-day-click");
+          setTimeout(() => cell.classList.remove("agenda-month-day-click"), 180);
+        });
+      } else {
+        cell.style.opacity = "0.25";
+        cell.style.cursor = "default";
       }
 
-      cont.appendChild(grid);
+      td.appendChild(cell);
+      tr.appendChild(td);
+      cellIndex++;
     }
+
+    tbody.appendChild(tr);
+  }
+
+  table.appendChild(tbody);
+  cont.appendChild(table);
+}
 
 
 
@@ -3834,78 +3868,75 @@ document.addEventListener('DOMContentLoaded', init);
 /* ====== RUBRICA MENU LATERALE & FILTRI ====== */
 const ENABLE_LEGACY_RUBRICA = false;
 if (ENABLE_LEGACY_RUBRICA) {
-  if (ENABLE_LEGACY_RUBRICA) {
-  document.addEventListener('DOMContentLoaded', () => {
-    const rubricaMenu = document.querySelector('.nav-item[data-view="rubrica"]');
-    const rubricaSub = document.getElementById('rubrica-submenu');
-    const rubricaList = document.getElementById('rubrica-list');
-    const counter = document.getElementById('rubrica-counter');
+document.addEventListener('DOMContentLoaded', () => {
+  const rubricaMenu = document.querySelector('.nav-item[data-view="rubrica"]');
+  const rubricaSub = document.getElementById('rubrica-submenu');
+  const rubricaList = document.getElementById('rubrica-list');
+  const counter = document.getElementById('rubrica-counter');
 
-    if (!rubricaMenu || !rubricaSub) return;
+  if (!rubricaMenu || !rubricaSub) return;
 
-    // espansione menu laterale
-    rubricaMenu.addEventListener('click', () => {
-      rubricaSub.style.display = 'block';
-      showRubrica('lista');
-    });
-
-    // click sottosezioni
-    rubricaSub.querySelectorAll('.nav-item-sub').forEach(item => {
-      item.addEventListener('click', e => {
-        e.stopPropagation();
-        const sub = item.getAttribute('data-rubrica-sub');
-        showRubrica(sub);
-      });
-    });
-
-    function getContacts() {
-      try {
-        return JSON.parse(localStorage.getItem('rubrica') || '[]');
-      } catch {
-        return [];
-      }
-    }
-
-    function showRubrica(mode) {
-      const all = getContacts();
-      let filtered = all;
-
-      if (mode === 'acquirenti') {
-        filtered = all.filter(c => c.acquirente);
-      } else if (mode === 'venditori') {
-        filtered = all.filter(c => c.venditore);
-      } else if (mode === 'nuovo') {
-        document.getElementById('rubrica-dialog-overlay').style.display = 'flex';
-        return;
-      }
-
-      renderList(filtered);
-      updateCounter(all);
-    }
-
-    function renderList(list) {
-      if (!rubricaList) return;
-      rubricaList.innerHTML = list.map(c => `
-        <div class="rubrica-row">
-          <strong>${c.nome || ''}</strong>
-          <span>${c.telefono || ''}</span>
-          <span>${c.email || ''}</span>
-        </div>
-      `).join('');
-    }
-
-    function updateCounter(all) {
-      const acq = all.filter(c => c.acquirente).length;
-      const ven = all.filter(c => c.venditore).length;
-      counter.textContent = `Totale: ${all.length} · Acquirenti: ${acq} · Venditori: ${ven}`;
-    }
-
-    // inizializza
-    updateCounter(getContacts());
+  // espansione menu laterale
+  rubricaMenu.addEventListener('click', () => {
+    rubricaSub.style.display = 'block';
+    showRubrica('lista');
   });
+
+  // click sottosezioni
+  rubricaSub.querySelectorAll('.nav-item-sub').forEach(item => {
+    item.addEventListener('click', e => {
+      e.stopPropagation();
+      const sub = item.getAttribute('data-rubrica-sub');
+      showRubrica(sub);
+    });
+  });
+
+  function getContacts() {
+    try {
+      return JSON.parse(localStorage.getItem('rubrica') || '[]');
+    } catch {
+      return [];
+    }
   }
 
+  function showRubrica(mode) {
+    const all = getContacts();
+    let filtered = all;
+
+    if (mode === 'acquirenti') {
+      filtered = all.filter(c => c.acquirente);
+    } else if (mode === 'venditori') {
+      filtered = all.filter(c => c.venditore);
+    } else if (mode === 'nuovo') {
+      document.getElementById('rubrica-dialog-overlay').style.display = 'flex';
+      return;
+    }
+
+    renderList(filtered);
+    updateCounter(all);
   }
+
+  function renderList(list) {
+    if (!rubricaList) return;
+    rubricaList.innerHTML = list.map(c => `
+      <div class="rubrica-row">
+        <strong>${c.nome || ''}</strong>
+        <span>${c.telefono || ''}</span>
+        <span>${c.email || ''}</span>
+      </div>
+    `).join('');
+  }
+
+  function updateCounter(all) {
+    const acq = all.filter(c => c.acquirente).length;
+    const ven = all.filter(c => c.venditore).length;
+    counter.textContent = `Totale: ${all.length} · Acquirenti: ${acq} · Venditori: ${ven}`;
+  }
+
+  // inizializza
+  updateCounter(getContacts());
+});
+}
 
 
 
