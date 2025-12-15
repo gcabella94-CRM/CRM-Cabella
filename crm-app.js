@@ -2665,21 +2665,23 @@ function setupAddressAutocomplete({ inputId, cityId, provId, capId }) {
   const box = ensureSuggestBox(inputEl);
   if (!box) return;
 
-  // Usa Leaflet.Geocoder se presente, altrimenti fallback fetch (gratis) su Photon/Nominatim
-  const leafletGeocoder = getAddrGeocoder();
+  // Prefer a fast, free provider (Photon). Fallback to Leaflet Nominatim geocoder if available.
+  const fallbackGeocoder = getAddrGeocoder();
 
-  let t = null;
-  let lastQ = '';
-  let activeCtrl = null;
-  const cache = new Map(); // query normalizzata -> risultati
+  const MIN_CHARS = 3;
+  const LIMIT = 8;
+  const DEBOUNCE_MS = 160;
 
-  const normalizeQ = (q) => (q || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  const cache = new Map(); // normalizedQuery -> results[]
+  let debounceTimer = null;
+  let lastQuery = '';
+  let activeController = null;
 
   const maybeSet = (el, val) => {
     if (!el || !val) return;
     const current = (el.value || '').trim();
     if (!current) { el.value = val; return; }
-    if (current.toLowerCase() === String(val).trim().toLowerCase()) return;
+    if (current.toLowerCase() === String(val).toLowerCase()) return;
     const ok = confirm(`Sovrascrivere "${current}" con "${val}"?`);
     if (ok) el.value = val;
   };
@@ -2691,118 +2693,170 @@ function setupAddressAutocomplete({ inputId, cityId, provId, capId }) {
     if (capId) maybeSet(document.getElementById(capId), parts.cap);
   };
 
-  const openBox = () => { box.style.display = 'block'; };
+  const normalizeQ = (q) => (q || '').toString().trim().toLowerCase().replace(/\s+/g, ' ');
 
-  const renderMessage = (msg) => {
-    box.innerHTML = `<div class="addr-suggest__item"><div class="addr-suggest__main">${escapeHtml(msg)}</div></div>`;
-    openBox();
+  const renderLoading = () => {
+    box.innerHTML = '';
+    const item = document.createElement('div');
+    item.className = 'suggest-item';
+    item.textContent = 'Ricerca...';
+    item.style.opacity = '0.8';
+    box.appendChild(item);
+    openSuggest(box);
+  };
+
+  const renderEmpty = (msg = 'Nessun risultato') => {
+    box.innerHTML = '';
+    const item = document.createElement('div');
+    item.className = 'suggest-item';
+    item.textContent = msg;
+    item.style.opacity = '0.8';
+    box.appendChild(item);
+    openSuggest(box);
   };
 
   const renderOptions = (results) => {
     box.innerHTML = '';
+
+    // Mantieni la tendina aperta mentre scrivi, anche se vuota
     if (!results || !results.length) {
-      renderMessage('Nessun risultato');
+      renderEmpty('Nessun risultato');
       return;
     }
-    results.slice(0, 8).forEach((r) => {
+
+    results.slice(0, LIMIT).forEach((r) => {
       const parts = extractPartsFromGeocodeResult(r);
       const item = document.createElement('div');
-      item.className = 'addr-suggest__item';
-      item.innerHTML = `
-        <div class="addr-suggest__main">${escapeHtml(parts.street || parts.label || 'Risultato')}</div>
-        <div class="addr-suggest__sub">${escapeHtml([parts.cap, parts.citta, parts.provincia].filter(Boolean).join(' · '))}</div>
-      `;
-      // Compilazione SOLO su selezione
-      item.addEventListener('mousedown', (ev) => {
-        ev.preventDefault();
+      item.className = 'suggest-item';
+
+      const main = document.createElement('div');
+      main.className = 'suggest-main';
+      main.textContent = parts.label || r?.name || '';
+
+      const sub = document.createElement('div');
+      sub.className = 'suggest-sub';
+      const pieces = [];
+      if (parts.cap) pieces.push(parts.cap);
+      if (parts.citta) pieces.push(parts.citta);
+      if (parts.provincia) pieces.push(`(${parts.provincia})`);
+      sub.textContent = pieces.join(' ');
+
+      item.appendChild(main);
+      item.appendChild(sub);
+
+      item.addEventListener('mousedown', (e) => {
+        // mousedown per non perdere il focus prima del click
+        e.preventDefault();
         applyParts(parts);
         closeSuggest(box);
       });
+
       box.appendChild(item);
     });
-    openBox();
+
+    openSuggest(box);
   };
 
-  const geocodeViaLeaflet = (q) => new Promise((resolve) => {
+  async function photonSearch(qNorm, signal) {
+    const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(qNorm)}&lang=it&limit=${LIMIT}`;
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+      signal
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    const feats = Array.isArray(data?.features) ? data.features : [];
+    // Normalize to the shape expected by extractPartsFromGeocodeResult
+    return feats.map((f) => {
+      const p = f?.properties || {};
+      const a = p?.address || p || {};
+      // Build a stable label
+      const name = (p.name || p.street || p.locality || '').toString().trim();
+      const city = (a.city || a.town || a.village || a.municipality || '').toString().trim();
+      const postcode = (a.postcode || '').toString().trim();
+      const country = (a.country || '').toString().trim();
+      const label = p.label || [name, city, postcode, country].filter(Boolean).join(', ');
+      return { ...f, name: label, properties: { ...p, address: a, label } };
+    });
+  }
+
+  async function fallbackSearch(qNorm) {
+    if (!fallbackGeocoder || typeof fallbackGeocoder.geocode !== 'function') return [];
+    return await new Promise((resolve) => {
+      fallbackGeocoder.geocode(qNorm, (res) => resolve(res || []));
+    });
+  }
+
+  async function searchAddresses(queryRaw) {
+    const qNorm = normalizeQ(queryRaw);
+    if (qNorm.length < MIN_CHARS) return [];
+
+    if (cache.has(qNorm)) return cache.get(qNorm);
+
+    // Abort previous in-flight request
+    if (activeController) activeController.abort();
+    activeController = new AbortController();
+
+    let results = [];
     try {
-      leafletGeocoder.geocode(q, (res) => resolve(res || []));
-    } catch {
-      resolve([]);
+      results = await photonSearch(qNorm, activeController.signal);
+    } catch (e) {
+      // AbortError is normal while typing fast
+      if (e && e.name === 'AbortError') return [];
+      results = [];
     }
-  });
 
-  const geocodeViaFetch = async (q) => {
-    const qn = normalizeQ(q);
-    if (cache.has(qn)) return cache.get(qn);
-
-    if (activeCtrl) activeCtrl.abort();
-    activeCtrl = new AbortController();
-
-    // 1) Photon (gratis, spesso rapido)
-    const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=8&lang=it`;
-    try {
-      const r = await fetch(photonUrl, { signal: activeCtrl.signal });
-      if (r.ok) {
-        const j = await r.json();
-        const features = Array.isArray(j?.features) ? j.features : [];
-        const mapped = features.map(f => ({
-          name: f?.properties?.name || f?.properties?.label || '',
-          properties: f?.properties || {}
-        }));
-        cache.set(qn, mapped);
-        return mapped;
+    // If photon returns nothing, try fallback (nominatim)
+    if (!results || results.length === 0) {
+      try {
+        results = await fallbackSearch(qNorm);
+      } catch {
+        results = [];
       }
-    } catch (e) {
-      if (e && e.name === 'AbortError') throw e;
     }
 
-    // 2) Fallback Nominatim (gratis) - più soggetto a rate limit
-    const nomUrl = `https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=8&countrycodes=it&q=${encodeURIComponent(q)}`;
-    const r2 = await fetch(nomUrl, { signal: activeCtrl.signal, headers: { 'Accept': 'application/json' } });
-    const j2 = await r2.json();
-    const mapped2 = (Array.isArray(j2) ? j2 : []).map(x => ({
-      name: x?.display_name || '',
-      properties: { ...(x?.address || {}), postcode: x?.address?.postcode || x?.postcode || '' }
-    }));
-    cache.set(qn, mapped2);
-    return mapped2;
-  };
+    cache.set(qNorm, results || []);
+    return results || [];
+  }
 
-  const run = async () => {
-    const q = (inputEl.value || '').trim();
-    if (!q || q.length < 3) { closeSuggest(box); return; }
-    if (q === lastQ) return;
-    lastQ = q;
+  const handleInput = () => {
+    const q = (inputEl.value || '');
+    const qNorm = normalizeQ(q);
+    lastQuery = qNorm;
 
-    // Apri SUBITO la tendina (perceived speed)
-    renderMessage('Ricerca…');
+    // Apri subito con stato "Ricerca..."
+    if (qNorm.length >= MIN_CHARS) renderLoading();
+    else { closeSuggest(box); return; }
 
-    try {
-      const res = leafletGeocoder ? await geocodeViaLeaflet(q) : await geocodeViaFetch(q);
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(async () => {
+      // se nel frattempo è cambiata la query, ignora
+      const current = normalizeQ(inputEl.value || '');
+      if (current !== lastQuery) return;
+
+      const res = await searchAddresses(current);
+      // Re-check query
+      const after = normalizeQ(inputEl.value || '');
+      if (after !== current) return;
+
       renderOptions(res);
-    } catch (e) {
-      if (e && e.name === 'AbortError') return;
-      console.error('[ADDR] geocode error', e);
-      renderMessage('Errore ricerca indirizzo');
-    }
+    }, DEBOUNCE_MS);
   };
 
-  inputEl.addEventListener('input', () => {
-    clearTimeout(t);
-    // Debounce aggressivo per velocità percepita
-    t = setTimeout(run, 140);
-    openBox();
+  inputEl.addEventListener('input', handleInput);
+
+  // Close on outside click
+  document.addEventListener('mousedown', (e) => {
+    if (!box.contains(e.target) && e.target !== inputEl) closeSuggest(box);
   });
 
+  // If focus returns, show suggestions for current input
   inputEl.addEventListener('focus', () => {
-    if ((inputEl.value || '').trim().length >= 3) run();
-    else if (box.innerHTML.trim()) openBox();
-  });
-
-  inputEl.addEventListener('blur', () => {
-    setTimeout(() => closeSuggest(box), 180);
+    if ((inputEl.value || '').trim().length >= MIN_CHARS) handleInput();
   });
 }
+
 
   // Autofill indirizzo da condominio (Notizie / Immobili)
   document.getElementById('not-condominio')?.addEventListener('change', (e) => {
@@ -4046,7 +4100,8 @@ function applyCondominioAddressTo(prefix, condoName) {
       '',
       'Differenze rilevate:',
       ...diffs.map(d => `- ${pretty(d.field)}: "${d.from}" → "${d.to}"`)
-    ].join('\n');
+    ].join('
+');
 
     if (confirm(msg)) {
       diffs.forEach(d => {
