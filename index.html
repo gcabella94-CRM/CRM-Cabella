@@ -652,6 +652,7 @@
 
               <div class="card-body">
                 <form id="not-form">
+                    <input type="hidden" id="not-id" value="">
                   <div class="form-grid" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;">
 
                     <!-- Contatto proprietario -->
@@ -742,7 +743,8 @@
 
                   <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:8px;">
                     <button type="button" class="btn btn-sm" onclick="resetNotizieForm()">Pulisci</button>
-                    <button type="submit" class="btn btn-primary btn-sm">Salva notizia</button>
+                    <button type="button" class="btn btn-sm" id="not-cancel-edit" style="display:none;">Annulla modifica</button>
+                    <button type="submit" class="btn btn-primary btn-sm" id="not-save-btn">Salva notizia</button>
                   </div>
                 </form>
               </div>

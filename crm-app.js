@@ -1066,6 +1066,7 @@ function renderAgendaMonth() {
         <td>${caldoLabel}</td>
         <td>${staffObj ? staffObj.nome : ''}</td>
         <td>
+          <button class="btn btn-xs" data-not-edit="${n.id || ''}" title="Modifica notizia">✏️ Modifica</button>
           <button class="btn btn-xs" data-not-att="${n.id || ''}" title="Crea attività collegata">➕ Attività</button>
           <button class="btn btn-xs" data-not-imm="${n.id || ''}" title="Apri scheda inserimento immobile">🏠 Immobile</button>
         </td>
@@ -1082,6 +1083,13 @@ function renderAgendaMonth() {
     if (caldoEl) caldoEl.checked = false;
     const creaContattoEl = document.getElementById('not-crea-contatto');
     if (creaContattoEl) creaContattoEl.checked = true;
+    const idEl = document.getElementById('not-id');
+    if (idEl) idEl.value = '';
+    const saveBtn = document.getElementById('not-save-btn');
+    if (saveBtn) saveBtn.textContent = 'Salva notizia';
+    const cancelBtn = document.getElementById('not-cancel-edit');
+    if (cancelBtn) cancelBtn.style.display = 'none';
+
   }
 
   // Apre la scheda di inserimento immobile precompilando i dati a partire da una notizia
@@ -1341,8 +1349,10 @@ function renderAgendaMonth() {
 
       if (!Array.isArray(notizie)) notizie = [];
 
+      const existingId = (document.getElementById('not-id')?.value || '').trim();
+
       const notizia = {
-        id: genId('not'),
+        id: existingId || genId('not'),
         nome: nome,
         cognome: cognome,
         telefono: telefono,
@@ -1358,9 +1368,15 @@ function renderAgendaMonth() {
         note: note
       };
 
-      notizie.push(notizia);
+      if (existingId) {
+        const ix = (notizie || []).findIndex(x => x && x.id === existingId);
+        if (ix >= 0) notizie[ix] = notizia;
+        else notizie.push(notizia);
+      } else {
+        notizie.push(notizia);
+      }
       saveList(STORAGE_KEYS.notizie, notizie);
-      if (creaContatto) {
+      if (!existingId && creaContatto) {
         addContattoDaNotizia(notizia);
       }
       renderNotizie();
@@ -2294,6 +2310,13 @@ function closeAppuntamentoDialog() {
         return;
       }
 
+      // Modifica notizia
+      if (t.dataset && t.dataset.notEdit) {
+        const notId = t.dataset.notEdit;
+        if (notId) startEditNotizia(notId);
+        return;
+      }
+
       // Apri scheda inserimento immobile partendo da notizia
       if (t.dataset && t.dataset.notImm) {
         const notId = t.dataset.notImm;
@@ -2573,6 +2596,50 @@ function closeAppuntamentoDialog() {
       });
       exportCsv('operazioni_concluse.csv', rows);
     }
+
+  // Autofill indirizzo da condominio (Notizie / Immobili)
+  document.getElementById('not-condominio')?.addEventListener('change', (e) => {
+    applyCondominioAddressTo('not', e.target.value);
+  });
+  document.getElementById('imm-condominio')?.addEventListener('change', (e) => {
+    applyCondominioAddressTo('imm', e.target.value);
+  });
+
+  // Editing notizie
+  function startEditNotizia(notId) {
+    const n = (notizie || []).find(x => x && x.id === notId);
+    if (!n) return;
+    const view = document.getElementById('view-immobili');
+    // scroll nella sezione notizie (se esiste)
+    document.getElementById('app-notizia')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    document.getElementById('not-id').value = n.id || '';
+    document.getElementById('not-nome').value = n.nome || '';
+    document.getElementById('not-cognome').value = n.cognome || '';
+    document.getElementById('not-telefono').value = n.telefono || '';
+    document.getElementById('not-email').value = n.email || '';
+    document.getElementById('not-indirizzo').value = n.indirizzo || '';
+    document.getElementById('not-citta').value = n.citta || '';
+    document.getElementById('not-provincia').value = n.provincia || '';
+    const condEl = document.getElementById('not-condominio');
+    if (condEl) condEl.value = n.condominio || '';
+    document.getElementById('not-tipologia').value = n.tipologia || '';
+    document.getElementById('not-piano').value = n.piano || '';
+    document.getElementById('not-mq').value = (n.mq != null ? n.mq : '');
+    document.getElementById('not-caldo').checked = !!n.caldo;
+    document.getElementById('not-note').value = n.note || '';
+
+    const saveBtn = document.getElementById('not-save-btn');
+    if (saveBtn) saveBtn.textContent = 'Salva modifiche';
+    const cancelBtn = document.getElementById('not-cancel-edit');
+    if (cancelBtn) cancelBtn.style.display = '';
+  }
+
+  document.getElementById('not-cancel-edit')?.addEventListener('click', () => {
+    resetNotizieForm();
+  });
+
+
 /* ====== STAFF ====== */
 
     const STAFF_DEFAULT_COLORS = [
@@ -3693,6 +3760,35 @@ function loadPoligoni() {
 function savePoligoni() {
   try { localStorage.setItem(STORAGE_KEYS.poligoni, JSON.stringify(mappaPoligoni)); }
   catch (e) { console.warn('[POLIGONI] save error', e); }
+}
+
+
+function getCondominioByNome(nome) {
+  const n = (nome || '').trim().toLowerCase();
+  if (!n) return null;
+  const pol = loadPoligoni();
+  const list = (pol && Array.isArray(pol.condomini)) ? pol.condomini : [];
+  return list.find(c => ((c.nome || '').trim().toLowerCase() === n)) || null;
+}
+
+function applyCondominioAddressTo(prefix, condoName) {
+  const condo = getCondominioByNome(condoName);
+  if (!condo || !condo.indirizzo) return;
+
+  const addrEl = document.getElementById(prefix + '-indirizzo');
+  if (!addrEl) return;
+
+  const current = (addrEl.value || '').trim();
+  const target = (condo.indirizzo || '').trim();
+  if (!target) return;
+
+  if (!current) {
+    addrEl.value = target;
+  } else if (current !== target) {
+    // evita overwrite involontari
+    const ok = confirm('Vuoi sostituire l\'indirizzo con quello del condominio?\n\nCondominio: ' + (condo.nome || '') + '\nIndirizzo: ' + target);
+    if (ok) addrEl.value = target;
+  }
 }
 
 function ensurePoligoniLayers() {
