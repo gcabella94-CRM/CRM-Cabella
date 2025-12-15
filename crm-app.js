@@ -2662,34 +2662,62 @@ function closeSuggest(box) {
 function setupAddressAutocomplete({ inputId, cityId, provId, capId }) {
   const inputEl = document.getElementById(inputId);
   if (!inputEl) return;
-  const box = ensureSuggestBox(inputEl);
-  const geocoder = getAddrGeocoder();
-  if (!box || !geocoder) return;
 
-  let t = null;
-  let lastQ = '';
+  const box = ensureSuggestBox(inputEl);
+  if (!box) return;
+
+  // === Performance-first, free geocoding ===
+  // Use Photon (Komoot) which is generally faster than public Nominatim and designed for autocomplete-like queries.
+  // Debounce + abort + cache to avoid queued network calls while typing.
+  const PHOTON_URL = 'https://photon.komoot.io/api/';
+  const DEBOUNCE_MS = 140;
+  const MIN_CHARS = 3;
+  const LIMIT = 7;
+  const CACHE_MAX = 120;
+
+  const cache = new Map(); // key -> {ts, results}
+  let timer = null;
+  let activeController = null;
+  let lastKey = '';
+
+  const normalizeQ = (q) => (q || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  const cacheGet = (k) => (cache.has(k) ? cache.get(k) : null);
+  const cacheSet = (k, v) => {
+    cache.set(k, v);
+    // simple LRU: delete oldest when too big
+    if (cache.size > CACHE_MAX) {
+      const firstKey = cache.keys().next().value;
+      cache.delete(firstKey);
+    }
+  };
 
   const maybeSet = (el, val) => {
     if (!el || !val) return;
     const current = (el.value || '').trim();
-    if (!current) { el.value = val; return; }
-    if (current.toLowerCase() === val.toLowerCase()) return;
-    const ok = confirm(`Sovrascrivere "${current}" con "${val}"?`);
-    if (ok) el.value = val;
+    // Autocomplete should not pop confirmations: we fill only on explicit selection.
+    el.value = val;
   };
 
   const applyParts = (parts) => {
-    // street va SEMPRE nel campo input (indirizzo)
     if (parts.street) maybeSet(inputEl, parts.street);
     if (cityId) maybeSet(document.getElementById(cityId), parts.citta);
     if (provId) maybeSet(document.getElementById(provId), parts.provincia);
     if (capId) maybeSet(document.getElementById(capId), parts.cap);
   };
 
+  const renderLoading = () => {
+    box.innerHTML = `<div class="addr-suggest__item"><div class="addr-suggest__main">Ricerca…</div><div class="addr-suggest__sub">digitando: seleziona un risultato</div></div>`;
+    box.style.display = 'block';
+  };
+
   const renderOptions = (results) => {
     box.innerHTML = '';
-    if (!results || !results.length) { closeSuggest(box); return; }
-    results.slice(0, 8).forEach((r) => {
+    if (!results || !results.length) {
+      closeSuggest(box);
+      return;
+    }
+
+    results.slice(0, LIMIT).forEach((r) => {
       const parts = extractPartsFromGeocodeResult(r);
       const item = document.createElement('div');
       item.className = 'addr-suggest__item';
@@ -2697,6 +2725,7 @@ function setupAddressAutocomplete({ inputId, cityId, provId, capId }) {
         <div class="addr-suggest__main">${escapeHtml(parts.street || parts.label || 'Risultato')}</div>
         <div class="addr-suggest__sub">${escapeHtml([parts.cap, parts.citta, parts.provincia].filter(Boolean).join(' · '))}</div>
       `;
+      // Use mousedown so selection happens before blur closes the box
       item.addEventListener('mousedown', (ev) => {
         ev.preventDefault();
         applyParts(parts);
@@ -2704,24 +2733,86 @@ function setupAddressAutocomplete({ inputId, cityId, provId, capId }) {
       });
       box.appendChild(item);
     });
+
     box.style.display = 'block';
   };
 
-  const run = () => {
-    const q = (inputEl.value || '').trim();
-    if (q.length < 3) { closeSuggest(box); return; }
-    if (q === lastQ) return;
-    lastQ = q;
-    geocoder.geocode(q, (results) => renderOptions(results || []));
+  const photonToResult = (f) => {
+    const p = f && f.properties ? f.properties : {};
+    // Map Photon props to a structure compatible with extractPartsFromGeocodeResult()
+    const address = {
+      postcode: p.postcode || '',
+      city: p.city || p.town || p.village || p.municipality || '',
+      state: p.state || '',
+      county: p.county || '',
+      street: p.street || '',
+      housenumber: p.housenumber || '',
+      name: p.name || ''
+    };
+    return { name: p.name || p.label || '', properties: { address, ...p } };
+  };
+
+  const fetchPhoton = async (q) => {
+    const url = `${PHOTON_URL}?q=${encodeURIComponent(q)}&lang=it&limit=${LIMIT}`;
+    if (activeController) activeController.abort();
+    activeController = new AbortController();
+    const res = await fetch(url, { signal: activeController.signal, headers: { 'Accept': 'application/json' } });
+    if (!res.ok) return [];
+    const data = await res.json();
+    const feats = Array.isArray(data && data.features) ? data.features : [];
+    return feats.map(photonToResult);
+  };
+
+  const run = async () => {
+    const raw = inputEl.value || '';
+    const q = raw.trim();
+    const key = normalizeQ(q);
+
+    if (key.length < MIN_CHARS) {
+      closeSuggest(box);
+      lastKey = key;
+      return;
+    }
+
+    // Avoid re-running identical query
+    if (key === lastKey && box.style.display === 'block') return;
+    lastKey = key;
+
+    // Open dropdown immediately (feels instant), then fill results
+    renderLoading();
+
+    const cached = cacheGet(key);
+    if (cached) {
+      renderOptions(cached);
+      return;
+    }
+
+    try {
+      const results = await fetchPhoton(q);
+      cacheSet(key, results);
+      renderOptions(results);
+    } catch (e) {
+      if (e && e.name === 'AbortError') return;
+      closeSuggest(box);
+      console.error('[ADDR] autocomplete error', e);
+    }
   };
 
   inputEl.addEventListener('input', () => {
-    clearTimeout(t);
-    t = setTimeout(run, 220);
+    clearTimeout(timer);
+    timer = setTimeout(run, DEBOUNCE_MS);
   });
+
   inputEl.addEventListener('focus', () => {
-    if (box.innerHTML.trim()) box.style.display = 'block';
+    if ((inputEl.value || '').trim().length >= MIN_CHARS) {
+      // show last results quickly on refocus
+      const key = normalizeQ(inputEl.value);
+      const cached = cacheGet(key);
+      if (cached && cached.length) renderOptions(cached);
+      else run();
+    }
   });
+
   inputEl.addEventListener('blur', () => {
     setTimeout(() => closeSuggest(box), 180);
   });
@@ -3969,7 +4060,8 @@ function applyCondominioAddressTo(prefix, condoName) {
       '',
       'Differenze rilevate:',
       ...diffs.map(d => `- ${pretty(d.field)}: "${d.from}" → "${d.to}"`)
-    ].join('\n');
+    ].join('
+');
 
     if (confirm(msg)) {
       diffs.forEach(d => {
