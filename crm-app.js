@@ -2824,7 +2824,7 @@ function setupAddressAutocomplete({ inputId, cityId, provId, capId }) {
     clearTimeout(timer);
     timer = setTimeout(async () => {
       try {
-        const results = await photonSearch(q);
+        const results = await photonSearch(qNorm);
         renderResults(results);
       } catch (e) {
         if (e && e.name === 'AbortError') return;
