@@ -15,6 +15,10 @@
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script src="https://unpkg.com/leaflet.markercluster/dist/leaflet.markercluster.js"></script>
 
+  <!-- Leaflet Control Geocoder (autocomplete indirizzi) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css"/>
+  <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+
 
   <!-- Firebase Realtime Database (compat) -->
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
@@ -514,7 +518,7 @@
                     </div>
                     <div class="form-group">
                       <label>Indirizzo</label>
-                      <input type="text" id="imm-indirizzo" placeholder="Via, numero civico">
+                      <input type="text" id="imm-indirizzo" placeholder="Es. via micca 5 torino (autocomplete)" autocomplete="off" autocomplete="off">
                     </div>
 
                     <div class="form-group">
@@ -531,7 +535,13 @@
                       <input type="text" id="imm-provincia" placeholder="Es. MI">
                     </div>
 
-                    <!-- Tipologia / categoria -->
+                    
+
+                    <div class="form-group">
+                      <label>CAP</label>
+                      <input type="text" id="imm-cap" placeholder="Es. 10121">
+                    </div>
+<!-- Tipologia / categoria -->
                     <div class="form-group">
                       <label>Tipologia contratto</label>
                       <select id="imm-tipologia">
@@ -686,7 +696,7 @@
                     <!-- Dati immobile potenziale -->
                     <div class="form-group">
                       <label>Indirizzo immobile</label>
-                      <input type="text" id="not-indirizzo" placeholder="Via, numero">
+                      <input type="text" id="not-indirizzo" placeholder="Es. via micca 5 torino (autocomplete)" autocomplete="off" autocomplete="off">
                     </div>
                     <div class="form-group">
                       <label>Città</label>
@@ -698,7 +708,13 @@
                       <input type="text" id="not-provincia" placeholder="Es. MI">
                     </div>
 
+                    
+
                     <div class="form-group">
+                      <label>CAP</label>
+                      <input type="text" id="not-cap" placeholder="Es. 10121">
+                    </div>
+<div class="form-group">
                       <label>Condominio (opz.)</label>
                       <input type="text" id="not-condominio" list="condomini-datalist" placeholder="Seleziona o scrivi nome condominio">
                     </div>
@@ -1371,9 +1387,22 @@
         </div>
         <div class="form-group">
           <label>Indirizzo</label>
-          <input type="text" id="condominio-indirizzo" placeholder="Via, numero civico, città">
+          <input type="text" id="condominio-indirizzo" placeholder="Es. via micca 5 torino (autocomplete)" autocomplete="off" autocomplete="off">
         </div>
-        <div class="muted">Suggerimento: per associare una scheda immobile, compila il campo “Condominio” con lo stesso nome.</div>
+        <div class="form-group">
+          <label>Città</label>
+          <input type="text" id="condominio-citta" placeholder="Città">
+        </div>
+        <div class="form-group">
+          <label>Provincia</label>
+          <input type="text" id="condominio-provincia" placeholder="Es. MI">
+        </div>
+        
+        <div class="form-group">
+          <label>CAP</label>
+          <input type="text" id="condominio-cap" placeholder="Es. 10121">
+        </div>
+<div class="muted">Suggerimento: per associare una scheda immobile, compila il campo “Condominio” con lo stesso nome.</div>
       </div>
       <div class="condominio-modal__actions">
         <button type="button" id="condominio-cancel" class="btn">Annulla</button>

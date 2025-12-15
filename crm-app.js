@@ -2597,6 +2597,136 @@ function closeAppuntamentoDialog() {
       exportCsv('operazioni_concluse.csv', rows);
     }
 
+/* ====== AUTOCOMPLETE INDIRIZZI (stile Google-like con tendina opzioni) ======
+   Usa Leaflet Control Geocoder (Nominatim) per scomporre: via+civico / CAP / città / provincia.
+   - Se ci sono più risultati: mostra tendina sotto il campo.
+   - Se selezioni un'opzione: compila i campi collegati.
+*/
+let __addrGeocoder = null;
+function getAddrGeocoder() {
+  try {
+    if (__addrGeocoder) return __addrGeocoder;
+    if (typeof L === 'undefined' || !L.Control || !L.Control.Geocoder) return null;
+    __addrGeocoder = L.Control.Geocoder.nominatim({
+      geocodingQueryParams: { countrycodes: 'it', addressdetails: 1 }
+    });
+    return __addrGeocoder;
+  } catch { return null; }
+}
+
+function pickProvinceAbbrev(addr = {}) {
+  const iso = addr['ISO3166-2-lvl6'] || addr['ISO3166-2-lvl5'] || '';
+  if (typeof iso === 'string' && iso.includes('-')) return iso.split('-').pop().trim();
+  const p = (addr.province || addr.state_district || addr.county || '').toString().trim();
+  return p;
+}
+
+function normalizeStreet(addr = {}) {
+  const road = (addr.road || addr.pedestrian || addr.cycleway || addr.footway || addr.path || '').toString().trim();
+  const hn = (addr.house_number || '').toString().trim();
+  if (!road && !hn) return '';
+  return (road + ' ' + hn).trim();
+}
+
+function extractPartsFromGeocodeResult(r) {
+  const props = r?.properties || {};
+  const a = props.address || props;
+  const cap = (a.postcode || '').toString().trim();
+  const citta = (a.city || a.town || a.village || a.municipality || a.hamlet || '').toString().trim();
+  const provincia = pickProvinceAbbrev(a);
+  const street = normalizeStreet(a);
+  return { street, cap, citta, provincia, label: r?.name || '' };
+}
+
+function ensureSuggestBox(inputEl) {
+  if (!inputEl) return null;
+  const parent = inputEl.closest('.form-group') || inputEl.parentElement;
+  if (!parent) return null;
+  parent.classList.add('has-addr-suggest');
+  let box = parent.querySelector('.addr-suggest');
+  if (!box) {
+    box = document.createElement('div');
+    box.className = 'addr-suggest';
+    box.style.display = 'none';
+    parent.appendChild(box);
+  }
+  return box;
+}
+
+function closeSuggest(box) {
+  if (!box) return;
+  box.innerHTML = '';
+  box.style.display = 'none';
+}
+
+function setupAddressAutocomplete({ inputId, cityId, provId, capId }) {
+  const inputEl = document.getElementById(inputId);
+  if (!inputEl) return;
+  const box = ensureSuggestBox(inputEl);
+  const geocoder = getAddrGeocoder();
+  if (!box || !geocoder) return;
+
+  let t = null;
+  let lastQ = '';
+
+  const maybeSet = (el, val) => {
+    if (!el || !val) return;
+    const current = (el.value || '').trim();
+    if (!current) { el.value = val; return; }
+    if (current.toLowerCase() === val.toLowerCase()) return;
+    const ok = confirm(`Sovrascrivere "${current}" con "${val}"?`);
+    if (ok) el.value = val;
+  };
+
+  const applyParts = (parts) => {
+    // street va SEMPRE nel campo input (indirizzo)
+    if (parts.street) maybeSet(inputEl, parts.street);
+    if (cityId) maybeSet(document.getElementById(cityId), parts.citta);
+    if (provId) maybeSet(document.getElementById(provId), parts.provincia);
+    if (capId) maybeSet(document.getElementById(capId), parts.cap);
+  };
+
+  const renderOptions = (results) => {
+    box.innerHTML = '';
+    if (!results || !results.length) { closeSuggest(box); return; }
+    results.slice(0, 8).forEach((r) => {
+      const parts = extractPartsFromGeocodeResult(r);
+      const item = document.createElement('div');
+      item.className = 'addr-suggest__item';
+      item.innerHTML = `
+        <div class="addr-suggest__main">${escapeHtml(parts.street || parts.label || 'Risultato')}</div>
+        <div class="addr-suggest__sub">${escapeHtml([parts.cap, parts.citta, parts.provincia].filter(Boolean).join(' · '))}</div>
+      `;
+      item.addEventListener('mousedown', (ev) => {
+        ev.preventDefault();
+        applyParts(parts);
+        closeSuggest(box);
+      });
+      box.appendChild(item);
+    });
+    box.style.display = 'block';
+  };
+
+  const run = () => {
+    const q = (inputEl.value || '').trim();
+    if (q.length < 3) { closeSuggest(box); return; }
+    if (q === lastQ) return;
+    lastQ = q;
+    geocoder.geocode(q, (results) => renderOptions(results || []));
+  };
+
+  inputEl.addEventListener('input', () => {
+    clearTimeout(t);
+    t = setTimeout(run, 220);
+  });
+  inputEl.addEventListener('focus', () => {
+    if (box.innerHTML.trim()) box.style.display = 'block';
+  });
+  inputEl.addEventListener('blur', () => {
+    setTimeout(() => closeSuggest(box), 180);
+  });
+}
+
   // Autofill indirizzo da condominio (Notizie / Immobili)
   document.getElementById('not-condominio')?.addEventListener('change', (e) => {
     applyCondominioAddressTo('not', e.target.value);
@@ -3771,25 +3901,85 @@ function getCondominioByNome(nome) {
   return list.find(c => ((c.nome || '').trim().toLowerCase() === n)) || null;
 }
 
+function formatCondominioAddress(condo) {
+  if (!condo) return '';
+  const parts = [];
+  const a = (condo.indirizzo || '').trim();
+  const c = (condo.citta || '').trim();
+  const p = (condo.provincia || '').trim();
+  if (a) parts.push(a);
+  if (c) parts.push(c);
+  if (p) parts.push(p);
+  return parts.join(', ');
+}
+
 function applyCondominioAddressTo(prefix, condoName) {
   const condo = getCondominioByNome(condoName);
-  if (!condo || !condo.indirizzo) return;
+  if (!condo) return;
 
-  const addrEl = document.getElementById(prefix + '-indirizzo');
-  if (!addrEl) return;
+  const target = {
+    indirizzo: (condo.indirizzo || '').trim(),
+    citta: (condo.citta || '').trim(),
+    provincia: (condo.provincia || '').trim()
+  };
 
-  const current = (addrEl.value || '').trim();
-  const target = (condo.indirizzo || '').trim();
-  if (!target) return;
+  // Se non abbiamo nulla da applicare, esci
+  if (!target.indirizzo && !target.citta && !target.provincia) return;
 
-  if (!current) {
-    addrEl.value = target;
-  } else if (current !== target) {
-    // evita overwrite involontari
-    const ok = confirm('Vuoi sostituire l\'indirizzo con quello del condominio?\n\nCondominio: ' + (condo.nome || '') + '\nIndirizzo: ' + target);
-    if (ok) addrEl.value = target;
+  const els = {
+    indirizzo: document.getElementById(prefix + '-indirizzo'),
+    citta: document.getElementById(prefix + '-citta'),
+    provincia: document.getElementById(prefix + '-provincia')
+  };
+
+  // Se i campi della scheda non esistono, esci
+  if (!els.indirizzo && !els.citta && !els.provincia) return;
+
+  const current = {
+    indirizzo: (els.indirizzo?.value || '').trim(),
+    citta: (els.citta?.value || '').trim(),
+    provincia: (els.provincia?.value || '').trim()
+  };
+
+  // Applica in automatico solo dove vuoto
+  let needsConfirm = false;
+  const diffs = [];
+
+  (['indirizzo','citta','provincia']).forEach(k => {
+    if (!els[k]) return;
+    const cur = current[k];
+    const tar = target[k];
+    if (!tar) return;
+
+    if (!cur) {
+      // riempi subito
+      els[k].value = tar;
+    } else if (cur !== tar) {
+      needsConfirm = true;
+      diffs.push({ field: k, from: cur, to: tar });
+    }
+  });
+
+  if (needsConfirm) {
+    const pretty = (k) => (k === 'indirizzo' ? 'Indirizzo' : (k === 'citta' ? 'Città' : 'Provincia'));
+    const msg = [
+      'Vuoi sostituire i dati indirizzo con quelli del Condominio?',
+      'Condominio: ' + (condo.nome || ''),
+      'Dati condominio: ' + formatCondominioAddress(condo),
+      '',
+      'Differenze rilevate:',
+      ...diffs.map(d => `- ${pretty(d.field)}: "${d.from}" → "${d.to}"`)
+    ].join('
+');
+
+    if (confirm(msg)) {
+      diffs.forEach(d => {
+        if (els[d.field]) els[d.field].value = d.to;
+      });
+    }
   }
 }
+
 
 function ensurePoligoniLayers() {
   if (!mappa) return;
@@ -3923,7 +4113,7 @@ function onMapDblClickForDrawing(e) {
   }
 }
 
-function openCondominioModal(initialNome='', initialIndirizzo='') {
+function openCondominioModal(initialNome='', initialIndirizzo='', initialCitta='', initialProvincia='', initialCap='') {
   const modal = document.getElementById('condominio-modal');
   if (!modal) {
     alert('UI condominio non trovata (condominio-modal).');
@@ -3931,8 +4121,14 @@ function openCondominioModal(initialNome='', initialIndirizzo='') {
   }
   const nameEl = document.getElementById('condominio-nome');
   const addrEl = document.getElementById('condominio-indirizzo');
+  const cityEl = document.getElementById('condominio-citta');
+  const provEl = document.getElementById('condominio-provincia');
+  const capEl = document.getElementById('condominio-cap');
   if (nameEl) nameEl.value = initialNome || '';
   if (addrEl) addrEl.value = initialIndirizzo || '';
+  if (cityEl) cityEl.value = initialCitta || '';
+  if (provEl) provEl.value = initialProvincia || '';
+  if (capEl) capEl.value = initialCap || '';
 
   modal.classList.add('open');
   setTimeout(() => { try { nameEl && nameEl.focus(); } catch {} }, 0);
@@ -3951,10 +4147,13 @@ function openCondominioModal(initialNome='', initialIndirizzo='') {
       if (id === 'condominio-save') {
         const nome = (nameEl?.value || '').trim();
         const indirizzo = (addrEl?.value || '').trim();
+        const citta = (cityEl?.value || '').trim();
+        const provincia = (provEl?.value || '').trim();
+        const cap = (capEl?.value || '').trim();
         if (!nome) { alert('Inserisci un nome condominio.'); return; }
         modal.classList.remove('open');
         cleanup();
-        resolve({ ok: true, nome, indirizzo });
+        resolve({ ok: true, nome, indirizzo, citta, provincia, cap });
       } else {
         modal.classList.remove('open');
         cleanup();
@@ -3990,6 +4189,9 @@ async function finalizePolygon() {
       kind: 'condominio',
       nome: res.nome,
       indirizzo: res.indirizzo || '',
+      citta: res.citta || '',
+      provincia: res.provincia || '',
+      cap: res.cap || '',
       latlngs,
       createdAt: Date.now()
     };
@@ -4076,7 +4278,7 @@ function renderCondominiList() {
     const notCount = (notizie || []).filter(n => ((n.condominio || '').trim().toLowerCase() === key)).length;
     item.innerHTML = `
       <div class="condominio-item__name">${escapeHtml(c.nome || 'Condominio')}</div>
-      <div class="condominio-item__addr">${escapeHtml(c.indirizzo || '')}</div>
+      <div class="condominio-item__addr">${escapeHtml(formatCondominioAddress(c) || '')}</div>
       <div class="condominio-item__meta">${immCount} immobili · ${notCount} notizie</div>
     `;
     item.addEventListener('click', () => {
@@ -4111,7 +4313,7 @@ function openCondominioPanel(condoId) {
     <div class="condominio-detail__head">
       <div>
         <div class="condominio-detail__name">${escapeHtml(c.nome || 'Condominio')}</div>
-        <div class="condominio-detail__addr">${escapeHtml(c.indirizzo || '')}</div>
+        <div class="condominio-detail__addr">${escapeHtml(formatCondominioAddress(c) || '')}</div>
       </div>
       <div class="condominio-detail__count">${contenutiImm.length} immobili · ${contenutiNot.length} notizie</div>
     </div>
@@ -4666,6 +4868,12 @@ function initPoligoniModule() {
   
       
 setView('home');
+
+// Autocomplete indirizzi (Immobile / Notizia / Condominio)
+setupAddressAutocomplete({ inputId: 'imm-indirizzo', cityId: 'imm-citta', provId: 'imm-provincia', capId: 'imm-cap' });
+setupAddressAutocomplete({ inputId: 'not-indirizzo', cityId: 'not-citta', provId: 'not-provincia', capId: 'not-cap' });
+setupAddressAutocomplete({ inputId: 'condominio-indirizzo', cityId: 'condominio-citta', provId: 'condominio-provincia', capId: 'condominio-cap' });
+
   }
 
   
