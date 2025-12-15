@@ -2782,13 +2782,9 @@ function setupAddressAutocomplete({ inputId, cityId, provId, capId }) {
     if (controller) controller.abort();
     controller = new AbortController();
 
-    const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=${LIMIT}&lang=it`;
+    const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=${LIMIT}`;
     const res = await fetch(url, { signal: controller.signal, headers: { 'Accept': 'application/json' }});
-    if (!res.ok) {
-      // Photon returns 400 when 'q' is missing/empty; don't spam console, just return no results.
-      if (res.status === 400) return [];
-      return [];
-    }
+    if (!res.ok) return [];
     const data = await res.json();
 
     const out = (data.features || []).map(f => {
@@ -2809,6 +2805,42 @@ function setupAddressAutocomplete({ inputId, cityId, provId, capId }) {
     return out;
   }
 
+
+  async function nominatimSearch(qRaw) {
+    const q = norm(qRaw);
+    if (q.length < MIN_CHARS) return [];
+    if (cache.has('n:'+q)) return cache.get('n:'+q);
+
+    // nota: Nominatim pubblico è più lento e con rate limit, usiamolo solo come fallback
+    const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=${LIMIT}&q=${encodeURIComponent(q)}`;
+    const res = await fetch(url, { headers: { 'Accept': 'application/json' }});
+    if (!res.ok) return [];
+    const data = await res.json();
+
+    const out = (data || []).map(item => {
+      const a = item.address || {};
+      const street = (a.road || a.pedestrian || a.cycleway || a.footway || a.path || '').trim();
+      const housenumber = (a.house_number || '').trim();
+      const postcode = (a.postcode || '').trim();
+      const city = (a.city || a.town || a.village || a.municipality || a.county || '').trim();
+      const prov = (a.state || a.province || '').trim();
+      const label = [street || item.display_name, housenumber, city].filter(Boolean).join(' ').trim();
+      const meta = [postcode, city, prov].filter(Boolean).join(' · ');
+      return {
+        label,
+        name: street || (item.display_name || ''),
+        city,
+        prov,
+        cap: postcode,
+        lat: item.lat ? parseFloat(item.lat) : null,
+        lon: item.lon ? parseFloat(item.lon) : null,
+        meta
+      };
+    }).filter(x => x.label);
+
+    cache.set('n:'+q, out);
+    return out;
+  }
   // UI events
   function scheduleSearch() {
     const qRaw = input.value || '';
