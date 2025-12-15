@@ -3969,8 +3969,7 @@ function applyCondominioAddressTo(prefix, condoName) {
       '',
       'Differenze rilevate:',
       ...diffs.map(d => `- ${pretty(d.field)}: "${d.from}" → "${d.to}"`)
-    ].join('
-');
+    ].join('\n');
 
     if (confirm(msg)) {
       diffs.forEach(d => {
