@@ -894,10 +894,11 @@
   top: 70px;
   width: min(360px, calc(100% - 28px));
   max-height: calc(100% - 90px);
-  background: rgba(255,255,255,0.98);
-  border: 1px solid rgba(0,0,0,0.10);
+  background: radial-gradient(circle at 0 0, #0b1220, #020617 60%, #000 100%);
+  color: var(--text-main);
+  border: 1px solid rgba(148,163,184,0.22);
   border-radius: 16px;
-  box-shadow: 0 12px 30px rgba(0,0,0,0.15);
+  box-shadow: 0 18px 50px rgba(0,0,0,0.92);
   overflow: hidden;
   z-index: 600; /* sopra la mappa */
   display: none;
@@ -905,29 +906,43 @@
 .condomini-panel.open { display: block; }
 .condomini-panel__header {
   display: flex; justify-content: space-between; align-items: center;
-  padding: 10px 12px; border-bottom: 1px solid rgba(0,0,0,0.08);
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(148,163,184,0.16);
 }
-.condomini-panel__title { font-weight: 700; }
-.condomini-panel__close { border: 0; background: transparent; font-size: 16px; cursor: pointer; opacity: .8; }
+.condomini-panel__title { font-weight: 800; letter-spacing: 0.01em; }
+.condomini-panel__close { color: var(--text-main); border: 0; background: transparent; font-size: 16px; cursor: pointer; opacity: .9; }
 .condomini-panel__close:hover { opacity: 1; }
 
 .condomini-panel__body { padding: 10px 12px; overflow: auto; max-height: calc(100% - 44px); }
 
-.condominio-item { padding: 10px 10px; border: 1px solid rgba(0,0,0,0.08); border-radius: 14px; cursor: pointer; margin-bottom: 8px; }
-.condominio-item:hover { background: rgba(0,0,0,0.03); }
-.condominio-item__name { font-weight: 700; }
-.condominio-item__addr { font-size: 12px; opacity: .75; margin-top: 2px; }
+.condominio-item {
+  padding: 10px 10px;
+  border: 1px solid rgba(148,163,184,0.16);
+  border-radius: 14px;
+  cursor: pointer;
+  margin-bottom: 8px;
+  background: rgba(2,6,23,0.35);
+}
+.condominio-item:hover { background: rgba(34,197,94,0.14); border-color: rgba(34,197,94,0.28); }
+.condominio-item__name { font-weight: 800; color: #ffffff; }
+.condominio-item__addr { font-size: 12px; color: rgba(255,255,255,0.80); margin-top: 2px; }
 
-.condominio-detail { margin-top: 10px; padding-top: 10px; border-top: 1px dashed rgba(0,0,0,0.15); }
+.condominio-detail { margin-top: 10px; padding-top: 10px; border-top: 1px dashed rgba(148,163,184,0.22); }
 .condominio-detail__head { display: flex; justify-content: space-between; gap: 10px; align-items: center; margin-bottom: 10px; }
-.condominio-detail__name { font-weight: 800; font-size: 16px; }
-.condominio-detail__addr { font-size: 12px; opacity: .75; }
-.condominio-detail__count { font-weight: 700; font-size: 12px; padding: 4px 8px; border-radius: 999px; background: rgba(0,0,0,0.06); }
+.condominio-detail__name { font-weight: 900; font-size: 16px; color: #ffffff; }
+.condominio-detail__addr { font-size: 12px; color: rgba(255,255,255,0.80); }
+.condominio-detail__count { font-weight: 800; font-size: 12px; padding: 4px 8px; border-radius: 999px; background: rgba(148,163,184,0.16); color: #ffffff; }
 
-.condominio-imm { display: flex; justify-content: space-between; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 12px; border: 1px solid rgba(0,0,0,0.08); margin-bottom: 8px; }
-.condominio-imm__rif { font-weight: 700; font-size: 12px; }
-.condominio-imm__addr { font-size: 12px; opacity: .75; }
-.muted { opacity: .7; font-size: 12px; }
+.condominio-imm {
+  display: flex; justify-content: space-between; gap: 10px; align-items: center;
+  padding: 8px 10px; border-radius: 12px;
+  border: 1px solid rgba(148,163,184,0.16);
+  margin-bottom: 8px;
+  background: rgba(2,6,23,0.28);
+}
+.condominio-imm__rif { font-weight: 800; font-size: 12px; color: #ffffff; }
+.condominio-imm__addr { font-size: 12px; color: rgba(255,255,255,0.78); }
+.muted { color: rgba(255,255,255,0.72); font-size: 12px; }
 
 /* ====== MODALE CONDOMINIO ====== */
 .condominio-modal {
@@ -1001,37 +1016,44 @@
 /* ====== Autocomplete indirizzi ====== */
 .form-group.has-addr-suggest { position: relative; }
 
+/* Contrasto aumentato: fondo più chiaro (dark), testo più luminoso, separatori più netti */
 .addr-suggest{
   position:absolute;
   left:0;
   right:0;
   top: calc(100% + 6px);
-  border: 1px solid #1f2937;
-  background: radial-gradient(circle at 0 0, #020617, #020617 60%, #000 100%);
-  box-shadow: 0 18px 50px rgba(0,0,0,0.9);
+  border: 1px solid rgba(148,163,184,0.28); /* slate-400 */
+  background: #0b1220; /* dark but not black */
+  box-shadow: 0 18px 50px rgba(0,0,0,0.92);
   border-radius: 12px;
   z-index: 9999;
   overflow: hidden;
-  max-height: 260px;
+  max-height: 280px;
   overflow-y: auto;
 }
 
 .addr-suggest__item{
-  padding: 8px 10px;
+  padding: 9px 10px;
   cursor: pointer;
-  border-bottom: 1px solid rgba(31,41,55,0.8);
+  border-bottom: 1px solid rgba(148,163,184,0.14);
 }
 .addr-suggest__item:last-child{ border-bottom: none; }
-.addr-suggest__item:hover{
-  background: radial-gradient(circle at 0 0, rgba(34,197,94,0.14), rgba(2,6,23,0.9));
+
+.addr-suggest__item:hover,
+.addr-suggest__item:focus{
+  outline: none;
+  background: rgba(34,197,94,0.18);
 }
+
 .addr-suggest__main{
-  font-size: 12px;
-  color: #e5e7eb;
-  font-weight: 600;
+  font-size: 12.5px;
+  color: #ffffff;
+  font-weight: 700;
+  letter-spacing: 0.01em;
 }
+
 .addr-suggest__sub{
   margin-top: 2px;
-  font-size: 11px;
-  color: #9ca3af;
+  font-size: 11.5px;
+  color: rgba(255,255,255,0.82);
 }
