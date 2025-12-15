@@ -1186,3 +1186,54 @@
 .autocomplete-dropdown::-webkit-scrollbar-track {
     background: #1e1f22;
 }
+/* =====================================================
+   OVERRIDE FORTE: TENDINA RICERCA INDIRIZZI (stile condomini)
+   ===================================================== */
+
+/* Contenitore tendina */
+.addr-suggest{
+  background: #0b1220 !important;          /* dark */
+  color: #f8fafc !important;               /* testo chiaro */
+  border: 1px solid #334155 !important;    /* bordo leggibile */
+  box-shadow: 0 12px 30px rgba(0,0,0,.55) !important;
+  border-radius: 12px !important;
+  overflow: hidden !important;
+}
+
+/* Forza opacità piena su tutto (a volte arriva “sbiadita”) */
+.addr-suggest, .addr-suggest *{
+  opacity: 1 !important;
+}
+
+/* Elementi lista */
+.addr-suggest__item{
+  background: transparent !important;
+  color: #f8fafc !important;
+  border-bottom: 1px solid rgba(148,163,184,.22) !important;
+}
+
+/* Riga principale (via/civico) */
+.addr-suggest__main{
+  color: #f8fafc !important;
+  font-weight: 700 !important;
+  font-size: 13.5px !important;
+}
+
+/* Riga secondaria (CAP - città - provincia) */
+.addr-suggest__sub{
+  color: #cbd5e1 !important;
+  font-size: 12px !important;
+}
+
+/* Hover (come “condomini”) */
+.addr-suggest__item:hover{
+  background: rgba(34,197,94,.18) !important; /* verde soft */
+}
+
+/* Scrollbar (Chrome) */
+.addr-suggest::-webkit-scrollbar{ width: 10px; }
+.addr-suggest::-webkit-scrollbar-track{ background: #0b1220; }
+.addr-suggest::-webkit-scrollbar-thumb{
+  background: #334155;
+  border-radius: 8px;
+}
