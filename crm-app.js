@@ -2784,7 +2784,11 @@ function setupAddressAutocomplete({ inputId, cityId, provId, capId }) {
 
     const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=${LIMIT}&lang=it`;
     const res = await fetch(url, { signal: controller.signal, headers: { 'Accept': 'application/json' }});
-    if (!res.ok) return [];
+    if (!res.ok) {
+      // Photon returns 400 when 'q' is missing/empty; don't spam console, just return no results.
+      if (res.status === 400) return [];
+      return [];
+    }
     const data = await res.json();
 
     const out = (data.features || []).map(f => {
