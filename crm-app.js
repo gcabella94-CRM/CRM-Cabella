@@ -2807,8 +2807,18 @@ function setupAddressAutocomplete({ inputId, cityId, provId, capId }) {
 
   // UI events
   function scheduleSearch() {
-    const q = input.value || '';
+    const qRaw = input.value || '';
+    const qNorm = norm(qRaw);
+
     openDropdown();
+
+    // Evita chiamate inutili (e 400) quando la query è troppo corta
+    if (qNorm.length < MIN_CHARS) {
+      clearTimeout(timer);
+      renderMessage(`Scrivi almeno ${MIN_CHARS} caratteri`);
+      return;
+    }
+
     renderMessage('Ricerca…');
 
     clearTimeout(timer);
