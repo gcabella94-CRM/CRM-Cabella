@@ -2668,6 +2668,7 @@ function setupAddressAutocomplete({ inputId, cityId, provId, capId }) {
 
   let t = null;
   let lastQ = '';
+  let lastResults = [];
 
   const maybeSet = (el, val) => {
     if (!el || !val) return;
@@ -2688,7 +2689,8 @@ function setupAddressAutocomplete({ inputId, cityId, provId, capId }) {
 
   const renderOptions = (results) => {
     box.innerHTML = '';
-    if (!results || !results.length) { closeSuggest(box); return; }
+    if (!results || !results.length) { lastResults = []; closeSuggest(box); return; }
+    lastResults = results || [];
     results.slice(0, 8).forEach((r) => {
       const parts = extractPartsFromGeocodeResult(r);
       const item = document.createElement('div');
@@ -2714,6 +2716,31 @@ function setupAddressAutocomplete({ inputId, cityId, provId, capId }) {
     lastQ = q;
     geocoder.geocode(q, (results) => renderOptions(results || []));
   };
+
+
+  const pickFirstResult = (results) => {
+    if (!results || !results.length) return false;
+    const parts = extractPartsFromGeocodeResult(results[0]);
+    applyParts(parts);
+    closeSuggest(box);
+    return true;
+  };
+
+  // Enter = autoseleziona il primo risultato (stile Google-like) senza obbligare il click
+  inputEl.addEventListener('keydown', (ev) => {
+    if (ev.key !== 'Enter') return;
+    ev.preventDefault();
+    const q = (inputEl.value || '').trim();
+    if (q.length < 3) return;
+    if (box.style.display === 'block' && lastResults && lastResults.length) {
+      pickFirstResult(lastResults);
+      return;
+    }
+    geocoder.geocode(q, (results) => {
+      // se arriva 1 solo risultato, autocompila; se più, mostra tendina
+      if (!pickFirstResult(results || [])) renderOptions(results || []);
+    });
+  });
 
   inputEl.addEventListener('input', () => {
     clearTimeout(t);
@@ -3969,7 +3996,8 @@ function applyCondominioAddressTo(prefix, condoName) {
       '',
       'Differenze rilevate:',
       ...diffs.map(d => `- ${pretty(d.field)}: "${d.from}" → "${d.to}"`)
-    ].join('\n');
+    ].join('
+');
 
     if (confirm(msg)) {
       diffs.forEach(d => {
