@@ -916,6 +916,7 @@ function renderAgendaMonth() {
       const caldoLabel = imm.caldo ? '🔥' : '';  
       tr.dataset.phone = imm.proprietarioTelefono || '';
       tr.dataset.email = imm.proprietarioEmail || '';
+      if ((imm.condominio || '').trim()) tr.classList.add('in-condominio-immobile');
       
       tr.innerHTML = `
         <td>${imm.rif || ''}</td>
@@ -1049,13 +1050,16 @@ function renderAgendaMonth() {
       const nomeCompleto = ((n.nome || '') + ' ' + (n.cognome || '')).trim();
       const caldoLabel = n.caldo ? '🔥' : '';
       const indirizzoCompleto = [n.indirizzo || '', n.citta || ''].filter(Boolean).join(' - ');
+      const condoName = (n.condominio || '').trim();
+      if (condoName) tr.classList.add('in-condominio-notizia');
+      const condoBadge = condoName ? ` <span class="badge-condominio badge-condominio--notizia">🏢 ${escapeHtml(condoName)}</span>` : '';
       tr.dataset.phone = n.telefono || '';
       tr.dataset.email = n.email || '';
 
       tr.innerHTML = `
         <td>${nomeCompleto || '—'}</td>
         <td>${n.telefono || ''}</td>
-        <td>${indirizzoCompleto}</td>
+        <td>${escapeHtml(indirizzoCompleto)}${condoBadge}</td>
         <td>${n.tipologia || ''}</td>
         <td>${n.piano || ''}</td>
         <td>${n.mq != null ? n.mq : ''}</td>
@@ -1320,6 +1324,7 @@ function renderAgendaMonth() {
       const indirizzo = document.getElementById('not-indirizzo').value.trim();
       const citta = document.getElementById('not-citta').value.trim();
       const provincia = document.getElementById('not-provincia').value.trim();
+      const condominio = (document.getElementById('not-condominio')?.value || '').trim();
       const tipologia = document.getElementById('not-tipologia').value || '';
       const piano = document.getElementById('not-piano').value.trim();
       const mqStr = document.getElementById('not-mq').value.trim();
@@ -1345,6 +1350,7 @@ function renderAgendaMonth() {
         indirizzo: indirizzo,
         citta: citta,
         provincia: provincia,
+        condominio: condominio,
         tipologia: tipologia,
         piano: piano,
         mq: mq,
@@ -3894,6 +3900,8 @@ async function finalizePolygon() {
     mappaPoligoni.condomini.push(rec);
     savePoligoni();
     renderPoligoni();
+    updateCondominiDatalist();
+    renderCondominiList();
     // zoom sul nuovo poligono
     try { mappa.fitBounds(L.polygon(latlngs.map(p=>[p.lat,p.lng])).getBounds(), { padding: [20,20] }); } catch {}
     openCondominioPanel(rec.id);
@@ -3938,8 +3946,22 @@ function ensureCondominiPanel() {
   closeBtn && closeBtn.addEventListener('click', () => panel.classList.remove('open'));
 }
 
+function updateCondominiDatalist() {
+  const dl = document.getElementById('condomini-datalist');
+  if (!dl) return;
+  dl.innerHTML = '';
+  const arr = (mappaPoligoni.condomini || []).slice().sort((a,b)=> (a.nome||'').localeCompare(b.nome||''));
+  arr.forEach(c => {
+    if (!c || !c.nome) return;
+    const opt = document.createElement('option');
+    opt.value = c.nome;
+    dl.appendChild(opt);
+  });
+}
+
 function renderCondominiList() {
   ensureCondominiPanel();
+  updateCondominiDatalist();
   const listEl = document.getElementById('condomini-list');
   if (!listEl) return;
   listEl.innerHTML = '';
@@ -3953,9 +3975,13 @@ function renderCondominiList() {
   arr.forEach(c => {
     const item = document.createElement('div');
     item.className = 'condominio-item';
+    const key = (c.nome || '').trim().toLowerCase();
+    const immCount = (immobili || []).filter(im => ((im.condominio || '').trim().toLowerCase() === key)).length;
+    const notCount = (notizie || []).filter(n => ((n.condominio || '').trim().toLowerCase() === key)).length;
     item.innerHTML = `
       <div class="condominio-item__name">${escapeHtml(c.nome || 'Condominio')}</div>
       <div class="condominio-item__addr">${escapeHtml(c.indirizzo || '')}</div>
+      <div class="condominio-item__meta">${immCount} immobili · ${notCount} notizie</div>
     `;
     item.addEventListener('click', () => {
       try {
@@ -3979,9 +4005,10 @@ function openCondominioPanel(condoId) {
 
   panel.classList.add('open');
 
-  // filtra immobili associati per nome condominio
+  // filtra contenuti associati per nome condominio (immobili + notizie)
   const key = (c.nome || '').trim().toLowerCase();
-  const contenuti = (immobili || []).filter(im => ((im.condominio || '').trim().toLowerCase() === key));
+  const contenutiImm = (immobili || []).filter(im => ((im.condominio || '').trim().toLowerCase() === key));
+  const contenutiNot = (notizie || []).filter(n => ((n.condominio || '').trim().toLowerCase() === key));
 
   detail.style.display = 'block';
   detail.innerHTML = `
@@ -3990,28 +4017,59 @@ function openCondominioPanel(condoId) {
         <div class="condominio-detail__name">${escapeHtml(c.nome || 'Condominio')}</div>
         <div class="condominio-detail__addr">${escapeHtml(c.indirizzo || '')}</div>
       </div>
-      <div class="condominio-detail__count">${contenuti.length} immobili</div>
+      <div class="condominio-detail__count">${contenutiImm.length} immobili · ${contenutiNot.length} notizie</div>
     </div>
-    <div class="condominio-detail__list">
-      ${contenuti.map(im => `
-        <div class="condominio-imm">
-          <div class="condominio-imm__main">
-            <div class="condominio-imm__rif">${escapeHtml(im.rif || im.id || '')}</div>
-            <div class="condominio-imm__addr">${escapeHtml(im.indirizzo || '')}</div>
+
+    <div class="condominio-detail__section">
+      <div class="condominio-detail__section-title">🏠 Immobili</div>
+      <div class="condominio-detail__list">
+        ${contenutiImm.map(im => `
+          <div class="condominio-imm in-condominio-immobile">
+            <div class="condominio-imm__main">
+              <div class="condominio-imm__rif">${escapeHtml(im.rif || im.id || '')}</div>
+              <div class="condominio-imm__addr">${escapeHtml(im.indirizzo || '')}</div>
+            </div>
+            <button type="button" class="btn btn-sm" data-open-imm="${escapeHtml(im.id)}">Apri</button>
           </div>
-          <button type="button" class="btn btn-sm" data-open-imm="${escapeHtml(im.id)}">Apri</button>
-        </div>
-      `).join('') || `<div class="muted">Nessun immobile associato (compila il campo “Condominio” nella scheda immobile).</div>`}
+        `).join('') || `<div class="muted">Nessun immobile associato (compila il campo “Condominio” nella scheda immobile).</div>`}
+      </div>
+    </div>
+
+    <div class="condominio-detail__section" style="margin-top:10px;">
+      <div class="condominio-detail__section-title">🧾 Notizie</div>
+      <div class="condominio-detail__list">
+        ${contenutiNot.map(n => {
+          const nome = ((n.nome || '') + ' ' + (n.cognome || '')).trim() || '—';
+          const addr = [n.indirizzo || '', n.citta || ''].filter(Boolean).join(' - ');
+          return `
+            <div class="condominio-imm condominio-notizia">
+              <div class="condominio-imm__main">
+                <div class="condominio-imm__rif">${escapeHtml(nome)}</div>
+                <div class="condominio-imm__addr">${escapeHtml(addr)}</div>
+              </div>
+              <button type="button" class="btn btn-sm" data-open-not="${escapeHtml(n.id)}">Apri</button>
+            </div>
+          `;
+        }).join('') || `<div class="muted">Nessuna notizia associata (compila il campo “Condominio” nella scheda notizia).</div>`}
+      </div>
     </div>
   `;
 
+  // Bind pulsanti
   detail.querySelectorAll('[data-open-imm]').forEach(btn => {
     btn.addEventListener('click', (e) => {
       const id = e.currentTarget.getAttribute('data-open-imm');
       if (id && typeof openSchedaImmobile === 'function') openSchedaImmobile(id);
     });
   });
+  detail.querySelectorAll('[data-open-not]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const id = e.currentTarget.getAttribute('data-open-not');
+      if (id && typeof openSchedaNotizia === 'function') openSchedaNotizia(id);
+    });
+  });
 }
+
 
 
 function hookPoligoniUI() {
