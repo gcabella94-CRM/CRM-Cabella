@@ -7,8 +7,8 @@
     staff: 'crm10_staff',
     omi: 'crm10_omi',
     contatti: 'crm10_contatti',      // rubrica contatti proprietari
-    intestazioni: 'crm10_intestazioni', // archivio header+footer per documenti IA
-    poligoni: 'crm10_mappa_poligoni' // layer poligoni mappa (aree+condomini)
+    intestazioni: 'crm10_intestazioni' // archivio header+footer per documenti IA
+  ,    poligoni: 'crm10_mappa_poligoni' // archivio poligoni mappa (aree ricerca + condomini)
   };
 
   let immobili = [];
@@ -959,7 +959,6 @@ function renderAgendaMonth() {
       const propTel = document.getElementById('imm-prop-telefono').value.trim();
       const propMail = document.getElementById('imm-prop-email').value.trim();
       const indirizzo = document.getElementById('imm-indirizzo').value.trim();
-      const condominio = (document.getElementById('imm-condominio')?.value || '').trim();
       const citta = document.getElementById('imm-citta').value.trim();
       const provincia = document.getElementById('imm-provincia').value.trim();
       const tipologia = document.getElementById('imm-tipologia').value || 'vendita';
@@ -1002,9 +1001,9 @@ function renderAgendaMonth() {
         proprietarioTelefono: propTel,
         proprietarioEmail: propMail,
         indirizzo: indirizzo,
-        condominio: condominio,
         citta: citta,
         provincia: provincia,
+        condominio: (document.getElementById('imm-condominio')?.value || '').trim(),
         tipologia: tipologia,
         categoria: categoria,
         piano: piano,
@@ -1344,7 +1343,6 @@ function renderAgendaMonth() {
         telefono: telefono,
         email: email,
         indirizzo: indirizzo,
-        condominio: condominio,
         citta: citta,
         provincia: provincia,
         tipologia: tipologia,
@@ -3380,17 +3378,6 @@ ${footerHtml}
     let mappaBaseSatellite = null;
     let mappaLayerControl = null;
 
-    // Poligoni (livello overlay)
-    let mappaPoligoni = [];           // [{id,type,name,address,latlngs}]
-    let mappaPoligoniLayer = null;    // L.layerGroup
-    let mappaPoligoniVisible = true;
-
-    // Drawing state (senza Leaflet.Draw)
-    let mappaDrawMode = null;         // 'area' | 'condominio' | null
-    let mappaDrawPoints = [];         // [L.LatLng]
-    let mappaDrawTempLine = null;     // L.Polyline
-    let mappaDrawHelpToast = null;
-
 
     // Stato interno mappa (evita doppie inizializzazioni / fitBounds aggressivi)
     let mappaUiBound = false;
@@ -3467,63 +3454,49 @@ ${footerHtml}
         }
         mappaSearchMarker = null;
       });
-
-      // --- POLIGONI (overlay) ---
-      const toolsId = 'mappa-poligoni-tools';
-      if (!document.getElementById(toolsId)) {
+    
+      /* ====== POLIGONI (Area ricerca + Condomini) ====== */
+      if (!document.getElementById('mappa-poligoni-tools')) {
         const tools = document.createElement('div');
-        tools.id = toolsId;
-        tools.style.display = 'flex';
-        tools.style.gap = '6px';
-        tools.style.alignItems = 'center';
-        tools.style.flexWrap = 'wrap';
-        tools.style.marginTop = '6px';
+        tools.id = 'mappa-poligoni-tools';
+        tools.className = 'mappa-poligoni-tools';
 
         const btnArea = document.createElement('button');
         btnArea.type = 'button';
         btnArea.className = 'btn btn-sm';
+        btnArea.id = 'btn-draw-area';
+        btnArea.title = 'Disegna area ricerca';
         btnArea.textContent = '✏️ Area';
-        btnArea.title = 'Disegna poligono area di ricerca';
-        btnArea.addEventListener('click', () => startMappaDraw('area'));
 
         const btnCondo = document.createElement('button');
         btnCondo.type = 'button';
         btnCondo.className = 'btn btn-sm';
-        btnCondo.textContent = '🏢 Condominio';
+        btnCondo.id = 'btn-draw-condo';
         btnCondo.title = 'Disegna poligono condominio';
-        btnCondo.addEventListener('click', () => startMappaDraw('condominio'));
+        btnCondo.textContent = '🏢 Condominio';
 
-        const sep = document.createElement('span');
-        sep.textContent = '·';
-        sep.style.opacity = '0.5';
+        const btnToggle = document.createElement('button');
+        btnToggle.type = 'button';
+        btnToggle.className = 'btn btn-sm';
+        btnToggle.id = 'btn-toggle-poligoni';
+        btnToggle.title = 'Mostra/Nasconde livello poligoni';
+        btnToggle.textContent = '👁️ Poligoni';
 
-        const chkWrap = document.createElement('label');
-        chkWrap.style.display = 'inline-flex';
-        chkWrap.style.alignItems = 'center';
-        chkWrap.style.gap = '6px';
-        chkWrap.style.userSelect = 'none';
-
-        const chk = document.createElement('input');
-        chk.type = 'checkbox';
-        chk.id = 'mappa-poligoni-toggle';
-        chk.checked = true;
-        chk.addEventListener('change', () => setPoligoniVisible(chk.checked));
-
-        const chkTxt = document.createElement('span');
-        chkTxt.textContent = 'Mostra poligoni';
-
-        chkWrap.appendChild(chk);
-        chkWrap.appendChild(chkTxt);
+        const btnList = document.createElement('button');
+        btnList.type = 'button';
+        btnList.className = 'btn btn-sm';
+        btnList.id = 'btn-list-condomini';
+        btnList.title = 'Apri lista condomini';
+        btnList.textContent = '📁 Condomini';
 
         tools.appendChild(btnArea);
         tools.appendChild(btnCondo);
-        tools.appendChild(sep);
-        tools.appendChild(chkWrap);
+        tools.appendChild(btnToggle);
+        tools.appendChild(btnList);
 
-        wrap.appendChild(tools);
+        actions.appendChild(tools);
       }
-
-    }
+}
 
     async function searchAddressOnMap(query) {
       if (!mappa) return;
@@ -3608,9 +3581,6 @@ function initMappa() {
         }
       }
 
-      // Init overlay poligoni (aree + condomini)
-      initMappaPoligoni();
-
       mappaCluster = L.markerClusterGroup();
       mappa.addLayer(mappaCluster);
 
@@ -3670,333 +3640,430 @@ function initMappa() {
 
       setTimeout(() => { try { mappa.invalidateSize(true); } catch {} }, 120);
       renderMappa();
-    }
+    
+      // Init livello poligoni (aree + condomini)
+      try { initPoligoniModule(); } catch (e) { console.warn('[POLIGONI] init error', e); }
+}
 
 
-    /* ====== MAPPA: POLIGONI (AREA + CONDOMINI) ====== */
-    function loadMappaPoligoni() {
-      try {
-        const raw = localStorage.getItem(STORAGE_KEYS.poligoni);
-        const arr = raw ? JSON.parse(raw) : [];
-        mappaPoligoni = Array.isArray(arr) ? arr : [];
-      } catch {
-        mappaPoligoni = [];
-      }
-    }
+/* ======================================================
+   MAPPA – LIVELLO POLIGONI (AREE + CONDOMINI)
+   - 2 tipi: "area" (delimitazione ricerca), "condominio" (cartella)
+   - chiusura poligono: clic sul 1° vertice (ancora) oppure doppio click
+   - alla chiusura "condominio" apre UI (nome + indirizzo) e salva in archivio
+====================================================== */
 
-    function saveMappaPoligoni() {
-      try { localStorage.setItem(STORAGE_KEYS.poligoni, JSON.stringify(mappaPoligoni || [])); } catch {}
-    }
+let mappaPoligoni = { aree: [], condomini: [] };
+let mappaPoligoniVisible = true;
 
-    function initMappaPoligoni() {
-      if (!mappa || mappaPoligoniLayer) return;
+// Layer groups
+let layerPoligoniRoot = null;
+let layerAree = null;
+let layerCondomini = null;
 
-      loadMappaPoligoni();
+// Drawing state
+let drawingMode = null; // 'area' | 'condominio' | null
+let drawingPoints = [];
+let drawingLine = null;
+let drawingVertices = null;
+let drawingFirstVertex = null;
 
-      mappaPoligoniLayer = L.layerGroup();
-      if (mappaPoligoniVisible) mappaPoligoniLayer.addTo(mappa);
+function loadPoligoni() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.poligoni);
+    if (!raw) return { aree: [], condomini: [] };
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return { aree: [], condomini: [] };
+    return {
+      aree: Array.isArray(parsed.aree) ? parsed.aree : [],
+      condomini: Array.isArray(parsed.condomini) ? parsed.condomini : []
+    };
+  } catch (e) {
+    console.warn('[POLIGONI] load error', e);
+    return { aree: [], condomini: [] };
+  }
+}
 
-      // Aggiungi overlay al layer control (se presente)
-      try {
-        if (mappaLayerControl) mappaLayerControl.addOverlay(mappaPoligoniLayer, 'Poligoni');
-      } catch {}
+function savePoligoni() {
+  try { localStorage.setItem(STORAGE_KEYS.poligoni, JSON.stringify(mappaPoligoni)); }
+  catch (e) { console.warn('[POLIGONI] save error', e); }
+}
 
-      // Render poligoni salvati
-      renderMappaPoligoni();
+function ensurePoligoniLayers() {
+  if (!mappa) return;
+  if (!layerPoligoniRoot) {
+    layerPoligoniRoot = L.layerGroup();
+    layerAree = L.layerGroup();
+    layerCondomini = L.layerGroup();
+    layerPoligoniRoot.addLayer(layerAree);
+    layerPoligoniRoot.addLayer(layerCondomini);
+  }
+  if (mappaPoligoniVisible) {
+    if (!mappa.hasLayer(layerPoligoniRoot)) layerPoligoniRoot.addTo(mappa);
+  } else {
+    if (mappa.hasLayer(layerPoligoniRoot)) mappa.removeLayer(layerPoligoniRoot);
+  }
+}
 
-      // Handlers disegno (1 sola volta)
-      if (!mappa.__poligoni_bound) {
-        mappa.on('click', onMappaDrawClick);
-        mappa.on('dblclick', onMappaDrawDblClick);
-        mappa.__poligoni_bound = true;
-      }
-    }
+function clearPoligoniMap() {
+  try { layerAree && layerAree.clearLayers(); } catch {}
+  try { layerCondomini && layerCondomini.clearLayers(); } catch {}
+}
 
-    function setPoligoniVisible(visible) {
-      mappaPoligoniVisible = !!visible;
-      if (!mappa || !mappaPoligoniLayer) return;
-      try {
-        if (mappaPoligoniVisible) mappaPoligoniLayer.addTo(mappa);
-        else mappa.removeLayer(mappaPoligoniLayer);
-      } catch {}
-    }
+function polygonStyle(kind) {
+  // stile più leggibile: linee evidenti e riempimento leggero
+  if (kind === 'condominio') {
+    return { color: '#2563EB', weight: 3, opacity: 0.95, fillColor: '#2563EB', fillOpacity: 0.10, dashArray: null };
+  }
+  return { color: '#111827', weight: 3, opacity: 0.85, fillColor: '#111827', fillOpacity: 0.06, dashArray: '6,6' };
+}
 
-    function renderMappaPoligoni() {
-      if (!mappaPoligoniLayer) return;
-      try { mappaPoligoniLayer.clearLayers(); } catch {}
+function addPolygonToMap(rec) {
+  if (!mappa || !rec || !Array.isArray(rec.latlngs)) return;
+  const latlngs = rec.latlngs.map(p => [p.lat, p.lng]);
 
-      (mappaPoligoni || []).forEach(p => {
-        if (!p || !Array.isArray(p.latlngs) || p.latlngs.length < 3) return;
-        const poly = L.polygon(p.latlngs, polygonStyleFor(p));
-        poly.__polyId = p.id;
-        poly.on('click', () => onSelectMappaPoligono(p.id));
-        mappaPoligoniLayer.addLayer(poly);
+  const kind = rec.kind;
+  const layer = L.polygon(latlngs, polygonStyle(kind));
 
-        // Label (solo condomini)
-        if (p.type === 'condominio' && p.name) {
-          const center = poly.getBounds().getCenter();
-          const marker = L.marker(center, {
-            interactive: false,
-            opacity: 0.95
-          });
-          marker.bindTooltip(p.name, { permanent: true, direction: 'center', className: 'map-condo-label' });
-          mappaPoligoniLayer.addLayer(marker);
-        }
-      });
-    }
+  layer.__polyId = rec.id;
+  layer.__polyKind = kind;
 
-    function polygonStyleFor(p) {
-      if (p.type === 'condominio') {
-        return { weight: 2, fillOpacity: 0.18, dashArray: null };
-      }
-      return { weight: 2, fillOpacity: 0.08, dashArray: '6,6' };
-    }
+  // Tooltip/label
+  if (kind === 'condominio') {
+    const label = (rec.nome || 'Condominio');
+    layer.bindTooltip(label, { sticky: true, direction: 'top' });
+    layer.on('click', () => openCondominioPanel(rec.id));
+    layerCondomini && layerCondomini.addLayer(layer);
+  } else {
+    layer.bindTooltip('Area ricerca', { sticky: true, direction: 'top' });
+    layerAree && layerAree.addLayer(layer);
+  }
+}
 
-    function startMappaDraw(mode) {
-      if (!mappa) return;
-      if (mode !== 'area' && mode !== 'condominio') return;
+function renderPoligoni() {
+  ensurePoligoniLayers();
+  clearPoligoniMap();
+  (mappaPoligoni.aree || []).forEach(addPolygonToMap);
+  (mappaPoligoni.condomini || []).forEach(addPolygonToMap);
+  renderCondominiList();
+}
 
-      // reset stato precedente
-      exitMappaDraw(true);
+function setDrawingCursor(active) {
+  const mapEl = document.getElementById('map');
+  if (!mapEl) return;
+  mapEl.classList.toggle('drawing-active', !!active);
+}
 
-      mappaDrawMode = mode;
-      mappaDrawPoints = [];
-      if (mappa.doubleClickZoom) mappa.doubleClickZoom.disable();
+function stopDrawing(resetOnly=false) {
+  drawingMode = null;
+  setDrawingCursor(false);
+  if (!resetOnly) {
+    try { drawingLine && mappa.removeLayer(drawingLine); } catch {}
+    try { drawingVertices && mappa.removeLayer(drawingVertices); } catch {}
+  }
+  drawingPoints = [];
+  drawingLine = null;
+  drawingVertices = null;
+  drawingFirstVertex = null;
+}
 
-      showMappaDrawToast(mode === 'condominio'
-        ? 'Disegno CONDOMINIO: clicca per aggiungere punti, doppio click per chiudere.'
-        : 'Disegno AREA: clicca per aggiungere punti, doppio click per chiudere.'
-      );
-    }
+function startDrawing(mode) {
+  if (!mappa) return;
+  ensurePoligoniLayers();
+  stopDrawing();
+  drawingMode = mode;
+  setDrawingCursor(true);
+  drawingVertices = L.layerGroup().addTo(mappa);
+  drawingLine = L.polyline([], { weight: 3, opacity: 1.0, dashArray: '4,6' }).addTo(mappa);
+}
 
-    function exitMappaDraw(keepToast) {
-      mappaDrawMode = null;
-      mappaDrawPoints = [];
-      if (mappaDrawTempLine) {
-        try { mappa.removeLayer(mappaDrawTempLine); } catch {}
-        mappaDrawTempLine = null;
-      }
-      if (mappa && mappa.doubleClickZoom) {
-        try { mappa.doubleClickZoom.enable(); } catch {}
-      }
-      if (!keepToast) hideMappaDrawToast();
-    }
+function addVertexMarker(latlng, isFirst=false) {
+  if (!drawingVertices) return null;
+  const marker = L.circleMarker(latlng, {
+    radius: isFirst ? 7 : 6,
+    weight: 2,
+    opacity: 1,
+    fillOpacity: 1,
+    color: isFirst ? '#111827' : '#111827',
+    fillColor: isFirst ? '#F59E0B' : '#60A5FA'
+  });
+  marker.addTo(drawingVertices);
+  marker._isFirstVertex = !!isFirst;
 
-    function onMappaDrawClick(e) {
-      if (!mappaDrawMode || !e || !e.latlng) return;
-      mappaDrawPoints.push(e.latlng);
+  // L'ancora (1° vertice) chiude il poligono
+  if (isFirst) {
+    marker.on('click', () => {
+      if (drawingMode && drawingPoints.length >= 3) finalizePolygon();
+    });
+  }
+  return marker;
+}
 
-      if (mappaDrawTempLine) {
-        try { mappaDrawTempLine.setLatLngs(mappaDrawPoints); } catch {}
+function onMapClickForDrawing(e) {
+  if (!drawingMode || !e || !e.latlng) return;
+
+  drawingPoints.push({ lat: e.latlng.lat, lng: e.latlng.lng });
+  drawingLine && drawingLine.setLatLngs(drawingPoints.map(p => [p.lat, p.lng]));
+
+  if (drawingPoints.length === 1) {
+    drawingFirstVertex = addVertexMarker(e.latlng, true);
+  } else {
+    addVertexMarker(e.latlng, false);
+  }
+}
+
+function onMapDblClickForDrawing(e) {
+  if (!drawingMode) return;
+  // dblclick chiude comunque (se sufficiente)
+  if (drawingPoints.length >= 3) {
+    try { L.DomEvent.stop(e); } catch {}
+    finalizePolygon();
+  }
+}
+
+function openCondominioModal(initialNome='', initialIndirizzo='') {
+  const modal = document.getElementById('condominio-modal');
+  if (!modal) {
+    alert('UI condominio non trovata (condominio-modal).');
+    return null;
+  }
+  const nameEl = document.getElementById('condominio-nome');
+  const addrEl = document.getElementById('condominio-indirizzo');
+  if (nameEl) nameEl.value = initialNome || '';
+  if (addrEl) addrEl.value = initialIndirizzo || '';
+
+  modal.classList.add('open');
+  setTimeout(() => { try { nameEl && nameEl.focus(); } catch {} }, 0);
+
+  return new Promise((resolve) => {
+    const btnSave = document.getElementById('condominio-save');
+    const btnCancel = document.getElementById('condominio-cancel');
+    const btnClose = document.getElementById('condominio-close');
+
+    const cleanup = () => {
+      [btnSave, btnCancel, btnClose].forEach(b => b && b.removeEventListener('click', onSaveOrCancel));
+    };
+
+    const onSaveOrCancel = (ev) => {
+      const id = ev?.currentTarget?.id;
+      if (id === 'condominio-save') {
+        const nome = (nameEl?.value || '').trim();
+        const indirizzo = (addrEl?.value || '').trim();
+        if (!nome) { alert('Inserisci un nome condominio.'); return; }
+        modal.classList.remove('open');
+        cleanup();
+        resolve({ ok: true, nome, indirizzo });
       } else {
-        mappaDrawTempLine = L.polyline(mappaDrawPoints, { weight: 2, dashArray: '4,6' }).addTo(mappa);
+        modal.classList.remove('open');
+        cleanup();
+        resolve({ ok: false });
       }
+    };
+
+    btnSave && btnSave.addEventListener('click', onSaveOrCancel);
+    btnCancel && btnCancel.addEventListener('click', onSaveOrCancel);
+    btnClose && btnClose.addEventListener('click', onSaveOrCancel);
+  });
+}
+
+async function finalizePolygon() {
+  if (!drawingMode) return;
+  if (drawingPoints.length < 3) return;
+
+  const latlngs = [...drawingPoints];
+  const kind = drawingMode;
+
+  // Reset drawing UI immediately (così non resta “appeso”)
+  stopDrawing(true);
+
+  if (kind === 'condominio') {
+    const res = await openCondominioModal('', '');
+    if (!res || !res.ok) {
+      // annullato: niente salvataggio
+      stopDrawing();
+      return;
     }
+    const rec = {
+      id: genId('condo'),
+      kind: 'condominio',
+      nome: res.nome,
+      indirizzo: res.indirizzo || '',
+      latlngs,
+      createdAt: Date.now()
+    };
+    mappaPoligoni.condomini.push(rec);
+    savePoligoni();
+    renderPoligoni();
+    // zoom sul nuovo poligono
+    try { mappa.fitBounds(L.polygon(latlngs.map(p=>[p.lat,p.lng])).getBounds(), { padding: [20,20] }); } catch {}
+    openCondominioPanel(rec.id);
+  } else {
+    const rec = {
+      id: genId('area'),
+      kind: 'area',
+      latlngs,
+      createdAt: Date.now()
+    };
+    mappaPoligoni.aree.push(rec);
+    savePoligoni();
+    renderPoligoni();
+    try { mappa.fitBounds(L.polygon(latlngs.map(p=>[p.lat,p.lng])).getBounds(), { padding: [20,20] }); } catch {}
+  }
 
-    function onMappaDrawDblClick(e) {
-      if (!mappaDrawMode) return;
-      if (e && e.originalEvent) {
-        // evita zoom su dblclick mentre disegni
-        try { e.originalEvent.preventDefault(); } catch {}
-        try { e.originalEvent.stopPropagation(); } catch {}
-      }
+  stopDrawing();
+}
 
-      if (!Array.isArray(mappaDrawPoints) || mappaDrawPoints.length < 3) {
-        alert('Servono almeno 3 punti per chiudere un poligono.');
-        return;
-      }
+/* ====== Pannello condomini (lista + contenuto) ====== */
+function ensureCondominiPanel() {
+  const mapWrap = document.getElementById('view-mappa');
+  if (!mapWrap) return;
+  if (document.getElementById('condomini-panel')) return;
 
-      const latlngs = mappaDrawPoints.map(ll => [ll.lat, ll.lng]);
+  const panel = document.createElement('div');
+  panel.id = 'condomini-panel';
+  panel.className = 'condomini-panel';
+  panel.innerHTML = `
+    <div class="condomini-panel__header">
+      <div class="condomini-panel__title">Condomini</div>
+      <button type="button" class="condomini-panel__close" id="condomini-panel-close">✕</button>
+    </div>
+    <div class="condomini-panel__body">
+      <div id="condomini-list" class="condomini-list"></div>
+      <div id="condominio-detail" class="condominio-detail" style="display:none;"></div>
+    </div>
+  `;
+  mapWrap.appendChild(panel);
 
-      // Crea un placeholder poligono
-      const p = {
-        id: genId('poly'),
-        type: mappaDrawMode,
-        name: '',
-        address: '',
-        latlngs
-      };
+  const closeBtn = panel.querySelector('#condomini-panel-close');
+  closeBtn && closeBtn.addEventListener('click', () => panel.classList.remove('open'));
+}
 
-      // Chiudi disegno prima di aprire UI
-      exitMappaDraw(true);
+function renderCondominiList() {
+  ensureCondominiPanel();
+  const listEl = document.getElementById('condomini-list');
+  if (!listEl) return;
+  listEl.innerHTML = '';
 
-      if (p.type === 'condominio') {
-        // UI richiesta: nome + indirizzo (alla chiusura)
-        openCondominioDialog({
-          onSave: (name, address) => {
-            p.name = (name || '').trim();
-            p.address = (address || '').trim();
-            if (!p.name) {
-              alert('Il nome condominio è obbligatorio.');
-              return false; // non chiudere dialog
-            }
-            mappaPoligoni.push(p);
-            saveMappaPoligoni();
-            renderMappaPoligoni();
-            hideMappaDrawToast();
-            return true;
-          },
-          onCancel: () => {
-            hideMappaDrawToast();
-          }
-        });
-      } else {
-        mappaPoligoni.push(p);
-        saveMappaPoligoni();
-        renderMappaPoligoni();
-        hideMappaDrawToast();
-      }
-    }
+  const arr = (mappaPoligoni.condomini || []).slice().sort((a,b)=> (a.nome||'').localeCompare(b.nome||''));
+  if (!arr.length) {
+    listEl.innerHTML = `<div class="muted">Nessun condominio censito.</div>`;
+    return;
+  }
 
-    function onSelectMappaPoligono(polyId) {
-      const p = (mappaPoligoni || []).find(x => x && x.id === polyId);
-      if (!p) return;
+  arr.forEach(c => {
+    const item = document.createElement('div');
+    item.className = 'condominio-item';
+    item.innerHTML = `
+      <div class="condominio-item__name">${escapeHtml(c.nome || 'Condominio')}</div>
+      <div class="condominio-item__addr">${escapeHtml(c.indirizzo || '')}</div>
+    `;
+    item.addEventListener('click', () => {
+      try {
+        const bounds = L.polygon(c.latlngs.map(p=>[p.lat,p.lng])).getBounds();
+        mappa.fitBounds(bounds, { padding: [20,20] });
+      } catch {}
+      openCondominioPanel(c.id);
+    });
+    listEl.appendChild(item);
+  });
+}
 
-      // Se è un condominio: mostra immobili associati per nome
-      if (p.type === 'condominio') {
-        const nome = (p.name || '').trim();
-        const list = (immobili || []).filter(im => ((im.condominio || '').trim() === nome));
-        const msg = [
-          `Condominio: ${nome || '(senza nome)'}`,
-          p.address ? `Indirizzo: ${p.address}` : '',
-          `Immobili associati: ${list.length}`
-        ].filter(Boolean).join('\n');
-        // Usa il pannello dettaglio se esiste, altrimenti alert semplice
-        const panel = document.getElementById('map-detail-panel');
-        if (panel) {
-          const title = document.getElementById('map-detail-title');
-          const body = document.getElementById('map-detail-body');
-          if (title) title.textContent = `🏢 ${nome || 'Condominio'}`;
-          if (body) {
-            body.innerHTML = '';
-            const meta = document.createElement('div');
-            meta.className = 'small';
-            meta.textContent = p.address ? p.address : 'Indirizzo non impostato';
-            body.appendChild(meta);
+function openCondominioPanel(condoId) {
+  ensureCondominiPanel();
+  const panel = document.getElementById('condomini-panel');
+  const detail = document.getElementById('condominio-detail');
+  if (!panel || !detail) return;
 
-            const ul = document.createElement('div');
-            ul.style.marginTop = '8px';
+  const c = (mappaPoligoni.condomini || []).find(x => x.id === condoId);
+  if (!c) return;
 
-            if (!list.length) {
-              const empty = document.createElement('div');
-              empty.className = 'small';
-              empty.textContent = 'Nessun immobile associato (compila il campo “Condominio” nella scheda immobile con lo stesso nome).';
-              ul.appendChild(empty);
-            } else {
-              list.slice(0, 50).forEach(im => {
-                const row = document.createElement('div');
-                row.style.display = 'flex';
-                row.style.justifyContent = 'space-between';
-                row.style.alignItems = 'center';
-                row.style.gap = '8px';
-                row.style.padding = '6px 0';
-                row.style.borderBottom = '1px solid rgba(255,255,255,0.08)';
+  panel.classList.add('open');
 
-                const left = document.createElement('div');
-                left.innerHTML = `<div><strong>${escapeHtml(im.rif || im.id || '')}</strong></div><div class="small">${escapeHtml(im.indirizzo || '')}</div>`;
+  // filtra immobili associati per nome condominio
+  const key = (c.nome || '').trim().toLowerCase();
+  const contenuti = (immobili || []).filter(im => ((im.condominio || '').trim().toLowerCase() === key));
 
-                const btn = document.createElement('button');
-                btn.className = 'btn btn-sm';
-                btn.textContent = 'Apri';
-                btn.addEventListener('click', () => openSchedaImmobile(im.id));
+  detail.style.display = 'block';
+  detail.innerHTML = `
+    <div class="condominio-detail__head">
+      <div>
+        <div class="condominio-detail__name">${escapeHtml(c.nome || 'Condominio')}</div>
+        <div class="condominio-detail__addr">${escapeHtml(c.indirizzo || '')}</div>
+      </div>
+      <div class="condominio-detail__count">${contenuti.length} immobili</div>
+    </div>
+    <div class="condominio-detail__list">
+      ${contenuti.map(im => `
+        <div class="condominio-imm">
+          <div class="condominio-imm__main">
+            <div class="condominio-imm__rif">${escapeHtml(im.rif || im.id || '')}</div>
+            <div class="condominio-imm__addr">${escapeHtml(im.indirizzo || '')}</div>
+          </div>
+          <button type="button" class="btn btn-sm" data-open-imm="${escapeHtml(im.id)}">Apri</button>
+        </div>
+      `).join('') || `<div class="muted">Nessun immobile associato (compila il campo “Condominio” nella scheda immobile).</div>`}
+    </div>
+  `;
 
-                row.appendChild(left);
-                row.appendChild(btn);
-                ul.appendChild(row);
-              });
-            }
+  detail.querySelectorAll('[data-open-imm]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const id = e.currentTarget.getAttribute('data-open-imm');
+      if (id && typeof openSchedaImmobile === 'function') openSchedaImmobile(id);
+    });
+  });
+}
 
-            body.appendChild(ul);
-          }
-          panel.classList.remove('hidden');
-        } else {
-          alert(msg);
-        }
-      }
-    }
 
-    function showMappaDrawToast(text) {
-      hideMappaDrawToast();
-      const toast = document.createElement('div');
-      toast.id = 'mappa-draw-toast';
-      toast.style.position = 'absolute';
-      toast.style.left = '12px';
-      toast.style.bottom = '12px';
-      toast.style.zIndex = '1200';
-      toast.style.padding = '10px 12px';
-      toast.style.borderRadius = '12px';
-      toast.style.background = 'rgba(0,0,0,0.72)';
-      toast.style.border = '1px solid rgba(255,255,255,0.14)';
-      toast.style.backdropFilter = 'blur(8px)';
-      toast.style.maxWidth = '340px';
-      toast.innerHTML = `<div style="display:flex; gap:8px; align-items:flex-start;">
-        <div style="flex:1; font-size:12px; line-height:1.35;">${escapeHtml(text || '')}</div>
-        <button type="button" class="btn btn-sm" id="mappa-draw-exit" title="Esci">✕</button>
-      </div>`;
-      document.body.appendChild(toast);
-      const btn = document.getElementById('mappa-draw-exit');
-      if (btn) btn.addEventListener('click', () => { exitMappaDraw(false); hideMappaDrawToast(); });
-      mappaDrawHelpToast = toast;
-    }
+function hookPoligoniUI() {
+  // bottoni creati da ensureMappaSearchUI
+  const btnArea = document.getElementById('btn-draw-area');
+  const btnCondo = document.getElementById('btn-draw-condo');
+  const btnToggle = document.getElementById('btn-toggle-poligoni');
+  const btnList = document.getElementById('btn-list-condomini');
 
-    function hideMappaDrawToast() {
-      if (mappaDrawHelpToast) {
-        try { mappaDrawHelpToast.remove(); } catch {}
-        mappaDrawHelpToast = null;
-      }
-    }
+  if (btnArea && !btnArea.__hooked) {
+    btnArea.__hooked = true;
+    btnArea.addEventListener('click', () => startDrawing('area'));
+  }
+  if (btnCondo && !btnCondo.__hooked) {
+    btnCondo.__hooked = true;
+    btnCondo.addEventListener('click', () => startDrawing('condominio'));
+  }
+  if (btnToggle && !btnToggle.__hooked) {
+    btnToggle.__hooked = true;
+    btnToggle.addEventListener('click', () => {
+      mappaPoligoniVisible = !mappaPoligoniVisible;
+      ensurePoligoniLayers();
+    });
+  }
+  if (btnList && !btnList.__hooked) {
+    btnList.__hooked = true;
+    btnList.addEventListener('click', () => {
+      ensureCondominiPanel();
+      const panel = document.getElementById('condomini-panel');
+      if (panel) panel.classList.toggle('open');
+      renderCondominiList();
+    });
+  }
+}
 
-    function openCondominioDialog({ onSave, onCancel } = {}) {
-      const overlay = document.getElementById('condominio-dialog-overlay');
-      const form = document.getElementById('condominio-form');
-      const nomeEl = document.getElementById('condominio-nome');
-      const indEl = document.getElementById('condominio-indirizzo');
-      const btnClose = document.getElementById('condominio-dialog-close');
-      const btnCancel = document.getElementById('condominio-cancel');
+function initPoligoniModule() {
+  if (!mappa) return;
+  mappaPoligoni = loadPoligoni();
+  ensurePoligoniLayers();
+  renderPoligoni();
 
-      if (!overlay || !form || !nomeEl || !indEl) {
-        // fallback
-        const name = prompt('Nome condominio (obbligatorio):') || '';
-        if (!name.trim()) { if (onCancel) onCancel(); return; }
-        const address = prompt('Indirizzo (facoltativo):') || '';
-        if (onSave) onSave(name, address);
-        return;
-      }
+  // Eventi mappa per disegno
+  try { mappa.off('click', onMapClickForDrawing); } catch {}
+  try { mappa.off('dblclick', onMapDblClickForDrawing); } catch {}
+  mappa.on('click', onMapClickForDrawing);
+  mappa.on('dblclick', onMapDblClickForDrawing);
 
-      // reset
-      nomeEl.value = '';
-      indEl.value = '';
+  ensureCondominiPanel();
+  hookPoligoniUI();
+}
 
-      overlay.style.display = 'flex';
 
-      const close = () => { overlay.style.display = 'none'; };
-
-      const handleCancel = (e) => {
-        if (e) { try { e.preventDefault(); } catch {} }
-        close();
-        if (onCancel) onCancel();
-      };
-
-      const handleSubmit = (e) => {
-        if (e) { try { e.preventDefault(); } catch {} }
-        const ok = onSave ? onSave(nomeEl.value, indEl.value) : true;
-        if (ok !== false) close();
-      };
-
-      // bind one-shot
-      const once = (el, ev, fn) => {
-        if (!el) return;
-        el.addEventListener(ev, fn, { once: true });
-      };
-
-      once(btnClose, 'click', handleCancel);
-      once(btnCancel, 'click', handleCancel);
-      overlay.addEventListener('click', (ev) => {
-        if (ev.target === overlay) handleCancel(ev);
-      }, { once: true });
-      form.addEventListener('submit', handleSubmit, { once: true });
-      setTimeout(() => { try { nomeEl.focus(); } catch {} }, 50);
-    }
 
 
     function hideMapDetail() {
