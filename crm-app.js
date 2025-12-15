@@ -2663,32 +2663,47 @@ function setupAddressAutocomplete({ inputId, cityId, provId, capId }) {
   const inputEl = document.getElementById(inputId);
   if (!inputEl) return;
   const box = ensureSuggestBox(inputEl);
-  const geocoder = getAddrGeocoder();
-  if (!box || !geocoder) return;
+  if (!box) return;
+
+  // Usa Leaflet.Geocoder se presente, altrimenti fallback fetch (gratis) su Photon/Nominatim
+  const leafletGeocoder = getAddrGeocoder();
 
   let t = null;
   let lastQ = '';
+  let activeCtrl = null;
+  const cache = new Map(); // query normalizzata -> risultati
+
+  const normalizeQ = (q) => (q || '').trim().toLowerCase().replace(/\s+/g, ' ');
 
   const maybeSet = (el, val) => {
     if (!el || !val) return;
     const current = (el.value || '').trim();
     if (!current) { el.value = val; return; }
-    if (current.toLowerCase() === val.toLowerCase()) return;
+    if (current.toLowerCase() === String(val).trim().toLowerCase()) return;
     const ok = confirm(`Sovrascrivere "${current}" con "${val}"?`);
     if (ok) el.value = val;
   };
 
   const applyParts = (parts) => {
-    // street va SEMPRE nel campo input (indirizzo)
     if (parts.street) maybeSet(inputEl, parts.street);
     if (cityId) maybeSet(document.getElementById(cityId), parts.citta);
     if (provId) maybeSet(document.getElementById(provId), parts.provincia);
     if (capId) maybeSet(document.getElementById(capId), parts.cap);
   };
 
+  const openBox = () => { box.style.display = 'block'; };
+
+  const renderMessage = (msg) => {
+    box.innerHTML = `<div class="addr-suggest__item"><div class="addr-suggest__main">${escapeHtml(msg)}</div></div>`;
+    openBox();
+  };
+
   const renderOptions = (results) => {
     box.innerHTML = '';
-    if (!results || !results.length) { closeSuggest(box); return; }
+    if (!results || !results.length) {
+      renderMessage('Nessun risultato');
+      return;
+    }
     results.slice(0, 8).forEach((r) => {
       const parts = extractPartsFromGeocodeResult(r);
       const item = document.createElement('div');
@@ -2697,6 +2712,7 @@ function setupAddressAutocomplete({ inputId, cityId, provId, capId }) {
         <div class="addr-suggest__main">${escapeHtml(parts.street || parts.label || 'Risultato')}</div>
         <div class="addr-suggest__sub">${escapeHtml([parts.cap, parts.citta, parts.provincia].filter(Boolean).join(' · '))}</div>
       `;
+      // Compilazione SOLO su selezione
       item.addEventListener('mousedown', (ev) => {
         ev.preventDefault();
         applyParts(parts);
@@ -2704,24 +2720,85 @@ function setupAddressAutocomplete({ inputId, cityId, provId, capId }) {
       });
       box.appendChild(item);
     });
-    box.style.display = 'block';
+    openBox();
   };
 
-  const run = () => {
+  const geocodeViaLeaflet = (q) => new Promise((resolve) => {
+    try {
+      leafletGeocoder.geocode(q, (res) => resolve(res || []));
+    } catch {
+      resolve([]);
+    }
+  });
+
+  const geocodeViaFetch = async (q) => {
+    const qn = normalizeQ(q);
+    if (cache.has(qn)) return cache.get(qn);
+
+    if (activeCtrl) activeCtrl.abort();
+    activeCtrl = new AbortController();
+
+    // 1) Photon (gratis, spesso rapido)
+    const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=8&lang=it`;
+    try {
+      const r = await fetch(photonUrl, { signal: activeCtrl.signal });
+      if (r.ok) {
+        const j = await r.json();
+        const features = Array.isArray(j?.features) ? j.features : [];
+        const mapped = features.map(f => ({
+          name: f?.properties?.name || f?.properties?.label || '',
+          properties: f?.properties || {}
+        }));
+        cache.set(qn, mapped);
+        return mapped;
+      }
+    } catch (e) {
+      if (e && e.name === 'AbortError') throw e;
+    }
+
+    // 2) Fallback Nominatim (gratis) - più soggetto a rate limit
+    const nomUrl = `https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=8&countrycodes=it&q=${encodeURIComponent(q)}`;
+    const r2 = await fetch(nomUrl, { signal: activeCtrl.signal, headers: { 'Accept': 'application/json' } });
+    const j2 = await r2.json();
+    const mapped2 = (Array.isArray(j2) ? j2 : []).map(x => ({
+      name: x?.display_name || '',
+      properties: { ...(x?.address || {}), postcode: x?.address?.postcode || x?.postcode || '' }
+    }));
+    cache.set(qn, mapped2);
+    return mapped2;
+  };
+
+  const run = async () => {
     const q = (inputEl.value || '').trim();
-    if (q.length < 3) { closeSuggest(box); return; }
+    if (!q || q.length < 3) { closeSuggest(box); return; }
     if (q === lastQ) return;
     lastQ = q;
-    geocoder.geocode(q, (results) => renderOptions(results || []));
+
+    // Apri SUBITO la tendina (perceived speed)
+    renderMessage('Ricerca…');
+
+    try {
+      const res = leafletGeocoder ? await geocodeViaLeaflet(q) : await geocodeViaFetch(q);
+      renderOptions(res);
+    } catch (e) {
+      if (e && e.name === 'AbortError') return;
+      console.error('[ADDR] geocode error', e);
+      renderMessage('Errore ricerca indirizzo');
+    }
   };
 
   inputEl.addEventListener('input', () => {
     clearTimeout(t);
-    t = setTimeout(run, 220);
+    // Debounce aggressivo per velocità percepita
+    t = setTimeout(run, 140);
+    openBox();
   });
+
   inputEl.addEventListener('focus', () => {
-    if (box.innerHTML.trim()) box.style.display = 'block';
+    if ((inputEl.value || '').trim().length >= 3) run();
+    else if (box.innerHTML.trim()) openBox();
   });
+
   inputEl.addEventListener('blur', () => {
     setTimeout(() => closeSuggest(box), 180);
   });
