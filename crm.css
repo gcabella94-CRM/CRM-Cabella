@@ -894,11 +894,10 @@
   top: 70px;
   width: min(360px, calc(100% - 28px));
   max-height: calc(100% - 90px);
-  background: radial-gradient(circle at 0 0, #0b1220, #020617 60%, #000 100%);
-  color: var(--text-main);
-  border: 1px solid rgba(148,163,184,0.22);
+  background: rgba(255,255,255,0.98);
+  border: 1px solid rgba(0,0,0,0.10);
   border-radius: 16px;
-  box-shadow: 0 18px 50px rgba(0,0,0,0.92);
+  box-shadow: 0 12px 30px rgba(0,0,0,0.15);
   overflow: hidden;
   z-index: 600; /* sopra la mappa */
   display: none;
@@ -906,43 +905,29 @@
 .condomini-panel.open { display: block; }
 .condomini-panel__header {
   display: flex; justify-content: space-between; align-items: center;
-  padding: 10px 12px;
-  border-bottom: 1px solid rgba(148,163,184,0.16);
+  padding: 10px 12px; border-bottom: 1px solid rgba(0,0,0,0.08);
 }
-.condomini-panel__title { font-weight: 800; letter-spacing: 0.01em; }
-.condomini-panel__close { color: var(--text-main); border: 0; background: transparent; font-size: 16px; cursor: pointer; opacity: .9; }
+.condomini-panel__title { font-weight: 700; }
+.condomini-panel__close { border: 0; background: transparent; font-size: 16px; cursor: pointer; opacity: .8; }
 .condomini-panel__close:hover { opacity: 1; }
 
 .condomini-panel__body { padding: 10px 12px; overflow: auto; max-height: calc(100% - 44px); }
 
-.condominio-item {
-  padding: 10px 10px;
-  border: 1px solid rgba(148,163,184,0.16);
-  border-radius: 14px;
-  cursor: pointer;
-  margin-bottom: 8px;
-  background: rgba(2,6,23,0.35);
-}
-.condominio-item:hover { background: rgba(34,197,94,0.14); border-color: rgba(34,197,94,0.28); }
-.condominio-item__name { font-weight: 800; color: #ffffff; }
-.condominio-item__addr { font-size: 12px; color: rgba(255,255,255,0.80); margin-top: 2px; }
+.condominio-item { padding: 10px 10px; border: 1px solid rgba(0,0,0,0.08); border-radius: 14px; cursor: pointer; margin-bottom: 8px; }
+.condominio-item:hover { background: rgba(0,0,0,0.03); }
+.condominio-item__name { font-weight: 700; }
+.condominio-item__addr { font-size: 12px; opacity: .75; margin-top: 2px; }
 
-.condominio-detail { margin-top: 10px; padding-top: 10px; border-top: 1px dashed rgba(148,163,184,0.22); }
+.condominio-detail { margin-top: 10px; padding-top: 10px; border-top: 1px dashed rgba(0,0,0,0.15); }
 .condominio-detail__head { display: flex; justify-content: space-between; gap: 10px; align-items: center; margin-bottom: 10px; }
-.condominio-detail__name { font-weight: 900; font-size: 16px; color: #ffffff; }
-.condominio-detail__addr { font-size: 12px; color: rgba(255,255,255,0.80); }
-.condominio-detail__count { font-weight: 800; font-size: 12px; padding: 4px 8px; border-radius: 999px; background: rgba(148,163,184,0.16); color: #ffffff; }
+.condominio-detail__name { font-weight: 800; font-size: 16px; }
+.condominio-detail__addr { font-size: 12px; opacity: .75; }
+.condominio-detail__count { font-weight: 700; font-size: 12px; padding: 4px 8px; border-radius: 999px; background: rgba(0,0,0,0.06); }
 
-.condominio-imm {
-  display: flex; justify-content: space-between; gap: 10px; align-items: center;
-  padding: 8px 10px; border-radius: 12px;
-  border: 1px solid rgba(148,163,184,0.16);
-  margin-bottom: 8px;
-  background: rgba(2,6,23,0.28);
-}
-.condominio-imm__rif { font-weight: 800; font-size: 12px; color: #ffffff; }
-.condominio-imm__addr { font-size: 12px; color: rgba(255,255,255,0.78); }
-.muted { color: rgba(255,255,255,0.72); font-size: 12px; }
+.condominio-imm { display: flex; justify-content: space-between; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 12px; border: 1px solid rgba(0,0,0,0.08); margin-bottom: 8px; }
+.condominio-imm__rif { font-weight: 700; font-size: 12px; }
+.condominio-imm__addr { font-size: 12px; opacity: .75; }
+.muted { opacity: .7; font-size: 12px; }
 
 /* ====== MODALE CONDOMINIO ====== */
 .condominio-modal {
@@ -1016,352 +1001,93 @@
 /* ====== Autocomplete indirizzi ====== */
 .form-group.has-addr-suggest { position: relative; }
 
-/* Contrasto aumentato: fondo più chiaro (dark), testo più luminoso, separatori più netti */
 .addr-suggest{
   position:absolute;
   left:0;
   right:0;
   top: calc(100% + 6px);
-  border: 1px solid rgba(148,163,184,0.28); /* slate-400 */
-  background: #0b1220; /* dark but not black */
-  box-shadow: 0 18px 50px rgba(0,0,0,0.92);
+  border: 1px solid #1f2937;
+  background: radial-gradient(circle at 0 0, #020617, #020617 60%, #000 100%);
+  box-shadow: 0 18px 50px rgba(0,0,0,0.9);
   border-radius: 12px;
   z-index: 9999;
   overflow: hidden;
-  max-height: 280px;
+  max-height: 260px;
   overflow-y: auto;
 }
 
 .addr-suggest__item{
-  padding: 9px 10px;
+  padding: 8px 10px;
   cursor: pointer;
-  border-bottom: 1px solid rgba(148,163,184,0.14);
+  border-bottom: 1px solid rgba(31,41,55,0.8);
 }
 .addr-suggest__item:last-child{ border-bottom: none; }
-
-.addr-suggest__item:hover,
-.addr-suggest__item:focus{
-  outline: none;
-  background: rgba(34,197,94,0.18);
+.addr-suggest__item:hover{
+  background: radial-gradient(circle at 0 0, rgba(34,197,94,0.14), rgba(2,6,23,0.9));
 }
-
 .addr-suggest__main{
-  font-size: 12.5px;
-  color: #ffffff;
-  font-weight: 700;
-  letter-spacing: 0.01em;
+  font-size: 12px;
+  color: #e5e7eb;
+  font-weight: 600;
 }
-
 .addr-suggest__sub{
   margin-top: 2px;
-  font-size: 11.5px;
-  color: rgba(255,255,255,0.82);
-}
-/* =========================================================
-   STILE UNIFICATO TENDINE
-   (indirizzi + condomini)
-   ========================================================= */
-
-/* Base comune */
-.addr-dropdown,
-.address-dropdown,
-.autocomplete-dropdown,
-.condomini-panel,
-.condomini-dropdown {
-    background-color: #1e1f22;
-    color: #f2f2f2;
-    border: 1px solid #3a3d42;
-    border-radius: 6px;
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
-    font-size: 14px;
-    z-index: 9999;
+  font-size: 11px;
+  color: #9ca3af;
 }
 
-/* Voci elenco */
-.addr-dropdown .item,
-.address-dropdown .item,
-.autocomplete-dropdown .item,
-.condomini-panel .condominio-item,
-.condomini-dropdown .condominio-item {
-    padding: 8px 12px;
-    cursor: pointer;
-    border-bottom: 1px solid #2f3136;
-    color: #f2f2f2;
-}
-
-/* Ultimo elemento senza bordo */
-.addr-dropdown .item:last-child,
-.address-dropdown .item:last-child,
-.autocomplete-dropdown .item:last-child,
-.condomini-panel .condominio-item:last-child,
-.condomini-dropdown .condominio-item:last-child {
-    border-bottom: none;
-}
-
-/* Hover / selezione */
-.addr-dropdown .item:hover,
-.address-dropdown .item:hover,
-.autocomplete-dropdown .item:hover,
-.condomini-panel .condominio-item:hover,
-.condomini-dropdown .condominio-item:hover {
-    background-color: #2b5cff;
-    color: #ffffff;
-}
-
-/* Riga secondaria (CAP / città / provincia) */
-.addr-dropdown .sub,
-.address-dropdown .sub,
-.autocomplete-dropdown .sub,
-.condomini-panel .sub {
-    font-size: 12px;
-    color: #b5b8be;
-}
-
-/* Stato "loading / hint" */
-.addr-dropdown .hint,
-.address-dropdown .hint,
-.autocomplete-dropdown .hint {
-    padding: 8px 12px;
-    font-style: italic;
-    color: #9fa3aa;
-}
 /* =====================================================
-   FIX CONTRASTO TENDINA AUTOCOMPLETE INDIRIZZI
+   OVERRIDE CONTRASTO: TENDINA RICERCA INDIRIZZI (Leaflet Control Geocoder)
+   Nota: questo blocco deve stare in fondo a crm.css per vincere sugli stili della libreria.
    ===================================================== */
 
-/* Contenitore tendina */
-.addr-dropdown,
-.address-dropdown,
-.autocomplete-dropdown,
-.leaflet-control-geocoder-alternatives {
-    background-color: #1e1f22 !important;
-    color: #f5f5f5 !important;
-    border: 1px solid #3a3d42 !important;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.55) !important;
-}
-
-/* Singola voce */
-.addr-dropdown div,
-.address-dropdown div,
-.autocomplete-dropdown div,
-.leaflet-control-geocoder-alternatives li {
-    background-color: transparent !important;
-    color: #f5f5f5 !important;
-    padding: 10px 12px !important;
-    border-bottom: 1px solid #2f3136 !important;
-    font-weight: 500;
-}
-
-/* Riga secondaria (CAP / città / provincia) */
-.addr-dropdown small,
-.address-dropdown small,
-.autocomplete-dropdown small,
-.leaflet-control-geocoder-alternatives li span {
-    color: #c2c6cc !important;
-    font-size: 12px;
-}
-
-/* Hover */
-.addr-dropdown div:hover,
-.address-dropdown div:hover,
-.autocomplete-dropdown div:hover,
-.leaflet-control-geocoder-alternatives li:hover {
-    background-color: #2b5cff !important;
-    color: #ffffff !important;
-}
-
-/* Scrollbar (Chrome) */
-.addr-dropdown::-webkit-scrollbar,
-.autocomplete-dropdown::-webkit-scrollbar {
-    width: 8px;
-}
-
-.addr-dropdown::-webkit-scrollbar-thumb,
-.autocomplete-dropdown::-webkit-scrollbar-thumb {
-    background: #3a3d42;
-    border-radius: 4px;
-}
-
-.addr-dropdown::-webkit-scrollbar-track,
-.autocomplete-dropdown::-webkit-scrollbar-track {
-    background: #1e1f22;
-}
-/* =====================================================
-   OVERRIDE FORTE: TENDINA RICERCA INDIRIZZI (stile condomini)
-   ===================================================== */
-
-/* Contenitore tendina */
-.addr-suggest{
-  background: #0b1220 !important;          /* dark */
-  color: #f8fafc !important;               /* testo chiaro */
-  border: 1px solid #334155 !important;    /* bordo leggibile */
-  box-shadow: 0 12px 30px rgba(0,0,0,.55) !important;
-  border-radius: 12px !important;
-  overflow: hidden !important;
-}
-
-/* Forza opacità piena su tutto (a volte arriva “sbiadita”) */
-.addr-suggest, .addr-suggest *{
-  opacity: 1 !important;
-}
-
-/* Elementi lista */
-.addr-suggest__item{
-  background: transparent !important;
-  color: #f8fafc !important;
-  border-bottom: 1px solid rgba(148,163,184,.22) !important;
-}
-
-/* Riga principale (via/civico) */
-.addr-suggest__main{
-  color: #f8fafc !important;
-  font-weight: 700 !important;
-  font-size: 13.5px !important;
-}
-
-/* Riga secondaria (CAP - città - provincia) */
-.addr-suggest__sub{
-  color: #cbd5e1 !important;
-  font-size: 12px !important;
-}
-
-/* Hover (come “condomini”) */
-.addr-suggest__item:hover{
-  background: rgba(34,197,94,.18) !important; /* verde soft */
-}
-
-/* Scrollbar (Chrome) */
-.addr-suggest::-webkit-scrollbar{ width: 10px; }
-.addr-suggest::-webkit-scrollbar-track{ background: #0b1220; }
-.addr-suggest::-webkit-scrollbar-thumb{
-  background: #334155;
-  border-radius: 8px;
-}
-/* =====================================================
-   OVERRIDE DEFINITIVO LEAFLET GEOCODER (TENDINA INDIRIZZI)
-   ===================================================== */
-
-.leaflet-control-geocoder-alternatives {
-  background: #0b1220 !important;
-  border: 1px solid #334155 !important;
-  border-radius: 12px !important;
-  box-shadow: 0 12px 30px rgba(0,0,0,.55) !important;
-  overflow: hidden !important;
-}
-
-/* lista */
-.leaflet-control-geocoder-alternatives ul {
-  margin: 0 !important;
-  padding: 0 !important;
-  background: #0b1220 !important;
-}
-
-/* singola voce */
-.leaflet-control-geocoder-alternatives li {
-  list-style: none !important;
-  border-bottom: 1px solid rgba(148,163,184,.25) !important;
-}
-
-/* link cliccabile */
-.leaflet-control-geocoder-alternatives li a {
-  display: block !important;
-  padding: 10px 14px !important;
-  background: transparent !important;
-  color: #f8fafc !important;
-  font-weight: 600 !important;
-  text-decoration: none !important;
-}
-
-/* riga secondaria (CAP / città / regione) */
-.leaflet-control-geocoder-alternatives li a span {
-  display: block !important;
-  margin-top: 2px !important;
-  color: #cbd5e1 !important;
-  font-weight: 400 !important;
-  font-size: 12px !important;
-}
-
-/* hover */
-.leaflet-control-geocoder-alternatives li a:hover {
-  background: rgba(34,197,94,.18) !important;
-  color: #ffffff !important;
-}
-
-/* scrollbar */
-.leaflet-control-geocoder-alternatives::-webkit-scrollbar {
-  width: 10px;
-}
-.leaflet-control-geocoder-alternatives::-webkit-scrollbar-thumb {
-  background: #334155;
-  border-radius: 8px;
-}
-.leaflet-control-geocoder-alternatives::-webkit-scrollbar-track {
-  background: #0b1220;
-}
-/* Tendina indirizzi (nostra) – alto contrasto */
-.addr-suggest{
-  background:#0b1220 !important;
+.leaflet-control-geocoder-alternatives,
+.leaflet-control-geocoder-alternatives *{
+  background-color:#0b1220 !important;
   color:#f8fafc !important;
+  opacity:1 !important;
+  filter:none !important;
+}
+
+.leaflet-control-geocoder-alternatives{
   border:1px solid #334155 !important;
   border-radius:12px !important;
   box-shadow:0 12px 30px rgba(0,0,0,.55) !important;
   overflow:hidden !important;
 }
 
-.addr-suggest__item{
-  padding:10px 14px !important;
-  border-bottom:1px solid rgba(148,163,184,.25) !important;
-  cursor:pointer !important;
+.leaflet-control-geocoder-alternatives ul{
+  margin:0 !important;
+  padding:0 !important;
 }
 
-.addr-suggest__main{
-  color:#f8fafc !important;
+.leaflet-control-geocoder-alternatives li{
+  list-style:none !important;
+  border-bottom:1px solid rgba(148,163,184,.25) !important;
+}
+
+.leaflet-control-geocoder-alternatives a{
+  display:block !important;
+  padding:10px 14px !important;
+  text-decoration:none !important;
   font-weight:700 !important;
 }
 
-.addr-suggest__sub{
+.leaflet-control-geocoder-alternatives a span{
+  display:block !important;
+  margin-top:2px !important;
   color:#cbd5e1 !important;
+  font-weight:400 !important;
   font-size:12px !important;
 }
 
-.addr-suggest__item:hover{
+.leaflet-control-geocoder-alternatives a:hover{
   background:rgba(34,197,94,.18) !important;
+  color:#ffffff !important;
 }
 
-.addr-suggest__hint{
-  padding:10px 14px !important;
-  color:#cbd5e1 !important;
-  font-style:italic !important;
-}
-/* CONTRASTO FORTE per la tendina Leaflet (quella bianca) */
-.leaflet-control-geocoder-alternatives,
-.leaflet-control-geocoder-alternatives * {
-  background: #0b1220 !important;
-  color: #f8fafc !important;
-  opacity: 1 !important;
-}
+/* Scrollbar (Chrome/Edge) */
+.leaflet-control-geocoder-alternatives::-webkit-scrollbar{ width:10px; }
+.leaflet-control-geocoder-alternatives::-webkit-scrollbar-thumb{ background:#334155; border-radius:8px; }
+.leaflet-control-geocoder-alternatives::-webkit-scrollbar-track{ background:#0b1220; }
 
-.leaflet-control-geocoder-alternatives {
-  border: 1px solid #334155 !important;
-  border-radius: 12px !important;
-  box-shadow: 0 12px 30px rgba(0,0,0,.55) !important;
-  overflow: hidden !important;
-}
-
-.leaflet-control-geocoder-alternatives li {
-  border-bottom: 1px solid rgba(148,163,184,.25) !important;
-}
-
-.leaflet-control-geocoder-alternatives a {
-  display: block !important;
-  padding: 10px 14px !important;
-  text-decoration: none !important;
-}
-
-.leaflet-control-geocoder-alternatives a span {
-  color: #cbd5e1 !important;
-}
-
-.leaflet-control-geocoder-alternatives a:hover {
-  background: rgba(34,197,94,.18) !important;
-}
