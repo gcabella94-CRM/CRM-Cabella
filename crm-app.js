@@ -1040,317 +1040,40 @@ function renderAgendaMonth() {
   /* ====== NOTIZIE ====== */
 
   function renderNotizie() {
-    // Nuova HOME Notizie: card verticali con scroll-snap.
-    // Fallback: se esiste ancora la tabella legacy (#not-table-body) la popola comunque.
-    const cardsContainer = document.getElementById('not-cards-container');
-    const respSel = document.getElementById('not-filter-resp');
-    const labelSel = document.getElementById('not-filter-label');
-    const sortSel = document.getElementById('not-filter-sort');
-    const searchEl = document.getElementById('not-filter-search');
-
-    // popolamento filtri (responsabili)
-    if (respSel) {
-      const prev = respSel.value;
-      respSel.innerHTML = '<option value="">Tutti i responsabili</option>';
-      (staff || []).forEach(s => {
-        if (!s || !s.id) return;
-        const opt = document.createElement('option');
-        opt.value = s.id;
-        opt.textContent = s.nome || 'Staff';
-        respSel.appendChild(opt);
-      });
-      respSel.value = prev || '';
-    }
-
-    // etichette (se non presenti nei dati, resta solo default)
-    if (labelSel) {
-      const prev = labelSel.value;
-      const labels = Array.from(new Set((notizie || []).map(n => (n && n.etichetta ? String(n.etichetta).trim() : '')).filter(Boolean)));
-      labelSel.innerHTML = '<option value="">Tutte le etichette</option>';
-      labels.forEach(l => {
-        const opt = document.createElement('option');
-        opt.value = l;
-        opt.textContent = l;
-        labelSel.appendChild(opt);
-      });
-      labelSel.value = prev || '';
-    }
-
-    // lista filtrata
-    const respFilter = respSel ? (respSel.value || '') : '';
-    const labelFilter = labelSel ? (labelSel.value || '') : '';
-    const q = (searchEl ? searchEl.value : '').trim().toLowerCase();
-    const sortVal = sortSel ? (sortSel.value || 'last') : 'last';
-
-    let list = (notizie || []).slice();
-
-    if (respFilter) list = list.filter(n => n && n.responsabileId === respFilter);
-    if (labelFilter) list = list.filter(n => n && String(n.etichetta || '').trim() === labelFilter);
-
-    if (q) {
-      list = list.filter(n => {
-        if (!n) return false;
-        const blob = [
-          n.indirizzo, n.citta, n.provincia, n.condominio, n.tipologia,
-          n.nome, n.cognome, n.telefono, n.email, n.note
-        ].filter(Boolean).join(' ').toLowerCase();
-        return blob.includes(q);
-      });
-    }
-
-    // sorting (se non ci sono campi, resta stabile)
-    const safeDate = (x) => {
-      const d = parseISODate(x);
-      return d ? d.getTime() : 0;
-    };
-    if (sortVal === 'last') {
-      // ultimo inserimento: se non abbiamo dataInserimento, ordina per id (fallback)
-      list.sort((a,b) => (b? (b._ts||0):0) - (a? (a._ts||0):0));
-    } else if (sortVal === 'hot') {
-      list.sort((a,b) => (b && b.caldo ? 1:0) - (a && a.caldo ? 1:0));
-    } else if (sortVal === 'mq_desc') {
-      list.sort((a,b) => (b?.mq||0) - (a?.mq||0));
-    } else if (sortVal === 'mq_asc') {
-      list.sort((a,b) => (a?.mq||0) - (b?.mq||0));
-    } else if (sortVal === 'label_asc') {
-      list.sort((a,b) => String(a?.etichetta||'').localeCompare(String(b?.etichetta||''), 'it'));
-    } else if (sortVal === 'recall_asc') {
-      list.sort((a,b) => safeDate(a?.dataRicontatto) - safeDate(b?.dataRicontatto));
-    }
-
-    // render cards
-    if (cardsContainer) {
-      cardsContainer.innerHTML = '';
-      if (!list.length) {
-        const empty = document.createElement('div');
-        empty.className = 'muted';
-        empty.style.padding = '10px 12px';
-        empty.textContent = 'Nessuna notizia. Clicca “Nuova notizia” per inserirne una.';
-        cardsContainer.appendChild(empty);
-      } else {
-        const staffMap = {};
-        (staff || []).forEach(s => { if (s && s.id) staffMap[s.id] = s; });
-
-        list.forEach(n => {
-          if (!n) return;
-          const card = document.createElement('div');
-          card.className = 'notizia-card';
-
-          const nomeCompleto = ((n.nome || '') + ' ' + (n.cognome || '')).trim();
-          const indirizzo = [n.indirizzo || '', n.citta || ''].filter(Boolean).join(' - ');
-          const tip = n.tipologia || '';
-          const mq = (n.mq != null && n.mq !== '') ? String(n.mq) : '';
-          const staffObj = n.responsabileId ? staffMap[n.responsabileId] : null;
-          const respName = staffObj ? (staffObj.nome || '') : '';
-          const respColor = staffObj ? (staffObj.colore || staffObj.color || '#22c55e') : '#22c55e';
-          const caldoLabel = n.caldo ? '🔥 ' : '';
-          const condo = (n.condominio || '').trim();
-
-          const headLeft = document.createElement('div');
-          headLeft.innerHTML = `
-            <div style="display:flex;align-items:center;gap:8px;">
-              <span style="display:inline-block;width:10px;height:10px;border-radius:999px;background:${respColor};"></span>
-              <div style="font-weight:700;font-size:14px;line-height:1.2;">
-                ${caldoLabel}${indirizzo || 'Senza indirizzo'}
-              </div>
-            </div>
-            <div class="muted" style="margin-top:2px;">
-              ${[tip, mq ? (mq + ' mq') : '', condo ? ('Condominio: ' + condo) : ''].filter(Boolean).join(' · ') || '—'}
-            </div>
-          `;
-
-          const actions = document.createElement('div');
-          actions.className = 'card-actions';
-          actions.innerHTML = `
-            <button class="btn btn-sm" data-not-edit="${n.id}">✏️ Modifica</button>
-            <button class="btn btn-sm btn-primary" data-not-recall="${n.id}">📅 Ricontatto (15')</button>
-          `;
-
-          const header = document.createElement('div');
-          header.className = 'card-header';
-          header.appendChild(headLeft);
-          header.appendChild(actions);
-
-          const body = document.createElement('div');
-          body.style.marginTop = '8px';
-
-          const ownerRow = document.createElement('div');
-          ownerRow.className = 'grid-responsive';
-          ownerRow.style.gap = '8px';
-          ownerRow.innerHTML = `
-            <div class="metric">
-              <div class="metric-label">Proprietario</div>
-              <div class="metric-value" style="font-size:14px;">${nomeCompleto || '—'}</div>
-              <div class="metric-extra">${[n.telefono || '', n.email || ''].filter(Boolean).join(' · ') || ''}</div>
-            </div>
-            <div class="metric">
-              <div class="metric-label">Responsabile</div>
-              <div class="metric-value" style="font-size:14px;">${respName || '—'}</div>
-              <div class="metric-extra">${(n.etichetta || '').toString().trim() ? ('Etichetta: ' + n.etichetta) : ''}</div>
-            </div>
-          `;
-
-          const noteWrap = document.createElement('div');
-          noteWrap.className = 'metric';
-          noteWrap.style.marginTop = '8px';
-
-          const noteHeader = document.createElement('div');
-          noteHeader.style.display = 'flex';
-          noteHeader.style.justifyContent = 'space-between';
-          noteHeader.style.alignItems = 'center';
-          noteHeader.innerHTML = `
-            <div>
-              <div class="metric-label">Ultima interazione</div>
-            </div>
-            <button type="button" class="btn btn-ghost btn-sm" data-not-toggle="${n.id}">Espandi</button>
-          `;
-
-          const noteText = document.createElement('div');
-          noteText.dataset.noteFor = n.id;
-          noteText.style.marginTop = '6px';
-          noteText.style.fontSize = '12px';
-          noteText.style.color = 'var(--text-main)';
-          noteText.style.whiteSpace = 'nowrap';
-          noteText.style.overflow = 'hidden';
-          noteText.style.textOverflow = 'ellipsis';
-          noteText.textContent = (n.note || '').trim() || '—';
-
-          noteWrap.appendChild(noteHeader);
-          noteWrap.appendChild(noteText);
-
-          body.appendChild(ownerRow);
-          body.appendChild(noteWrap);
-
-          card.appendChild(header);
-          card.appendChild(body);
-
-          // click card -> apre modale modifica (comodo)
-          card.addEventListener('dblclick', () => {
-            openNotiziaModalForEdit(n.id);
-          });
-
-          cardsContainer.appendChild(card);
-        });
-
-        // handlers (delegation)
-        cardsContainer.onclick = (e) => {
-          const editBtn = e.target.closest('[data-not-edit]');
-          if (editBtn) {
-            const id = editBtn.getAttribute('data-not-edit');
-            openNotiziaModalForEdit(id);
-            return;
-          }
-          const recallBtn = e.target.closest('[data-not-recall]');
-          if (recallBtn) {
-            const id = recallBtn.getAttribute('data-not-recall');
-            creaAppuntamentoDaNotiziaId(id);
-            return;
-          }
-          const toggleBtn = e.target.closest('[data-not-toggle]');
-          if (toggleBtn) {
-            const id = toggleBtn.getAttribute('data-not-toggle');
-            const txt = cardsContainer.querySelector(`[data-note-for="${id}"]`);
-            if (txt) {
-              const collapsed = txt.style.whiteSpace !== 'normal';
-              txt.style.whiteSpace = collapsed ? 'normal' : 'nowrap';
-              txt.style.overflow = collapsed ? 'visible' : 'hidden';
-              txt.style.textOverflow = collapsed ? 'clip' : 'ellipsis';
-              toggleBtn.textContent = collapsed ? 'Comprimi' : 'Espandi';
-            }
-            return;
-          }
-        };
-      }
-    }
-
-    // Fallback legacy: tabella
     const tbody = document.getElementById('not-table-body');
-    if (tbody) {
-      tbody.innerHTML = '';
-      (list || []).forEach(n => {
-        const tr = document.createElement('tr');
-        const staffObj = staff.find(s => s.id === n.responsabileId);
-        const nomeCompleto = ((n.nome || '') + ' ' + (n.cognome || '')).trim();
-        const caldoLabel = n.caldo ? '🔥' : '';
-        const indirizzoCompleto = [n.indirizzo || '', n.citta || ''].filter(Boolean).join(' - ');
-        tr.innerHTML = `
-          <td>${nomeCompleto}</td>
-          <td>${indirizzoCompleto}</td>
-          <td>${n.tipologia || ''}</td>
-          <td>${n.mq != null ? n.mq : ''}</td>
-          <td>${caldoLabel}</td>
-          <td>${staffObj ? staffObj.nome : ''}</td>
-          <td>
-            <button class="btn btn-xs" data-not-app="${n.id}">📅 App.</button>
-            <button class="btn btn-xs" data-not-imm="${n.id}">🏢 Imm.</button>
-          </td>
-        `;
-        tbody.appendChild(tr);
-      });
-    }
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    (notizie || []).forEach(n => {
+      const tr = document.createElement('tr');
+      const staffObj = staff.find(s => s.id === n.responsabileId);
+      const nomeCompleto = ((n.nome || '') + ' ' + (n.cognome || '')).trim();
+      const caldoLabel = n.caldo ? '🔥' : '';
+      const indirizzoCompleto = [n.indirizzo || '', n.citta || ''].filter(Boolean).join(' - ');
+      const condoName = (n.condominio || '').trim();
+      if (condoName) tr.classList.add('in-condominio-notizia');
+      const condoBadge = condoName ? ` <span class="badge-condominio badge-condominio--notizia">🏢 ${escapeHtml(condoName)}</span>` : '';
+      tr.dataset.phone = n.telefono || '';
+      tr.dataset.email = n.email || '';
+
+      tr.innerHTML = `
+        <td>${nomeCompleto || '—'}</td>
+        <td>${n.telefono || ''}</td>
+        <td>${escapeHtml(indirizzoCompleto)}${condoBadge}</td>
+        <td>${n.tipologia || ''}</td>
+        <td>${n.piano || ''}</td>
+        <td>${n.mq != null ? n.mq : ''}</td>
+        <td>${caldoLabel}</td>
+        <td>${staffObj ? staffObj.nome : ''}</td>
+        <td>
+          <button class="btn btn-xs" data-not-edit="${n.id || ''}" title="Modifica notizia">✏️ Modifica</button>
+          <button class="btn btn-xs" data-not-att="${n.id || ''}" title="Crea attività collegata">➕ Attività</button>
+          <button class="btn btn-xs" data-not-imm="${n.id || ''}" title="Apri scheda inserimento immobile">🏠 Immobile</button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
   }
-
-  // ====== MODALE NOTIZIE (apri/chiudi + edit) ======
-
-  function openNotiziaModal() {
-    const overlay = document.getElementById('notizie-modal-overlay');
-    if (overlay) overlay.style.display = 'flex';
-  }
-  function closeNotiziaModal() {
-    const overlay = document.getElementById('notizie-modal-overlay');
-    if (overlay) overlay.style.display = 'none';
-  }
-
-  function fillNotiziaForm(n) {
-    if (!n) return;
-    document.getElementById('not-id') && (document.getElementById('not-id').value = n.id || '');
-    document.getElementById('not-nome') && (document.getElementById('not-nome').value = n.nome || '');
-    document.getElementById('not-cognome') && (document.getElementById('not-cognome').value = n.cognome || '');
-    document.getElementById('not-telefono') && (document.getElementById('not-telefono').value = n.telefono || '');
-    document.getElementById('not-email') && (document.getElementById('not-email').value = n.email || '');
-    document.getElementById('not-indirizzo') && (document.getElementById('not-indirizzo').value = n.indirizzo || '');
-    document.getElementById('not-citta') && (document.getElementById('not-citta').value = n.citta || '');
-    document.getElementById('not-provincia') && (document.getElementById('not-provincia').value = n.provincia || '');
-    document.getElementById('not-cap') && (document.getElementById('not-cap').value = n.cap || '');
-    document.getElementById('not-condominio') && (document.getElementById('not-condominio').value = n.condominio || '');
-    document.getElementById('not-tipologia') && (document.getElementById('not-tipologia').value = n.tipologia || '');
-    document.getElementById('not-piano') && (document.getElementById('not-piano').value = n.piano || '');
-    document.getElementById('not-mq') && (document.getElementById('not-mq').value = (n.mq != null ? n.mq : ''));
-    document.getElementById('not-caldo') && (document.getElementById('not-caldo').checked = !!n.caldo);
-    document.getElementById('not-note') && (document.getElementById('not-note').value = n.note || '');
-  }
-
-  function openNotiziaModalForEdit(notId) {
-    const n = (notizie || []).find(x => x && x.id === notId);
-    if (!n) return;
-    resetNotizieForm();
-    fillNotiziaForm(n);
-    const saveBtn = document.getElementById('not-save-btn');
-    if (saveBtn) saveBtn.textContent = 'Salva modifiche';
-    const cancelBtn = document.getElementById('not-cancel-edit');
-    if (cancelBtn) cancelBtn.style.display = 'inline-flex';
-    openNotiziaModal();
-  }
-
-  // Hook UI modale
-  document.getElementById('not-modal-close')?.addEventListener('click', closeNotiziaModal);
-  document.getElementById('notizie-modal-overlay')?.addEventListener('click', (e) => {
-    if (e.target && e.target.id === 'notizie-modal-overlay') closeNotiziaModal();
-  });
-  document.getElementById('not-cancel-edit')?.addEventListener('click', () => {
-    resetNotizieForm();
-    closeNotiziaModal();
-  });
-
-  // filtri -> rerender
-  document.getElementById('not-filter-resp')?.addEventListener('change', renderNotizie);
-  document.getElementById('not-filter-label')?.addEventListener('change', renderNotizie);
-  document.getElementById('not-filter-sort')?.addEventListener('change', renderNotizie);
-  document.getElementById('not-filter-search')?.addEventListener('input', () => {
-    // micro-debounce
-    clearTimeout(window.__notSearchT);
-    window.__notSearchT = setTimeout(renderNotizie, 120);
-  });
 
   function resetNotizieForm() {
     const form = document.getElementById('not-form');
@@ -1658,14 +1381,11 @@ function renderAgendaMonth() {
       }
       renderNotizie();
       resetNotizieForm();
-      try{ closeNotiziaModal(); }catch(e){}
     });
   }
 
   document.getElementById('not-new-btn')?.addEventListener('click', () => {
-    resetNotizieForm();
-    openNotiziaModal();
-  });
+    const section = document.getElementById('view-notizie');
     if (section) {
       section.scrollIntoView({ behavior: 'smooth' });
     }
