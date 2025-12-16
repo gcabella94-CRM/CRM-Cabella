@@ -1039,469 +1039,639 @@ function renderAgendaMonth() {
 
   /* ====== NOTIZIE ====== */
 
-  let __notizieHomeInited = false;
+  function renderNotizie() {
+    // Nuova HOME Notizie: card verticali con scroll-snap.
+    // Fallback: se esiste ancora la tabella legacy (#not-table-body) la popola comunque.
+    const cardsContainer = document.getElementById('not-cards-container');
+    const respSel = document.getElementById('not-filter-resp');
+    const labelSel = document.getElementById('not-filter-label');
+    const sortSel = document.getElementById('not-filter-sort');
+    const searchEl = document.getElementById('not-filter-search');
 
-  function ensureNotiziaDefaults(n) {
-    if (!n) n = {};
-    if (!n.id) n.id = genId('not');
-    if (!n.createdAt) n.createdAt = Date.now();
-    if (!n.updatedAt) n.updatedAt = n.createdAt;
-    if (!n.responsabileId) n.responsabileId = (staff && staff[0] && staff[0].id) ? staff[0].id : '';
-    if (typeof n.nonRisponde !== 'boolean') n.nonRisponde = false;
-    if (!('recallAt' in n)) n.recallAt = ''; // datetime-local string
-    if (!('label' in n)) n.label = '';
-    if (!('lastNote' in n)) n.lastNote = '';
-    return n;
-  }
-
-  function getNotiziaLabel(n) {
-    return ((n && (n.label || n.etichetta)) || '').toString().trim();
-  }
-
-  function escapeAttr(str){ return escapeHtml(str).replace(/"/g,'&quot;'); }
-
-  function initNotizieHomeUI() {
-    if (__notizieHomeInited) return;
-    __notizieHomeInited = true;
-
-    const overlay = document.getElementById('notizie-modal-overlay');
-    const closeBtn = document.getElementById('not-modal-close');
-    const form = document.getElementById('not-form');
-
-    function closeModal() {
-      if (!overlay) return;
-      overlay.style.display = 'none';
-      document.body.classList.remove('modal-open');
-    }
-
-    function openModal(notizia) {
-      if (!overlay) return;
-      overlay.style.display = 'flex';
-      document.body.classList.add('modal-open');
-
-      const n = ensureNotiziaDefaults(notizia ? { ...notizia } : {});
-
-      // compila form
-      document.getElementById('not-id').value = n.id || '';
-      document.getElementById('not-nome').value = n.nome || '';
-      document.getElementById('not-cognome').value = n.cognome || '';
-      document.getElementById('not-telefono').value = n.telefono || '';
-      document.getElementById('not-email').value = n.email || '';
-      document.getElementById('not-indirizzo').value = n.indirizzo || '';
-      document.getElementById('not-citta').value = n.citta || '';
-      document.getElementById('not-provincia').value = n.provincia || '';
-      document.getElementById('not-cap').value = n.cap || '';
-      const cond = document.getElementById('not-condominio');
-      if (cond) cond.value = n.condominio || '';
-      const tip = document.getElementById('not-tipologia');
-      if (tip) tip.value = n.tipologia || (tip.options[0]?.value || '');
-      const piano = document.getElementById('not-piano');
-      if (piano) piano.value = n.piano || '';
-      const mq = document.getElementById('not-mq');
-      if (mq) mq.value = (n.mq != null ? String(n.mq) : '');
-      const note = document.getElementById('not-note');
-      if (note) note.value = n.note || '';
-    }
-
-    // espone per uso interno
-    window.__openNotiziaModal = openModal;
-    window.__closeNotiziaModal = closeModal;
-
-    closeBtn && closeBtn.addEventListener('click', closeModal);
-    overlay && overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
-
-    // Nuova notizia -> apri modale
-    document.getElementById('not-new-btn')?.addEventListener('click', () => {
-      openModal(null);
-      setTimeout(() => { try { document.getElementById('not-nome')?.focus(); } catch {} }, 0);
-    });
-
-    // submit (salva) + chiudi
-    if (form) {
-      form.addEventListener('submit', function (e) {
-        e.preventDefault();
-
-        const existingId = (document.getElementById('not-id').value || '').trim();
-        const nome = document.getElementById('not-nome').value.trim();
-        if (!nome) { alert('Inserisci almeno il nome proprietario.'); return; }
-
-        const cognome = document.getElementById('not-cognome').value.trim();
-        const telefono = document.getElementById('not-telefono').value.trim();
-        const email = document.getElementById('not-email').value.trim();
-        const indirizzo = document.getElementById('not-indirizzo').value.trim();
-        const citta = document.getElementById('not-citta').value.trim();
-        const provincia = document.getElementById('not-provincia').value.trim();
-        const cap = (document.getElementById('not-cap')?.value || '').trim();
-        const condominio = (document.getElementById('not-condominio')?.value || '').trim();
-        const tipologia = (document.getElementById('not-tipologia')?.value || '').trim();
-        const piano = (document.getElementById('not-piano')?.value || '').trim();
-        const mqStr = (document.getElementById('not-mq')?.value || '').trim();
-        const mq = mqStr ? Number(mqStr) : null;
-        const note = (document.getElementById('not-note')?.value || '').trim();
-
-        const creaContatto = !!document.getElementById('not-crea-contatto')?.checked;
-
-        // preserva campi "home card"
-        const prev = (notizie || []).find(x => x && x.id === existingId) || null;
-
-        const notizia = ensureNotiziaDefaults({
-          ...(prev || {}),
-          id: existingId || genId('not'),
-          nome, cognome, telefono, email,
-          indirizzo, citta, provincia, cap,
-          condominio,
-          tipologia, piano,
-          mq: (mq != null && isFinite(mq)) ? mq : (prev ? prev.mq : null),
-          note,
-          updatedAt: Date.now(),
-          // responsabileId resta quello già assegnato (o default)
-          responsabileId: (prev && prev.responsabileId) ? prev.responsabileId : ((staff && staff[0] && staff[0].id) ? staff[0].id : ''),
-          createdAt: (prev && prev.createdAt) ? prev.createdAt : Date.now()
-        });
-
-        if (!Array.isArray(notizie)) notizie = [];
-        const ix = notizie.findIndex(x => x && x.id === notizia.id);
-        if (ix >= 0) notizie[ix] = notizia;
-        else notizie.push(notizia);
-
-        saveList(STORAGE_KEYS.notizie, notizie);
-
-        if (!prev && creaContatto) {
-          addContattoDaNotizia(notizia);
-        }
-
-        closeModal();
-        renderNotizie();
-        resetNotizieForm?.();
-      });
-    }
-
-    // toolbar filters: re-render
-    ['not-filter-resp', 'not-filter-label', 'not-filter-sort'].forEach(id => {
-      document.getElementById(id)?.addEventListener('change', renderNotizie);
-    });
-    document.getElementById('not-filter-search')?.addEventListener('input', () => {
-      // piccolo debounce
-      clearTimeout(window.__notSearchT);
-      window.__notSearchT = setTimeout(renderNotizie, 120);
-    });
-
-    // azioni su card + campi inline
-    const cards = document.getElementById('not-cards-container');
-    if (cards) {
-      cards.addEventListener('click', (e) => {
-        const t = e.target;
-        const editBtn = t.closest('[data-not-edit]');
-        if (editBtn) {
-          const id = editBtn.getAttribute('data-not-edit');
-          const n = (notizie || []).find(x => x && x.id === id);
-          if (n) openModal(n);
-          return;
-        }
-        const toggleBtn = t.closest('[data-not-toggle-note]');
-        if (toggleBtn) {
-          const id = toggleBtn.getAttribute('data-not-toggle-note');
-          const box = cards.querySelector(`[data-not-note="${id}"]`);
-          if (box) box.classList.toggle('expanded');
-          return;
-        }
-        const ricontBtn = t.closest('[data-not-ricontatto]');
-        if (ricontBtn) {
-          const id = ricontBtn.getAttribute('data-not-ricontatto');
-          const n = (notizie || []).find(x => x && x.id === id);
-          if (!n) return;
-
-          // se c'è recallAt usa quella, altrimenti oggi 10:00
-          let dateIso = new Date().toISOString().slice(0,10);
-          let time = '10:00';
-          if (n.recallAt) {
-            const d = new Date(n.recallAt);
-            if (!isNaN(d)) {
-              dateIso = d.toISOString().slice(0,10);
-              time = d.toTimeString().slice(0,5);
-            }
-          }
-
-          // crea appuntamento collegato (15 min)
-          try {
-            const start = time;
-            const [hh, mm] = start.split(':').map(x => parseInt(x,10));
-            const d0 = new Date(dateIso + 'T' + start + ':00');
-            const d1 = new Date(d0.getTime() + 15*60*1000);
-            const end = d1.toTimeString().slice(0,5);
-
-            const staffId = n.responsabileId || ((staff && staff[0] && staff[0].id) ? staff[0].id : '');
-            const app = {
-              id: '',
-              data: dateIso,
-              ora: start,
-              oraFine: end,
-              tipo: 'appuntamento',
-              tipoDettaglio: 'ricontatto',
-              descrizione: '',
-              responsabileId: staffId,
-              clienteId: '',
-              contattoId: '',
-              notiziaId: n.id,
-              inUfficio: false,
-              cittaUfficio: '',
-              luogo: n.indirizzo || ''
-            };
-            if (typeof openAppuntamentoDialog === 'function') {
-              openAppuntamentoDialog(app);
-            } else if (typeof openAgendaRangeDialog === 'function') {
-              openAgendaRangeDialog(dateIso, hh*60+mm, hh*60+mm+15);
-            } else {
-              alert('Funzione appuntamento non trovata.');
-            }
-          } catch (err) {
-            console.warn('Ricontatto err', err);
-          }
-          return;
-        }
-      });
-
-      // salvataggio inline (checkbox, datetime, label, note)
-      const persist = (id, patch) => {
-        const ix = (notizie || []).findIndex(x => x && x.id === id);
-        if (ix < 0) return;
-        notizie[ix] = ensureNotiziaDefaults({ ...notizie[ix], ...patch, updatedAt: Date.now() });
-        saveList(STORAGE_KEYS.notizie, notizie);
-      };
-
-      cards.addEventListener('change', (e) => {
-        const el = e.target;
-        const id = el.getAttribute('data-not-id');
-        if (!id) return;
-        if (el.matches('[data-not-field="nonRisponde"]')) {
-          persist(id, { nonRisponde: !!el.checked });
-          renderNotizie(); // per filtro/sort, se serve
-        }
-        if (el.matches('[data-not-field="recallAt"]')) {
-          persist(id, { recallAt: el.value || '' });
-          renderNotizie(); // per sort recall
-        }
-        if (el.matches('[data-not-field="label"]')) {
-          persist(id, { label: el.value || '' });
-          renderNotizie(); // aggiorna lista etichette
-        }
-      });
-
-      cards.addEventListener('input', (e) => {
-        const el = e.target;
-        const id = el.getAttribute('data-not-id');
-        if (!id) return;
-        if (el.matches('[data-not-field="lastNote"]')) {
-          clearTimeout(window.__notNoteT);
-          window.__notNoteT = setTimeout(() => persist(id, { lastNote: el.value || '' }), 250);
-        }
-      });
-    }
-  }
-
-  function renderNotizieFilters() {
-    const selResp = document.getElementById('not-filter-resp');
-    const selLabel = document.getElementById('not-filter-label');
-    if (selResp) {
-      const cur = selResp.value || '';
-      selResp.innerHTML = '<option value="">Tutti i responsabili</option>';
+    // popolamento filtri (responsabili)
+    if (respSel) {
+      const prev = respSel.value;
+      respSel.innerHTML = '<option value="">Tutti i responsabili</option>';
       (staff || []).forEach(s => {
         if (!s || !s.id) return;
         const opt = document.createElement('option');
         opt.value = s.id;
-        opt.textContent = s.nome || s.id;
-        selResp.appendChild(opt);
+        opt.textContent = s.nome || 'Staff';
+        respSel.appendChild(opt);
       });
-      selResp.value = cur;
+      respSel.value = prev || '';
     }
-    if (selLabel) {
-      const cur = selLabel.value || '';
-      selLabel.innerHTML = '<option value="">Tutte le etichette</option>';
-      const set = new Set();
-      (notizie || []).forEach(n => {
-        const lab = getNotiziaLabel(n);
-        if (lab) set.add(lab);
-      });
-      Array.from(set).sort((a,b)=>a.localeCompare(b)).forEach(l => {
+
+    // etichette (se non presenti nei dati, resta solo default)
+    if (labelSel) {
+      const prev = labelSel.value;
+      const labels = Array.from(new Set((notizie || []).map(n => (n && n.etichetta ? String(n.etichetta).trim() : '')).filter(Boolean)));
+      labelSel.innerHTML = '<option value="">Tutte le etichette</option>';
+      labels.forEach(l => {
         const opt = document.createElement('option');
         opt.value = l;
         opt.textContent = l;
-        selLabel.appendChild(opt);
+        labelSel.appendChild(opt);
       });
-      selLabel.value = cur;
+      labelSel.value = prev || '';
     }
-  }
 
-  function renderNotizieCards() {
-    const cont = document.getElementById('not-cards-container');
-    if (!cont) return;
-    cont.innerHTML = '';
+    // lista filtrata
+    const respFilter = respSel ? (respSel.value || '') : '';
+    const labelFilter = labelSel ? (labelSel.value || '') : '';
+    const q = (searchEl ? searchEl.value : '').trim().toLowerCase();
+    const sortVal = sortSel ? (sortSel.value || 'last') : 'last';
 
-    renderNotizieFilters();
+    let list = (notizie || []).slice();
 
-    const fResp = document.getElementById('not-filter-resp')?.value || '';
-    const fLabel = document.getElementById('not-filter-label')?.value || '';
-    const fSort = document.getElementById('not-filter-sort')?.value || 'created_desc';
-    const q = (document.getElementById('not-filter-search')?.value || '').trim().toLowerCase();
+    if (respFilter) list = list.filter(n => n && n.responsabileId === respFilter);
+    if (labelFilter) list = list.filter(n => n && String(n.etichetta || '').trim() === labelFilter);
 
-    let arr = (notizie || []).map(n => ensureNotiziaDefaults({ ...n }));
-
-    // filtri
-    if (fResp) arr = arr.filter(n => (n.responsabileId || '') === fResp);
-    if (fLabel) arr = arr.filter(n => getNotiziaLabel(n) === fLabel);
     if (q) {
-      arr = arr.filter(n => {
-        const nome = ((n.nome||'')+' '+(n.cognome||'')).toLowerCase();
-        const addr = ((n.indirizzo||'')+' '+(n.citta||'')+' '+(n.provincia||'')+' '+(n.cap||'')).toLowerCase();
-        const misc = ((n.note||'')+' '+(n.lastNote||'')+' '+getNotiziaLabel(n)).toLowerCase();
-        return nome.includes(q) || addr.includes(q) || misc.includes(q);
+      list = list.filter(n => {
+        if (!n) return false;
+        const blob = [
+          n.indirizzo, n.citta, n.provincia, n.condominio, n.tipologia,
+          n.nome, n.cognome, n.telefono, n.email, n.note
+        ].filter(Boolean).join(' ').toLowerCase();
+        return blob.includes(q);
       });
     }
 
-    // sort
-    if (fSort === 'created_desc') {
-      arr.sort((a,b)=> (b.createdAt||0) - (a.createdAt||0));
-    } else if (fSort === 'recall_asc') {
-      arr.sort((a,b)=>{
-        const da = a.recallAt ? new Date(a.recallAt).getTime() : Infinity;
-        const db = b.recallAt ? new Date(b.recallAt).getTime() : Infinity;
-        return da - db || (b.createdAt||0) - (a.createdAt||0);
-      });
-    } else if (fSort === 'label_asc') {
-      arr.sort((a,b)=> (getNotiziaLabel(a)||'').localeCompare(getNotiziaLabel(b)||'') || (b.createdAt||0)-(a.createdAt||0));
+    // sorting (se non ci sono campi, resta stabile)
+    const safeDate = (x) => {
+      const d = parseISODate(x);
+      return d ? d.getTime() : 0;
+    };
+    if (sortVal === 'last') {
+      // ultimo inserimento: se non abbiamo dataInserimento, ordina per id (fallback)
+      list.sort((a,b) => (b? (b._ts||0):0) - (a? (a._ts||0):0));
+    } else if (sortVal === 'hot') {
+      list.sort((a,b) => (b && b.caldo ? 1:0) - (a && a.caldo ? 1:0));
+    } else if (sortVal === 'mq_desc') {
+      list.sort((a,b) => (b?.mq||0) - (a?.mq||0));
+    } else if (sortVal === 'mq_asc') {
+      list.sort((a,b) => (a?.mq||0) - (b?.mq||0));
+    } else if (sortVal === 'label_asc') {
+      list.sort((a,b) => String(a?.etichetta||'').localeCompare(String(b?.etichetta||''), 'it'));
+    } else if (sortVal === 'recall_asc') {
+      list.sort((a,b) => safeDate(a?.dataRicontatto) - safeDate(b?.dataRicontatto));
     }
 
-    if (!arr.length) {
-      const empty = document.createElement('div');
-      empty.className = 'muted';
-      empty.style.padding = '10px';
-      empty.textContent = 'Nessuna notizia con i filtri attuali.';
-      cont.appendChild(empty);
-      return;
+    // render cards
+    if (cardsContainer) {
+      cardsContainer.innerHTML = '';
+      if (!list.length) {
+        const empty = document.createElement('div');
+        empty.className = 'muted';
+        empty.style.padding = '10px 12px';
+        empty.textContent = 'Nessuna notizia. Clicca “Nuova notizia” per inserirne una.';
+        cardsContainer.appendChild(empty);
+      } else {
+        const staffMap = {};
+        (staff || []).forEach(s => { if (s && s.id) staffMap[s.id] = s; });
+
+        list.forEach(n => {
+          if (!n) return;
+          const card = document.createElement('div');
+          card.className = 'notizia-card';
+
+          const nomeCompleto = ((n.nome || '') + ' ' + (n.cognome || '')).trim();
+          const indirizzo = [n.indirizzo || '', n.citta || ''].filter(Boolean).join(' - ');
+          const tip = n.tipologia || '';
+          const mq = (n.mq != null && n.mq !== '') ? String(n.mq) : '';
+          const staffObj = n.responsabileId ? staffMap[n.responsabileId] : null;
+          const respName = staffObj ? (staffObj.nome || '') : '';
+          const respColor = staffObj ? (staffObj.colore || staffObj.color || '#22c55e') : '#22c55e';
+          const caldoLabel = n.caldo ? '🔥 ' : '';
+          const condo = (n.condominio || '').trim();
+
+          const headLeft = document.createElement('div');
+          headLeft.innerHTML = `
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="display:inline-block;width:10px;height:10px;border-radius:999px;background:${respColor};"></span>
+              <div style="font-weight:700;font-size:14px;line-height:1.2;">
+                ${caldoLabel}${indirizzo || 'Senza indirizzo'}
+              </div>
+            </div>
+            <div class="muted" style="margin-top:2px;">
+              ${[tip, mq ? (mq + ' mq') : '', condo ? ('Condominio: ' + condo) : ''].filter(Boolean).join(' · ') || '—'}
+            </div>
+          `;
+
+          const actions = document.createElement('div');
+          actions.className = 'card-actions';
+          actions.innerHTML = `
+            <button class="btn btn-sm" data-not-edit="${n.id}">✏️ Modifica</button>
+            <button class="btn btn-sm btn-primary" data-not-recall="${n.id}">📅 Ricontatto (15')</button>
+          `;
+
+          const header = document.createElement('div');
+          header.className = 'card-header';
+          header.appendChild(headLeft);
+          header.appendChild(actions);
+
+          const body = document.createElement('div');
+          body.style.marginTop = '8px';
+
+          const ownerRow = document.createElement('div');
+          ownerRow.className = 'grid-responsive';
+          ownerRow.style.gap = '8px';
+          ownerRow.innerHTML = `
+            <div class="metric">
+              <div class="metric-label">Proprietario</div>
+              <div class="metric-value" style="font-size:14px;">${nomeCompleto || '—'}</div>
+              <div class="metric-extra">${[n.telefono || '', n.email || ''].filter(Boolean).join(' · ') || ''}</div>
+            </div>
+            <div class="metric">
+              <div class="metric-label">Responsabile</div>
+              <div class="metric-value" style="font-size:14px;">${respName || '—'}</div>
+              <div class="metric-extra">${(n.etichetta || '').toString().trim() ? ('Etichetta: ' + n.etichetta) : ''}</div>
+            </div>
+          `;
+
+          const noteWrap = document.createElement('div');
+          noteWrap.className = 'metric';
+          noteWrap.style.marginTop = '8px';
+
+          const noteHeader = document.createElement('div');
+          noteHeader.style.display = 'flex';
+          noteHeader.style.justifyContent = 'space-between';
+          noteHeader.style.alignItems = 'center';
+          noteHeader.innerHTML = `
+            <div>
+              <div class="metric-label">Ultima interazione</div>
+            </div>
+            <button type="button" class="btn btn-ghost btn-sm" data-not-toggle="${n.id}">Espandi</button>
+          `;
+
+          const noteText = document.createElement('div');
+          noteText.dataset.noteFor = n.id;
+          noteText.style.marginTop = '6px';
+          noteText.style.fontSize = '12px';
+          noteText.style.color = 'var(--text-main)';
+          noteText.style.whiteSpace = 'nowrap';
+          noteText.style.overflow = 'hidden';
+          noteText.style.textOverflow = 'ellipsis';
+          noteText.textContent = (n.note || '').trim() || '—';
+
+          noteWrap.appendChild(noteHeader);
+          noteWrap.appendChild(noteText);
+
+          body.appendChild(ownerRow);
+          body.appendChild(noteWrap);
+
+          card.appendChild(header);
+          card.appendChild(body);
+
+          // click card -> apre modale modifica (comodo)
+          card.addEventListener('dblclick', () => {
+            openNotiziaModalForEdit(n.id);
+          });
+
+          cardsContainer.appendChild(card);
+        });
+
+        // handlers (delegation)
+        cardsContainer.onclick = (e) => {
+          const editBtn = e.target.closest('[data-not-edit]');
+          if (editBtn) {
+            const id = editBtn.getAttribute('data-not-edit');
+            openNotiziaModalForEdit(id);
+            return;
+          }
+          const recallBtn = e.target.closest('[data-not-recall]');
+          if (recallBtn) {
+            const id = recallBtn.getAttribute('data-not-recall');
+            creaAppuntamentoDaNotiziaId(id);
+            return;
+          }
+          const toggleBtn = e.target.closest('[data-not-toggle]');
+          if (toggleBtn) {
+            const id = toggleBtn.getAttribute('data-not-toggle');
+            const txt = cardsContainer.querySelector(`[data-note-for="${id}"]`);
+            if (txt) {
+              const collapsed = txt.style.whiteSpace !== 'normal';
+              txt.style.whiteSpace = collapsed ? 'normal' : 'nowrap';
+              txt.style.overflow = collapsed ? 'visible' : 'hidden';
+              txt.style.textOverflow = collapsed ? 'clip' : 'ellipsis';
+              toggleBtn.textContent = collapsed ? 'Comprimi' : 'Espandi';
+            }
+            return;
+          }
+        };
+      }
     }
 
-    arr.forEach(n => {
-      const staffObj = (staff || []).find(s => s.id === n.responsabileId);
-      const nomeCompleto = ((n.nome || '') + ' ' + (n.cognome || '')).trim() || '—';
-      const indirizzoCompleto = [n.indirizzo || '', n.citta || '', n.provincia ? `(${n.provincia})` : ''].filter(Boolean).join(' ');
-      const tip = (n.tipologia || '').toString();
-      const mqLabel = (n.mq != null && n.mq !== '') ? `${n.mq} mq` : '';
-      const condoName = (n.condominio || '').trim();
-      const label = getNotiziaLabel(n);
-
-      const recallText = n.recallAt ? formatDateTimeIT(n.recallAt) : '—';
-      const respName = staffObj ? staffObj.nome : '';
-
-      const card = document.createElement('div');
-      card.className = 'notizia-card';
-      card.setAttribute('data-not-card', n.id);
-
-      card.innerHTML = `
-        <div class="notizia-card-inner">
-          <div>
-            <div class="notizia-title">${escapeHtml(indirizzoCompleto || 'Senza indirizzo')}</div>
-            <div class="notizia-sub">
-              <span class="notizia-pill">👤 ${escapeHtml(nomeCompleto)}</span>
-              ${n.telefono ? `<span class="notizia-pill">📞 ${escapeHtml(n.telefono)}</span>` : ``}
-              ${n.email ? `<span class="notizia-pill">✉️ ${escapeHtml(n.email)}</span>` : ``}
-              ${tip ? `<span class="notizia-pill">🏷️ ${escapeHtml(tip)}</span>` : ``}
-              ${mqLabel ? `<span class="notizia-pill">📐 ${escapeHtml(mqLabel)}</span>` : ``}
-              ${condoName ? `<span class="notizia-pill">🏢 ${escapeHtml(condoName)}</span>` : ``}
-            </div>
-
-            <div class="notizia-row">
-              <div class="notizia-muted">Responsabile: <strong>${escapeHtml(respName || '—')}</strong></div>
-              <div class="notizia-muted">Inserita: <strong>${n.createdAt ? new Date(n.createdAt).toLocaleDateString('it-IT') : '—'}</strong></div>
-            </div>
-
-            <div class="notizia-field">
-              <label>Note scheda</label>
-              <div class="notizia-muted">${escapeHtml(n.note || '—')}</div>
-            </div>
-          </div>
-
-          <div class="notizia-right">
-            <div class="notizia-actions">
-              <button class="btn btn-xs btn-outline" data-not-edit="${n.id}">✏️ Apri</button>
-              <button class="btn btn-xs" data-not-ricontatto="${n.id}">📅 Ricontatto (15')</button>
-            </div>
-
-            <div class="notizia-field">
-              <label>Etichetta</label>
-              <input type="text" value="${escapeAttr(label)}" data-not-id="${n.id}" data-not-field="label" placeholder="Es. caldo, acquisizione, da richiamare">
-            </div>
-
-            <div class="notizia-field">
-              <label>Data ricontatto</label>
-              <input type="datetime-local" value="${escapeAttr(n.recallAt || '')}" data-not-id="${n.id}" data-not-field="recallAt">
-              <div class="notizia-muted" style="margin-top:4px;">Attuale: <strong>${escapeHtml(recallText)}</strong></div>
-            </div>
-
-            <div class="notizia-row">
-              <label class="notizia-checkbox">
-                <input type="checkbox" ${n.nonRisponde ? 'checked' : ''} data-not-id="${n.id}" data-not-field="nonRisponde">
-                Non risponde
-              </label>
-              <button class="btn btn-xs" data-not-toggle-note="${n.id}">↕︎ Espandi</button>
-            </div>
-
-            <div class="notizia-field">
-              <label>Commento ultima interazione</label>
-              <textarea rows="3" class="notizia-lastnote" data-not-note="${n.id}" data-not-id="${n.id}" data-not-field="lastNote" placeholder="Scrivi cosa vi siete detti...">${escapeHtml(n.lastNote || '')}</textarea>
-            </div>
-          </div>
-        </div>
-      `;
-      cont.appendChild(card);
-    });
-  }
-
-  function renderNotizie() {
-    // nuova UI a card (se presente)
-    const cards = document.getElementById('not-cards-container');
-    if (cards) {
-      initNotizieHomeUI();
-      renderNotizieCards();
-      return;
-    }
-
-    // fallback legacy (tabella) – se qualcuno usa ancora markup vecchio
+    // Fallback legacy: tabella
     const tbody = document.getElementById('not-table-body');
-    if (!tbody) return;
-    tbody.innerHTML = '';
-
-    (notizie || []).forEach(n0 => {
-      const n = ensureNotiziaDefaults(n0);
-      const tr = document.createElement('tr');
-      const staffObj = staff.find(s => s.id === n.responsabileId);
-      const nomeCompleto = ((n.nome || '') + ' ' + (n.cognome || '')).trim();
-      const indirizzoCompleto = [n.indirizzo || '', n.citta || ''].filter(Boolean).join(' - ');
-      const condoName = (n.condominio || '').trim();
-      if (condoName) tr.classList.add('in-condominio-notizia');
-      const condoBadge = condoName ? ` <span class="badge-condominio badge-condominio--notizia">🏢 ${escapeHtml(condoName)}</span>` : '';
-      tr.dataset.phone = n.telefono || '';
-      tr.dataset.email = n.email || '';
-
-      tr.innerHTML = `
-        <td>${nomeCompleto || '—'}</td>
-        <td>${n.telefono || ''}</td>
-        <td>${escapeHtml(indirizzoCompleto)}${condoBadge}</td>
-        <td>${n.tipologia || ''}</td>
-        <td>${n.piano || ''}</td>
-        <td>${n.mq != null ? n.mq : ''}</td>
-        <td>${staffObj ? staffObj.nome : ''}</td>
-      `;
-      tbody.appendChild(tr);
-    });
+    if (tbody) {
+      tbody.innerHTML = '';
+      (list || []).forEach(n => {
+        const tr = document.createElement('tr');
+        const staffObj = staff.find(s => s.id === n.responsabileId);
+        const nomeCompleto = ((n.nome || '') + ' ' + (n.cognome || '')).trim();
+        const caldoLabel = n.caldo ? '🔥' : '';
+        const indirizzoCompleto = [n.indirizzo || '', n.citta || ''].filter(Boolean).join(' - ');
+        tr.innerHTML = `
+          <td>${nomeCompleto}</td>
+          <td>${indirizzoCompleto}</td>
+          <td>${n.tipologia || ''}</td>
+          <td>${n.mq != null ? n.mq : ''}</td>
+          <td>${caldoLabel}</td>
+          <td>${staffObj ? staffObj.nome : ''}</td>
+          <td>
+            <button class="btn btn-xs" data-not-app="${n.id}">📅 App.</button>
+            <button class="btn btn-xs" data-not-imm="${n.id}">🏢 Imm.</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
   }
+
+  // ====== MODALE NOTIZIE (apri/chiudi + edit) ======
+
+  function openNotiziaModal() {
+    const overlay = document.getElementById('notizie-modal-overlay');
+    if (overlay) overlay.style.display = 'flex';
+  }
+  function closeNotiziaModal() {
+    const overlay = document.getElementById('notizie-modal-overlay');
+    if (overlay) overlay.style.display = 'none';
+  }
+
+  function fillNotiziaForm(n) {
+    if (!n) return;
+    document.getElementById('not-id') && (document.getElementById('not-id').value = n.id || '');
+    document.getElementById('not-nome') && (document.getElementById('not-nome').value = n.nome || '');
+    document.getElementById('not-cognome') && (document.getElementById('not-cognome').value = n.cognome || '');
+    document.getElementById('not-telefono') && (document.getElementById('not-telefono').value = n.telefono || '');
+    document.getElementById('not-email') && (document.getElementById('not-email').value = n.email || '');
+    document.getElementById('not-indirizzo') && (document.getElementById('not-indirizzo').value = n.indirizzo || '');
+    document.getElementById('not-citta') && (document.getElementById('not-citta').value = n.citta || '');
+    document.getElementById('not-provincia') && (document.getElementById('not-provincia').value = n.provincia || '');
+    document.getElementById('not-cap') && (document.getElementById('not-cap').value = n.cap || '');
+    document.getElementById('not-condominio') && (document.getElementById('not-condominio').value = n.condominio || '');
+    document.getElementById('not-tipologia') && (document.getElementById('not-tipologia').value = n.tipologia || '');
+    document.getElementById('not-piano') && (document.getElementById('not-piano').value = n.piano || '');
+    document.getElementById('not-mq') && (document.getElementById('not-mq').value = (n.mq != null ? n.mq : ''));
+    document.getElementById('not-caldo') && (document.getElementById('not-caldo').checked = !!n.caldo);
+    document.getElementById('not-note') && (document.getElementById('not-note').value = n.note || '');
+  }
+
+  function openNotiziaModalForEdit(notId) {
+    const n = (notizie || []).find(x => x && x.id === notId);
+    if (!n) return;
+    resetNotizieForm();
+    fillNotiziaForm(n);
+    const saveBtn = document.getElementById('not-save-btn');
+    if (saveBtn) saveBtn.textContent = 'Salva modifiche';
+    const cancelBtn = document.getElementById('not-cancel-edit');
+    if (cancelBtn) cancelBtn.style.display = 'inline-flex';
+    openNotiziaModal();
+  }
+
+  // Hook UI modale
+  document.getElementById('not-modal-close')?.addEventListener('click', closeNotiziaModal);
+  document.getElementById('notizie-modal-overlay')?.addEventListener('click', (e) => {
+    if (e.target && e.target.id === 'notizie-modal-overlay') closeNotiziaModal();
+  });
+  document.getElementById('not-cancel-edit')?.addEventListener('click', () => {
+    resetNotizieForm();
+    closeNotiziaModal();
+  });
+
+  // filtri -> rerender
+  document.getElementById('not-filter-resp')?.addEventListener('change', renderNotizie);
+  document.getElementById('not-filter-label')?.addEventListener('change', renderNotizie);
+  document.getElementById('not-filter-sort')?.addEventListener('change', renderNotizie);
+  document.getElementById('not-filter-search')?.addEventListener('input', () => {
+    // micro-debounce
+    clearTimeout(window.__notSearchT);
+    window.__notSearchT = setTimeout(renderNotizie, 120);
+  });
 
   function resetNotizieForm() {
     const form = document.getElementById('not-form');
     if (!form) return;
     form.reset();
+    const caldoEl = document.getElementById('not-caldo');
+    if (caldoEl) caldoEl.checked = false;
+    const creaContattoEl = document.getElementById('not-crea-contatto');
+    if (creaContattoEl) creaContattoEl.checked = true;
     const idEl = document.getElementById('not-id');
     if (idEl) idEl.value = '';
+    const saveBtn = document.getElementById('not-save-btn');
+    if (saveBtn) saveBtn.textContent = 'Salva notizia';
+    const cancelBtn = document.getElementById('not-cancel-edit');
+    if (cancelBtn) cancelBtn.style.display = 'none';
+
   }
+
+  // Apre la scheda di inserimento immobile precompilando i dati a partire da una notizia
+  function apriSchedaImmobileDaNotizia(notId) {
+    if (!notizie || !notizie.length) return;
+    const n = notizie.find(x => x && x.id === notId);
+    if (!n) return;
+
+    // switch vista sugli immobili
+    setView('immobili');
+
+    const section = document.getElementById('view-immobili');
+    if (section && section.scrollIntoView) {
+      section.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    // Campi del form Immobili
+    const rifEl        = document.getElementById('imm-rif');
+    const propNomeEl   = document.getElementById('imm-prop-nome');
+    const propTelEl    = document.getElementById('imm-prop-telefono');
+    const propMailEl   = document.getElementById('imm-prop-email');
+    const indirizzoEl  = document.getElementById('imm-indirizzo');
+    const cittaEl      = document.getElementById('imm-citta');
+    const provinciaEl  = document.getElementById('imm-provincia');
+    const tipologiaEl  = document.getElementById('imm-tipologia');
+    const mqEl         = document.getElementById('imm-mq');
+    const pianoEl      = document.getElementById('imm-piano');
+    const caldoImmEl   = document.getElementById('imm-caldo');
+    const noteEl       = document.getElementById('imm-note');
+
+    const nomeCompleto = ((n.nome || '') + ' ' + (n.cognome || '')).trim();
+
+    // Precompila campi base
+    if (rifEl) {
+      const base = (n.cognome || n.nome || 'NOT').toUpperCase().slice(0, 3);
+      rifEl.value = `NOT-${base}`;
+    }
+    if (propNomeEl)  propNomeEl.value  = nomeCompleto;
+    if (propTelEl)   propTelEl.value   = n.telefono || '';
+    if (propMailEl)  propMailEl.value  = n.email || '';
+    if (indirizzoEl) indirizzoEl.value = n.indirizzo || '';
+    if (cittaEl)     cittaEl.value     = n.citta || '';
+    if (provinciaEl) provinciaEl.value = n.provincia || '';
+    if (tipologiaEl && n.tipologia) tipologiaEl.value = n.tipologia;
+    if (mqEl && n.mq != null) mqEl.value = n.mq;
+    if (pianoEl) pianoEl.value = n.piano || '';
+    if (caldoImmEl) caldoImmEl.checked = !!n.caldo;
+
+    if (noteEl) {
+      const extra = n.note
+        ? `Da notizia ${n.id}: ${n.note}`
+        : `Da notizia ${n.id}`;
+      noteEl.value = noteEl.value
+        ? (noteEl.value + '\n' + extra)
+        : extra;
+    }
+
+    // focus sul primo campo del form
+    const form = document.getElementById('imm-form');
+    if (form) {
+      const first = form.querySelector('input, select, textarea');
+      if (first && first.focus) first.focus();
+    }
+  }
+
+
+  function ensureContattoFromImmobile(imm) {
+    if (!imm) return null;
+    if (!Array.isArray(contatti)) contatti = [];
+    const tel = (imm.proprietarioTelefono || '').trim();
+    const mail = (imm.proprietarioEmail || '').trim();
+
+    let found = contatti.find(c =>
+      c &&
+      ((tel && c.telefono === tel) || (mail && c.email === mail))
+    );
+
+    if (!found && (tel || mail || imm.proprietarioNome)) {
+      const nome = imm.proprietarioNome || '';
+      const today = new Date().toISOString().slice(0, 10);
+      found = {
+        id: genId('cont'),
+        nome,
+        telefono: tel,
+        email: mail,
+        origine: 'immobile',
+        immobileId: imm.id,
+        indirizzo: imm.indirizzo || '',
+        citta: imm.citta || '',
+        provincia: imm.provincia || '',
+        ultimoContatto: today
+      };
+      contatti.push(found);
+      saveList(STORAGE_KEYS.contatti, contatti);
+    }
+    return found ? found.id : null;
+  }
+
+  function creaAppuntamentoDaImmobileId(immId) {
+    if (!immobili || !immobili.length) return;
+    const imm = immobili.find(i => i && i.id === immId);
+    if (!imm) return;
+
+    if (!Array.isArray(attivita)) attivita = [];
+
+    const today = new Date();
+    const dateIso = today.toISOString().slice(0, 10);
+
+    const staffId = (staff && staff[0] && staff[0].id) || null;
+    const clienteId = ensureContattoFromImmobile(imm);
+
+    // Non salviamo subito: prepariamo l'appuntamento collegato all'immobile
+    // e demandiamo la creazione effettiva al submit della scheda.
+    const app = {
+      id: '', // generato al salvataggio
+      data: dateIso,
+      ora: '10:00',
+      oraFine: '11:00',
+      tipo: 'appuntamento',
+      tipoDettaglio: 'sopralluogo',
+      descrizione: '',
+      responsabileId: staffId,
+      clienteId: clienteId || '',
+      contattoId: clienteId || '',
+      immobileId: imm.id,
+      inUfficio: false,
+      cittaUfficio: '',
+      luogo: imm.indirizzo || ''
+    };
+
+    openAppuntamentoDialog(app);
+  }
+
+  function findContattoFromNotizia(n) {
+    if (!Array.isArray(contatti)) contatti = [];
+    const tel = (n.telefono || '').trim();
+    const mail = (n.email || '').trim();
+
+    let found = contatti.find(c =>
+      c &&
+      ((tel && c.telefono === tel) || (mail && c.email === mail) || (c.notiziaId && c.notiziaId === n.id))
+    );
+    if (found) return found.id || null;
+    return null;
+  }
+
+  function creaAppuntamentoDaNotiziaId(notId) {
+    if (!notizie || !notizie.length) return;
+    const n = notizie.find(x => x && x.id === notId);
+    if (!n) return;
+
+    if (!Array.isArray(attivita)) attivita = [];
+    if (!Array.isArray(contatti)) contatti = [];
+
+    const today = new Date();
+    const dateIso = today.toISOString().slice(0, 10);
+
+    const staffId = (staff && staff[0] && staff[0].id) || null;
+    let clienteId = findContattoFromNotizia(n);
+
+    // Se non esiste ancora un contatto collegato alla notizia, crealo ora
+    if (!clienteId && (n.nome || n.cognome || n.telefono || n.email)) {
+      const nomeCompleto = ((n.nome || '') + ' ' + (n.cognome || '')).trim();
+      const contatto = {
+        id: genId('cont'),
+        nome: nomeCompleto || n.nome || '',
+        telefono: n.telefono || '',
+        email: n.email || '',
+        origine: 'notizia',
+        notiziaId: n.id,
+        indirizzo: n.indirizzo || '',
+        citta: n.citta || '',
+        provincia: n.provincia || '',
+        ultimoContatto: dateIso
+      };
+      contatti.push(contatto);
+      saveList(STORAGE_KEYS.contatti, contatti);
+      clienteId = contatto.id;
+    }
+
+    // Anche qui: non salviamo subito l'appuntamento, ma apriamo la scheda
+    // precompilata collegata alla notizia.
+    const app = {
+      id: '', // generato al salvataggio
+      data: dateIso,
+      ora: '10:00',
+      oraFine: '11:00',
+      tipo: 'appuntamento',
+      tipoDettaglio: 'sopralluogo',
+      descrizione: '',
+      responsabileId: staffId,
+      clienteId: clienteId || '',
+      contattoId: clienteId || '',
+      notiziaId: n.id,
+      inUfficio: false,
+      cittaUfficio: '',
+      luogo: n.indirizzo || ''
+    };
+
+    openAppuntamentoDialog(app);
+  }
+
+  function addContattoDaNotizia(notizia) {
+    if (!Array.isArray(contatti)) contatti = [];
+
+    const nomeCompleto = ((notizia.nome || '') + ' ' + (notizia.cognome || '')).trim();
+    if (!nomeCompleto && !notizia.telefono && !notizia.email) return;
+
+    // evita duplicati banali sul telefono
+    const already = contatti.some(c => c.telefono && notizia.telefono && c.telefono === notizia.telefono);
+    if (already) return;
+
+    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+
+    const contatto = {
+      id: genId('cont'),
+      nome: nomeCompleto || notizia.nome || '',
+      telefono: notizia.telefono || '',
+      email: notizia.email || '',
+      origine: 'notizia',
+      notiziaId: notizia.id,
+      indirizzo: notizia.indirizzo || '',
+      citta: notizia.citta || '',
+      provincia: notizia.provincia || '',
+      ultimoContatto: today
+    };
+    contatti.push(contatto);
+    saveList(STORAGE_KEYS.contatti, contatti);
+  }
+
+  const notForm = document.getElementById('not-form');
+  if (notForm) {
+    notForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+
+      const nome = document.getElementById('not-nome').value.trim();
+      const cognome = document.getElementById('not-cognome').value.trim();
+      const telefono = document.getElementById('not-telefono').value.trim();
+      const email = document.getElementById('not-email').value.trim();
+      const indirizzo = document.getElementById('not-indirizzo').value.trim();
+      const citta = document.getElementById('not-citta').value.trim();
+      const provincia = document.getElementById('not-provincia').value.trim();
+      const condominio = (document.getElementById('not-condominio')?.value || '').trim();
+      const tipologia = document.getElementById('not-tipologia').value || '';
+      const piano = document.getElementById('not-piano').value.trim();
+      const mqStr = document.getElementById('not-mq').value.trim();
+      const caldo = document.getElementById('not-caldo').checked;
+      const note = document.getElementById('not-note').value.trim();
+      const creaContatto = document.getElementById('not-crea-contatto').checked;
+
+      if (!nome && !cognome) {
+        alert('Inserisci almeno nome o cognome del proprietario.');
+        return;
+      }
+
+      const mq = mqStr ? Number(mqStr.replace('.', '').replace(',', '.')) : null;
+
+      if (!Array.isArray(notizie)) notizie = [];
+
+      const existingId = (document.getElementById('not-id')?.value || '').trim();
+
+      const notizia = {
+        id: existingId || genId('not'),
+        nome: nome,
+        cognome: cognome,
+        telefono: telefono,
+        email: email,
+        indirizzo: indirizzo,
+        citta: citta,
+        provincia: provincia,
+        condominio: condominio,
+        tipologia: tipologia,
+        piano: piano,
+        mq: mq,
+        caldo: caldo,
+        note: note
+      };
+
+      if (existingId) {
+        const ix = (notizie || []).findIndex(x => x && x.id === existingId);
+        if (ix >= 0) notizie[ix] = notizia;
+        else notizie.push(notizia);
+      } else {
+        notizie.push(notizia);
+      }
+      saveList(STORAGE_KEYS.notizie, notizie);
+      if (!existingId && creaContatto) {
+        addContattoDaNotizia(notizia);
+      }
+      renderNotizie();
+      resetNotizieForm();
+      try{ closeNotiziaModal(); }catch(e){}
+    });
+  }
+
+  document.getElementById('not-new-btn')?.addEventListener('click', () => {
+    resetNotizieForm();
+    openNotiziaModal();
+  });
+    if (section) {
+      section.scrollIntoView({ behavior: 'smooth' });
+    }
+    const nomeEl = document.getElementById('not-nome');
+    if (nomeEl) nomeEl.focus();
+  });
 
 /* ====== RUBRICA / CONTATTI ====== */
 
