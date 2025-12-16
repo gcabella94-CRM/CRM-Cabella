@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <title>CRM Immobiliare 10.3</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="crm.css">
 
 <!-- jsPDF per export PDF -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -23,8 +24,6 @@
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
   <script src="firebase-sync.js"></script>
-  <!-- CRM CSS (deve essere l'ultimo CSS) -->
-  <link rel="stylesheet" href="crm.css">
 </head>
 <body>
   <div class="app-shell">
@@ -621,8 +620,9 @@
                   </div>
                 </form>
               </div>
+              </div>
 
-              <div class="table-wrap" style="margin-top:12px;">
+              <div class="table-wrap" id="not-table-wrap" style="margin-top:12px; display:none;">
                 <table>
                   <thead>
                   <tr>
@@ -662,7 +662,39 @@
               </div>
 
               <div class="card-body">
-                <form id="not-form">
+                
+                <!-- Sottosezioni Notizie -->
+                <div class="notizie-subnav">
+                  <button type="button" class="btn btn-xs notizie-subtab active" data-sub="lista">Lista notizie</button>
+                  <button type="button" class="btn btn-xs notizie-subtab" data-sub="form">Inserisci / Modifica</button>
+                </div>
+
+                <!-- Filtri & ordinamento -->
+                <div class="notizie-toolbar">
+                  <div class="notizie-toolbar-left">
+                    <select id="not-filter-resp" class="select-sm">
+                      <option value="tutti">Tutti i responsabili</option>
+                    </select>
+                    <select id="not-sort" class="select-sm">
+                      <option value="inserimento_desc">Ultimo inserimento</option>
+                      <option value="ricontatto_asc">Data ricontatto (vicina)</option>
+                      <option value="ricontatto_desc">Data ricontatto (lontana)</option>
+                      <option value="etichetta_asc">Etichetta (A→Z)</option>
+                    </select>
+                    <input id="not-filter-label" class="input-sm" placeholder="Filtra per etichetta (testo)">
+                  </div>
+                  <div class="notizie-toolbar-right">
+                    <input id="not-search" class="input-sm" placeholder="Cerca (indirizzo / nome / telefono)">
+                    <button type="button" class="btn btn-xs" id="not-filter-clear">Pulisci</button>
+                  </div>
+                </div>
+
+                <!-- Lista cards (scroll social) -->
+                <div id="notizie-cards" class="notizie-cards"></div>
+
+                <!-- Form inserimento/modifica -->
+                <div id="not-form-wrap" class="notizie-form-wrap">
+                  <form id="not-form">
                     <input type="hidden" id="not-id" value="">
                   <div class="form-grid" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;">
 
@@ -766,7 +798,7 @@
                 </form>
               </div>
 
-              <div class="table-wrap" style="margin-top:12px;">
+              <div class="table-wrap" id="not-table-wrap" style="margin-top:12px; display:none;">
                 <table>
                   <thead>
                   <tr>
