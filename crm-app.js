@@ -1040,40 +1040,169 @@ function renderAgendaMonth() {
   /* ====== NOTIZIE ====== */
 
   function renderNotizie() {
-    const tbody = document.getElementById('not-table-body');
-    if (!tbody) return;
-    tbody.innerHTML = '';
+  const container = document.getElementById('not-cards-container');
+  if (!container) return;
 
-    (notizie || []).forEach(n => {
-      const tr = document.createElement('tr');
-      const staffObj = staff.find(s => s.id === n.responsabileId);
-      const nomeCompleto = ((n.nome || '') + ' ' + (n.cognome || '')).trim();
-      const caldoLabel = n.caldo ? '🔥' : '';
-      const indirizzoCompleto = [n.indirizzo || '', n.citta || ''].filter(Boolean).join(' - ');
-      const condoName = (n.condominio || '').trim();
-      if (condoName) tr.classList.add('in-condominio-notizia');
-      const condoBadge = condoName ? ` <span class="badge-condominio badge-condominio--notizia">🏢 ${escapeHtml(condoName)}</span>` : '';
-      tr.dataset.phone = n.telefono || '';
-      tr.dataset.email = n.email || '';
+  // UI filtri (se presenti)
+  const selResp  = document.getElementById('not-filter-resp');
+  const selLabel = document.getElementById('not-filter-label');
+  const selSort  = document.getElementById('not-filter-sort');
+  const inpSearch= document.getElementById('not-filter-search');
 
-      tr.innerHTML = `
-        <td>${nomeCompleto || '—'}</td>
-        <td>${n.telefono || ''}</td>
-        <td>${escapeHtml(indirizzoCompleto)}${condoBadge}</td>
-        <td>${n.tipologia || ''}</td>
-        <td>${n.piano || ''}</td>
-        <td>${n.mq != null ? n.mq : ''}</td>
-        <td>${caldoLabel}</td>
-        <td>${staffObj ? staffObj.nome : ''}</td>
-        <td>
-          <button class="btn btn-xs" data-not-edit="${n.id || ''}" title="Modifica notizia">✏️ Modifica</button>
-          <button class="btn btn-xs" data-not-att="${n.id || ''}" title="Crea attività collegata">➕ Attività</button>
-          <button class="btn btn-xs" data-not-imm="${n.id || ''}" title="Apri scheda inserimento immobile">🏠 Immobile</button>
-        </td>
-      `;
-      tbody.appendChild(tr);
+  // Popola responsabili / etichette (best effort, non rompe se non esistono)
+  try {
+    if (selResp && selResp.options.length <= 1) {
+      const optAll = selResp.querySelector('option[value=""]') || null;
+      if (!optAll) selResp.insertAdjacentHTML('afterbegin', '<option value="">Tutti i responsabili</option>');
+      const used = new Set((notizie||[]).map(n => n && n.responsabileId).filter(Boolean));
+      (staff||[]).forEach(s => {
+        if (s && s.id && used.has(s.id)) {
+          const o = document.createElement('option');
+          o.value = s.id;
+          o.textContent = s.nome || s.id;
+          selResp.appendChild(o);
+        }
+      });
+    }
+    if (selLabel && selLabel.options.length <= 1) {
+      const labels = new Set((notizie||[]).map(n => (n && (n.etichetta || n.label)) || '').filter(Boolean));
+      labels.forEach(l => {
+        const o = document.createElement('option');
+        o.value = l;
+        o.textContent = l;
+        selLabel.appendChild(o);
+      });
+    }
+  } catch {}
+
+  const staffMap = {};
+  (staff || []).forEach(s => { if (s && s.id) staffMap[s.id] = s; });
+
+  // Applica filtri
+  let list = Array.isArray(notizie) ? [...notizie] : [];
+
+  const fResp = selResp ? (selResp.value || '') : '';
+  const fLabel = selLabel ? (selLabel.value || '') : '';
+  const q = (inpSearch ? (inpSearch.value || '') : '').trim().toLowerCase();
+
+  if (fResp) list = list.filter(n => n && n.responsabileId === fResp);
+  if (fLabel) list = list.filter(n => n && ((n.etichetta || n.label) === fLabel));
+
+  if (q) {
+    list = list.filter(n => {
+      if (!n) return false;
+      const hay = [
+        n.indirizzo, n.citta, n.provincia,
+        n.nome, n.cognome, n.telefono, n.email,
+        n.tipologia, n.piano, n.condominio,
+        n.note
+      ].filter(Boolean).join(' ').toLowerCase();
+      return hay.includes(q);
     });
   }
+
+  // Ordinamento (best effort: non abbiamo sempre createdAt / recallAt)
+  const sort = selSort ? (selSort.value || 'created_desc') : 'created_desc';
+  if (sort === 'label_asc') {
+    list.sort((a,b) => String((a?.etichetta||a?.label||'')).localeCompare(String((b?.etichetta||b?.label||'')), 'it'));
+  } else {
+    // fallback: stabile per indirizzo
+    list.sort((a,b) => String(a?.indirizzo||'').localeCompare(String(b?.indirizzo||''), 'it'));
+  }
+
+  container.innerHTML = '';
+
+  if (!list.length) {
+    container.innerHTML = '<div class="muted" style="padding:10px 6px;">Nessuna notizia trovata con i filtri attuali.</div>';
+    return;
+  }
+
+  list.forEach(n => {
+    const nomeCompleto = ((n.nome || '') + ' ' + (n.cognome || '')).trim() || '—';
+    const indirizzoCompleto = [n.indirizzo || '', n.citta || '', n.provincia ? '(' + n.provincia + ')' : ''].filter(Boolean).join(' ');
+    const staffObj = n.responsabileId ? staffMap[n.responsabileId] : null;
+    const staffName = staffObj ? (staffObj.nome || '') : '';
+    const staffColor = staffObj ? (staffObj.colore || staffObj.color || '#22c55e') : '#22c55e';
+    const mqLabel = (n.mq != null && n.mq !== '') ? `${n.mq} mq` : '';
+    const condoName = (n.condominio || '').trim();
+    const etichetta = (n.etichetta || n.label || '').toString().trim();
+    const caldo = !!n.caldo;
+
+    const card = document.createElement('div');
+    card.className = 'notizia-card';
+    card.dataset.phone = n.telefono || '';
+    card.dataset.email = n.email || '';
+
+    const pills = [];
+    if (n.tipologia) pills.push(`<span class="notizia-pill">🏷️ ${escapeHtml(n.tipologia)}</span>`);
+    if (mqLabel) pills.push(`<span class="notizia-pill">📐 ${escapeHtml(mqLabel)}</span>`);
+    if (condoName) pills.push(`<span class="notizia-pill">🏢 ${escapeHtml(condoName)}</span>`);
+    if (etichetta) pills.push(`<span class="notizia-pill">🔖 ${escapeHtml(etichetta)}</span>`);
+    if (staffName) pills.push(`<span class="notizia-pill"><span style="width:10px;height:10px;border-radius:999px;background:${staffColor};display:inline-block;"></span> ${escapeHtml(staffName)}</span>`);
+    if (caldo) pills.push(`<span class="notizia-pill">🔥 Caldo</span>`);
+
+    const note = (n.note || '').trim();
+    const noteHtml = note ? escapeHtml(note).replace(/
+/g,'<br>') : '<span class="notizia-muted">Nessuna nota.</span>';
+
+    card.innerHTML = `
+      <div class="notizia-card-inner">
+        <div>
+          <div class="notizia-title">${escapeHtml(indirizzoCompleto || 'Senza indirizzo')}</div>
+          <div class="notizia-meta">
+            <span class="notizia-pill">👤 ${escapeHtml(nomeCompleto)}</span>
+            ${n.telefono ? `<span class="notizia-pill">📞 ${escapeHtml(n.telefono)}</span>` : ''}
+            ${n.email ? `<span class="notizia-pill">✉️ ${escapeHtml(n.email)}</span>` : ''}
+          </div>
+
+          <div class="notizia-meta" style="margin-top:8px;gap:6px;">
+            ${pills.join('')}
+          </div>
+
+          <div class="notizia-field">
+            <label>Nota / ultimo contatto</label>
+            <div class="notizia-lastnote" data-note-box="1">${noteHtml}</div>
+            ${note ? `<button type="button" class="btn btn-ghost btn-sm" data-note-toggle="1" style="margin-top:6px;">Espandi/chiudi</button>` : ''}
+          </div>
+        </div>
+
+        <div class="notizia-right">
+          <div class="notizia-actions">
+            <button class="btn btn-xs" data-not-edit="${n.id || ''}" title="Modifica notizia">✏️ Modifica</button>
+            <button class="btn btn-xs" data-not-att="${n.id || ''}" title="Crea attività collegata">➕ Attività</button>
+            <button class="btn btn-xs" data-not-imm="${n.id || ''}" title="Apri scheda inserimento immobile">🏠 Immobile</button>
+          </div>
+
+          <div class="notizia-field">
+            <label>Dettagli</label>
+            <div class="notizia-muted">
+              Piano: <strong>${escapeHtml(n.piano || '—')}</strong><br>
+              Tipologia: <strong>${escapeHtml(n.tipologia || '—')}</strong>
+            </div>
+          </div>
+
+          <div class="notizia-field">
+            <label>Follow-up</label>
+            <div class="notizia-muted">
+              (Placeholder) Non risponde / ricontatto: da attivare quando aggiungiamo i campi dedicati.
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    // toggle note
+    const toggleBtn = card.querySelector('[data-note-toggle]');
+    if (toggleBtn) {
+      toggleBtn.addEventListener('click', () => {
+        const box = card.querySelector('.notizia-lastnote');
+        if (box) box.classList.toggle('expanded');
+      });
+    }
+
+    container.appendChild(card);
+  });
+}
 
   function resetNotizieForm() {
     const form = document.getElementById('not-form');
@@ -1386,6 +1515,22 @@ function renderAgendaMonth() {
 
   document.getElementById('not-new-btn')?.addEventListener('click', () => {
     const section = document.getElementById('view-notizie');
+
+
+  // Filtri Notizie (card view)
+  const __bindNotizieFilter = (id, ev) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const key = `__bound_${id}_${ev}`;
+    if (el[key]) return;
+    el.addEventListener(ev, () => renderNotizie());
+    el[key] = true;
+  };
+  __bindNotizieFilter('not-filter-resp', 'change');
+  __bindNotizieFilter('not-filter-label', 'change');
+  __bindNotizieFilter('not-filter-sort', 'change');
+  __bindNotizieFilter('not-filter-search', 'input');
+
     if (section) {
       section.scrollIntoView({ behavior: 'smooth' });
     }
