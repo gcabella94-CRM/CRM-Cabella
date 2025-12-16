@@ -868,7 +868,7 @@ function renderAgendaMonth() {
           tr.appendChild(td);
         }
 
-        tbody.appendChild(tr);
+        if (tbody) tbody.appendChild(tr);
       }
 
       table.appendChild(tbody);
@@ -933,7 +933,7 @@ function renderAgendaMonth() {
           <button class="btn btn-xs" data-imm-att="${imm.id || ''}" title="Crea attività collegata">➕ Attività</button>
         </td>
       `;
-      tbody.appendChild(tr);
+      if (tbody) tbody.appendChild(tr);
     });
   }
 
@@ -1040,243 +1040,12 @@ function renderAgendaMonth() {
   /* ====== NOTIZIE ====== */
 
   function renderNotizie() {
-    // Preferisci la vista a card (nuova). Se non esiste, fallback alla tabella legacy.
-    const cardsWrap = document.getElementById('notizie-cards');
-    const tableWrap = document.getElementById('not-table-wrap');
+    ensureNotizieFeedUI();
     const tbody = document.getElementById('not-table-body');
-
-    const staffMap = {};
-    (staff || []).forEach(s => { if (s && s.id) staffMap[s.id] = s; });
-
-    // Helper: normalizza data
-    const asTime = (v) => {
-      if (!v) return 0;
-      const d = new Date(v);
-      return isNaN(d) ? 0 : d.getTime();
-    };
-
-    // Helper: filtro/sort
-    const respFilter = (document.getElementById('not-filter-resp')?.value || 'tutti');
-    const sortMode   = (document.getElementById('not-sort')?.value || 'inserimento_desc');
-    const labelQ     = (document.getElementById('not-filter-label')?.value || '').trim().toLowerCase();
-    const searchQ    = (document.getElementById('not-search')?.value || '').trim().toLowerCase();
-
-    const base = Array.isArray(notizie) ? [...notizie] : [];
-
-    let list = base.filter(n => {
-      if (!n) return false;
-
-      if (respFilter !== 'tutti' && (n.responsabileId || '') !== respFilter) return false;
-
-      if (labelQ) {
-        const lab = (n.etichetta || n.label || '').toString().toLowerCase();
-        if (!lab.includes(labelQ)) return false;
-      }
-
-      if (searchQ) {
-        const nome = ((n.nome || '') + ' ' + (n.cognome || '')).toLowerCase();
-        const tel  = (n.telefono || '').toLowerCase();
-        const ind  = ((n.indirizzo || '') + ' ' + (n.citta || '') + ' ' + (n.provincia || '')).toLowerCase();
-        if (!(nome.includes(searchQ) || tel.includes(searchQ) || ind.includes(searchQ))) return false;
-      }
-
-      return true;
-    });
-
-    list.sort((a,b) => {
-      const aCreated = asTime(a.createdAt || a.inseritoIl || a.created || 0);
-      const bCreated = asTime(b.createdAt || b.inseritoIl || b.created || 0);
-      const aRecall  = asTime(a.ricontattoAt || a.recallAt || a.ricontatto || 0);
-      const bRecall  = asTime(b.ricontattoAt || b.recallAt || b.ricontatto || 0);
-      const aLab     = ((a.etichetta || a.label || '') + '').toLowerCase();
-      const bLab     = ((b.etichetta || b.label || '') + '').toLowerCase();
-
-      if (sortMode === 'ricontatto_asc')  return (aRecall||9e15) - (bRecall||9e15) || bCreated - aCreated;
-      if (sortMode === 'ricontatto_desc') return (bRecall||0) - (aRecall||0) || bCreated - aCreated;
-      if (sortMode === 'etichetta_asc')   return aLab.localeCompare(bLab) || bCreated - aCreated;
-      // default: ultimo inserimento
-      return bCreated - aCreated;
-    });
-
-    // POPOLA SELECT RESPONSABILI (se presente)
-    const respSel = document.getElementById('not-filter-resp');
-    if (respSel && !respSel.__notizieBound) {
-      // riempi una sola volta, poi aggiorniamo le opzioni se cambia staff
-      respSel.__notizieBound = true;
-    }
-    if (respSel) {
-      const current = respSel.value || 'tutti';
-      // ricostruisci le opzioni mantenendo selezione
-      const opts = ['tutti', ...(staff || []).map(s => s.id).filter(Boolean)];
-      respSel.innerHTML = '';
-      const o0 = document.createElement('option');
-      o0.value = 'tutti';
-      o0.textContent = 'Tutti i responsabili';
-      respSel.appendChild(o0);
-      (staff || []).forEach(s => {
-        if (!s || !s.id) return;
-        const o = document.createElement('option');
-        o.value = s.id;
-        o.textContent = s.nome || s.id;
-        respSel.appendChild(o);
-      });
-      respSel.value = opts.includes(current) ? current : 'tutti';
+    if (tbody) {
+      tbody.innerHTML = '';
     }
 
-    // ====== VISTA CARDS ======
-    if (cardsWrap) {
-      if (tableWrap) tableWrap.style.display = 'none';
-      cardsWrap.innerHTML = '';
-
-      // vuoto
-      if (!list.length) {
-        const empty = document.createElement('div');
-        empty.className = 'muted';
-        empty.style.padding = '10px';
-        empty.textContent = 'Nessuna notizia trovata con i filtri attuali.';
-        cardsWrap.appendChild(empty);
-        return;
-      }
-
-      list.forEach(n => {
-        const card = document.createElement('div');
-        card.className = 'notizia-card';
-
-        const staffObj = staffMap[n.responsabileId];
-        const nomeCompleto = ((n.nome || '') + ' ' + (n.cognome || '')).trim() || '—';
-        const indirizzoCompleto = [n.indirizzo || '', n.citta || '', n.provincia || ''].filter(Boolean).join(' · ');
-        const tipologia = (n.tipologia || '').trim();
-        const mq = (n.mq != null && n.mq !== '') ? `${n.mq} mq` : '';
-        const condoName = (n.condominio || '').trim();
-        const caldoLabel = n.caldo ? '🔥' : '';
-        const label = (n.etichetta || n.label || '').toString().trim();
-        const lastComment = (n.ultimoCommento || n.lastComment || n.noteUltimaInterazione || '').toString().trim();
-        const nonRisponde = !!(n.nonRisponde);
-        const ricontattoAt = (n.ricontattoAt || n.recallAt || n.ricontatto || '');
-
-        const ricontattoLabel = ricontattoAt ? formatDateTimeIT(ricontattoAt) : '—';
-
-        card.innerHTML = `
-          <div class="notizia-card-top">
-            <div class="notizia-main">
-              <div class="notizia-title">${escapeHtml(indirizzoCompleto || '—')}${condoName ? ` <span class="badge-condominio badge-condominio--notizia">🏢 ${escapeHtml(condoName)}</span>` : ''}</div>
-              <div class="notizia-meta">
-                <span class="pill">👤 ${escapeHtml(nomeCompleto)}</span>
-                ${tipologia ? `<span class="pill">🏠 ${escapeHtml(tipologia)}</span>` : ''}
-                ${mq ? `<span class="pill">📐 ${escapeHtml(mq)}</span>` : ''}
-                ${caldoLabel ? `<span class="pill">${caldoLabel} Calda</span>` : ''}
-                <span class="pill">🧑‍💼 ${escapeHtml((staffObj && staffObj.nome) ? staffObj.nome : '—')}</span>
-                ${label ? `<span class="pill">🏷️ ${escapeHtml(label)}</span>` : ''}
-                <span class="pill">📅 Ricontatto: <strong>${escapeHtml(ricontattoLabel)}</strong></span>
-              </div>
-            </div>
-
-            <div class="notizia-actions">
-              <button class="btn btn-xs" data-not-edit="${n.id || ''}" title="Apri in modifica">✏️</button>
-              <button class="btn btn-xs" data-not-att="${n.id || ''}" title="Crea attività collegata">➕ Attività</button>
-              <button class="btn btn-xs" data-not-imm="${n.id || ''}" title="Apri scheda inserimento immobile">🏠 Immobile</button>
-            </div>
-          </div>
-
-          <div class="notizia-body">
-            <div class="notizia-last">
-              <div class="notizia-last-header">
-                <div class="muted">Ultima interazione</div>
-                <button type="button" class="btn btn-xs" data-not-toggle="${n.id || ''}">Mostra/Nascondi</button>
-              </div>
-              <div class="notizia-last-text collapsed" id="not-last-${n.id || ''}">${escapeHtml(lastComment || '—')}</div>
-            </div>
-
-            <div class="notizia-editrow">
-              <label class="notizia-flag" title="Se il contatto non risponde, spunta e imposta un ricontatto">
-                <input type="checkbox" data-not-nonrisp="${n.id || ''}" ${nonRisponde ? 'checked' : ''}>
-                Non risponde
-              </label>
-
-              <input type="datetime-local" data-not-ricontatto="${n.id || ''}" value="${toDatetimeLocalValue(ricontattoAt)}" title="Data ricontatto">
-
-              <textarea data-not-comment="${n.id || ''}" placeholder="Commento ultima interazione (cosa vi siete detti)">${escapeHtml(lastComment)}</textarea>
-
-              <button type="button" class="btn btn-xs" data-not-savequick="${n.id || ''}">Salva</button>
-              <button type="button" class="btn btn-xs" data-not-agenda="${n.id || ''}" title="Crea/aggiorna ricontatto in agenda (15 min)">📅 Agenda</button>
-            </div>
-          </div>
-        `;
-
-        cardsWrap.appendChild(card);
-      });
-
-      // bind eventi (delegation)
-      if (!cardsWrap.__bound) {
-        cardsWrap.addEventListener('click', (e) => {
-          const btnToggle = e.target.closest('[data-not-toggle]');
-          if (btnToggle) {
-            const id = btnToggle.getAttribute('data-not-toggle');
-            const el = document.getElementById('not-last-' + id);
-            if (el) el.classList.toggle('collapsed');
-            return;
-          }
-
-          const btnEdit = e.target.closest('[data-not-edit]');
-          if (btnEdit) {
-            const id = btnEdit.getAttribute('data-not-edit');
-            try { setNotizieSubview('form'); } catch {}
-            if (typeof startEditNotizia === 'function') startEditNotizia(id); else openNotiziaEdit(id);
-            return;
-          }
-          const btnAtt = e.target.closest('[data-not-att]');
-          if (btnAtt) {
-            const id = btnAtt.getAttribute('data-not-att');
-            if (typeof creaAppuntamentoDaNotiziaId === 'function') creaAppuntamentoDaNotiziaId(id);
-            return;
-          }
-          const btnImm = e.target.closest('[data-not-imm]');
-          if (btnImm) {
-            const id = btnImm.getAttribute('data-not-imm');
-            apriSchedaImmobileDaNotizia(id);
-            return;
-          }
-          const btnSave = e.target.closest('[data-not-savequick]');
-          if (btnSave) {
-            const id = btnSave.getAttribute('data-not-savequick');
-            quickSaveNotiziaCard(id);
-            return;
-          }
-          const btnAgenda = e.target.closest('[data-not-agenda]');
-          if (btnAgenda) {
-            const id = btnAgenda.getAttribute('data-not-agenda');
-            quickSaveNotiziaCard(id, {alsoAgenda:true});
-            return;
-          }
-        });
-
-        cardsWrap.__bound = true;
-      }
-
-      // bind change non risponde (delegation)
-      if (!cardsWrap.__boundChange) {
-        cardsWrap.addEventListener('change', (e) => {
-          const chk = e.target.closest('[data-not-nonrisp]');
-          if (chk) {
-            const id = chk.getAttribute('data-not-nonrisp');
-            const n = (notizie || []).find(x => x && x.id === id);
-            if (n) {
-              n.nonRisponde = !!chk.checked;
-              n.updatedAt = new Date().toISOString();
-              saveList(STORAGE_KEYS.notizie, notizie);
-            }
-          }
-        });
-        cardsWrap.__boundChange = true;
-      }
-
-      return;
-    }
-
-    // ====== FALLBACK TABELLA LEGACY ======
-    if (!tbody) return;
-    if (tableWrap) tableWrap.style.display = '';
-    tbody.innerHTML = '';
 
     (notizie || []).forEach(n => {
       const tr = document.createElement('tr');
@@ -1305,12 +1074,338 @@ function renderAgendaMonth() {
           <button class="btn btn-xs" data-not-imm="${n.id || ''}" title="Apri scheda inserimento immobile">🏠 Immobile</button>
         </td>
       `;
-      tbody.appendChild(tr);
+      if (tbody) tbody.appendChild(tr);
+    });
+  
+    // Vista home a card
+    try { renderNotizieFeed(notizie || []); } catch (e) { console.warn('[NOTIZIE] feed render error', e); }
+}
+
+  
+  /* ====== NOTIZIE FEED (CARD SINGOLA + FILTRI) ====== */
+  let NOTIZIE_FEED_INITED = false;
+
+  function ensureNotizieFeedUI() {
+    if (NOTIZIE_FEED_INITED) return;
+    NOTIZIE_FEED_INITED = true;
+
+    const selResp = document.getElementById('not-filter-resp');
+    const selLabel = document.getElementById('not-filter-label');
+    const selSort = document.getElementById('not-filter-sort');
+    const qInput = document.getElementById('not-filter-search');
+
+    const overlay = document.getElementById('notizie-modal-overlay');
+    const closeBtn = document.getElementById('not-modal-close');
+
+    if (closeBtn && overlay) {
+      closeBtn.addEventListener('click', () => { overlay.style.display = 'none'; });
+    }
+    if (overlay) {
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) overlay.style.display = 'none';
+      });
+    }
+
+    const onChange = () => renderNotizie();
+    selResp?.addEventListener('change', onChange);
+    selLabel?.addEventListener('change', onChange);
+    selSort?.addEventListener('change', onChange);
+    qInput?.addEventListener('input', () => {
+      // debounce leggero
+      clearTimeout(window.__notizieQTimer);
+      window.__notizieQTimer = setTimeout(onChange, 120);
+    });
+
+    // Delegation card actions
+    const container = document.getElementById('not-cards-container');
+    if (container) {
+      container.addEventListener('click', (e) => {
+        const t = e.target;
+
+        const toggle = t.closest('[data-not-toggle]');
+        if (toggle) {
+          const id = toggle.getAttribute('data-not-toggle');
+          const box = container.querySelector('[data-not-last="'+id+'"]');
+          if (box) box.classList.toggle('expanded');
+          return;
+        }
+
+        const editBtn = t.closest('[data-not-edit]');
+        if (editBtn) {
+          const id = editBtn.getAttribute('data-not-edit');
+          if (id) startEditNotizia(id);
+          return;
+        }
+
+        const saveBtn = t.closest('[data-not-save]');
+        if (saveBtn) {
+          const id = saveBtn.getAttribute('data-not-save');
+          if (id) saveNotiziaFromCard(id);
+          return;
+        }
+
+        const agendaBtn = t.closest('[data-not-agenda]');
+        if (agendaBtn) {
+          const id = agendaBtn.getAttribute('data-not-agenda');
+          if (id) createRicontattoInAgenda(id);
+          return;
+        }
+      });
+
+      container.addEventListener('change', (e) => {
+        const el = e.target;
+        const id = el?.getAttribute?.('data-not-id') || el?.dataset?.notId;
+        if (!id) return;
+
+        if (el.matches('[data-not-noanswer]')) {
+          updateNotiziaPartial(id, { nonRisponde: !!el.checked });
+        }
+        if (el.matches('[data-not-recall]')) {
+          updateNotiziaPartial(id, { ricontattoAt: el.value || '' });
+        }
+      });
+    }
+  }
+
+  function openNotizieModal() {
+    const overlay = document.getElementById('notizie-modal-overlay');
+    if (overlay) overlay.style.display = 'flex';
+  }
+
+  function updateNotiziaPartial(id, patch) {
+    const ix = (notizie || []).findIndex(n => n && n.id === id);
+    if (ix < 0) return;
+    const prev = notizie[ix] || {};
+    notizie[ix] = { ...prev, ...patch, updatedAt: new Date().toISOString() };
+    saveList(STORAGE_KEYS.notizie, notizie);
+    // rerender (mantiene feed aggiornato)
+    renderNotizie();
+  }
+
+  function saveNotiziaFromCard(id) {
+    const container = document.getElementById('not-cards-container');
+    if (!container) return;
+    const card = container.querySelector('.notizia-card[data-id="'+id+'"]');
+    if (!card) return;
+
+    const last = card.querySelector('[data-not-lastcomment]');
+    const label = card.querySelector('[data-not-label]');
+    const note = (last && last.value != null) ? last.value : '';
+
+    updateNotiziaPartial(id, {
+      ultimaInterazione: note,
+      etichetta: label ? (label.value || '') : (undefined)
     });
   }
 
+  function createRicontattoInAgenda(notiziaId) {
+    const n = (notizie || []).find(x => x && x.id === notiziaId);
+    if (!n) return;
 
-  function resetNotizieForm() {
+    const when = n.ricontattoAt || '';
+    if (!when) {
+      alert('Imposta una data di ricontatto prima di inviare in agenda.');
+      return;
+    }
+    const d = new Date(when);
+    if (isNaN(d)) {
+      alert('Data ricontatto non valida.');
+      return;
+    }
+
+    const pad = (x) => String(x).padStart(2,'0');
+    const dateIso = d.toISOString().slice(0,10);
+    const startMins = d.getHours()*60 + d.getMinutes();
+    const endMins = startMins + 15;
+
+    const fmt = (mins) => {
+      const h = Math.floor(mins/60);
+      const m = mins%60;
+      return pad(h)+':'+pad(m);
+    };
+
+    const staffId = n.responsabileId || ((staff[0] && staff[0].id) || '');
+    const nomeProp = ((n.nome||'')+' '+(n.cognome||'')).trim() || 'Proprietario';
+    const titleAddr = (n.indirizzo || '').trim() || 'Indirizzo';
+    const descr = `Ricontatto: ${nomeProp} · ${titleAddr} · ${n.telefono||''}`;
+
+    // cerca se esiste già un ricontatto per questa notizia
+    const existingIx = (attivita || []).findIndex(a => a && a.tipo==='appuntamento' && a.linkedNotiziaId === notiziaId && a.tipoDettaglio === 'ricontatto');
+    const app = {
+      id: (existingIx>=0 ? attivita[existingIx].id : genId('app')),
+      data: dateIso,
+      ora: fmt(startMins),
+      oraFine: fmt(endMins),
+      tipo: 'appuntamento',
+      tipoDettaglio: 'ricontatto',
+      descrizione: descr,
+      responsabileId: staffId,
+      clienteId: '',
+      stato: 'aperta',
+      linkedNotiziaId: notiziaId
+    };
+
+    if (existingIx>=0) attivita[existingIx] = { ...attivita[existingIx], ...app };
+    else attivita.push(app);
+
+    saveList(STORAGE_KEYS.attivita, attivita);
+    try { renderAttivita(); } catch {}
+    try { renderAgendaWeek(); } catch {}
+    try { renderAgendaMonth(); } catch {}
+
+    alert('Ricontatto inserito in agenda (15 min).');
+  }
+
+  function getNotizieFilteredSorted(list) {
+    const selResp = document.getElementById('not-filter-resp');
+    const selLabel = document.getElementById('not-filter-label');
+    const selSort = document.getElementById('not-filter-sort');
+    const qInput = document.getElementById('not-filter-search');
+
+    const resp = selResp ? selResp.value : '';
+    const lab = selLabel ? selLabel.value : '';
+    const q = (qInput ? qInput.value : '').trim().toLowerCase();
+    const sort = selSort ? selSort.value : 'created_desc';
+
+    let out = (list || []).slice();
+
+    if (resp) out = out.filter(n => (n.responsabileId || '') === resp);
+
+    if (lab) {
+      out = out.filter(n => ((n.etichetta || n.label || '')+'').trim().toLowerCase() === lab.toLowerCase());
+    }
+
+    if (q) {
+      out = out.filter(n => {
+        const blob = [
+          n.indirizzo, n.citta, n.provincia, n.tipologia, n.mq,
+          n.nome, n.cognome, n.telefono, n.email,
+          n.note, n.ultimaInterazione, n.etichetta
+        ].filter(Boolean).join(' ').toLowerCase();
+        return blob.includes(q);
+      });
+    }
+
+    const getCreated = (n) => {
+      const v = n.createdAt || n.dataInserimento || n.date || '';
+      const d = new Date(v);
+      return isNaN(d) ? 0 : d.getTime();
+    };
+    const getRecall = (n) => {
+      const d = new Date(n.ricontattoAt || '');
+      return isNaN(d) ? Infinity : d.getTime();
+    };
+    const getLabel = (n) => ((n.etichetta || n.label || '')+'').toLowerCase();
+
+    if (sort === 'created_desc') out.sort((a,b)=>getCreated(b)-getCreated(a));
+    else if (sort === 'recall_asc') out.sort((a,b)=>getRecall(a)-getRecall(b));
+    else if (sort === 'label_asc') out.sort((a,b)=>getLabel(a).localeCompare(getLabel(b)));
+
+    return out;
+  }
+
+  function renderNotizieFeed(list) {
+    const container = document.getElementById('not-cards-container');
+    if (!container) return;
+
+    // populate filters options
+    const selResp = document.getElementById('not-filter-resp');
+    if (selResp) {
+      const current = selResp.value;
+      selResp.innerHTML = '<option value="">Tutti i responsabili</option>' + (staff||[]).map(s => (
+        `<option value="${s.id}">${escapeHtml(s.nome||s.nomeCompleto||'Staff')}</option>`
+      )).join('');
+      selResp.value = current;
+    }
+
+    const labels = Array.from(new Set((notizie||[]).map(n => (n.etichetta || n.label || '')).filter(x => (x||'').trim()))).sort((a,b)=>a.localeCompare(b));
+    const selLabel = document.getElementById('not-filter-label');
+    if (selLabel) {
+      const current = selLabel.value;
+      selLabel.innerHTML = '<option value="">Tutte le etichette</option>' + labels.map(l => `<option value="${escapeHtml(l)}">${escapeHtml(l)}</option>`).join('');
+      selLabel.value = current;
+    }
+
+    const data = getNotizieFilteredSorted(list);
+
+    container.innerHTML = data.map(n => {
+      const id = n.id || '';
+      const nomeProp = escapeHtml((((n.nome||'')+' '+(n.cognome||'')).trim()) || '—');
+      const tel = escapeHtml(n.telefono || '—');
+      const addr = escapeHtml(n.indirizzo || '—');
+      const tip = escapeHtml(n.tipologia || '—');
+      const mq = (n.mq != null && n.mq !== '') ? escapeHtml(String(n.mq)) : '—';
+      const citta = escapeHtml(n.citta || '');
+      const prov = escapeHtml(n.provincia || '');
+      const staffObj = (staff||[]).find(s => s.id === n.responsabileId);
+      const respName = escapeHtml(staffObj ? (staffObj.nome || staffObj.nomeCompleto || 'Staff') : '—');
+      const last = escapeHtml(n.ultimaInterazione || n.note || '');
+      const et = escapeHtml(n.etichetta || n.label || '');
+      const nonRisponde = !!n.nonRisponde;
+      const recall = escapeHtml(n.ricontattoAt || '');
+
+      return `
+      <div class="notizia-card" data-id="${id}">
+        <div class="notizia-card-inner">
+          <div>
+            <div class="notizia-title">${addr}${citta ? ' · '+citta : ''}${prov ? ' ('+prov+')' : ''}</div>
+            <div class="notizia-meta">
+              <span class="notizia-pill">🏷️ ${tip}</span>
+              <span class="notizia-pill">📐 ${mq} mq</span>
+              ${et ? `<span class="notizia-pill">🧷 ${et}</span>` : ``}
+            </div>
+
+            <div class="notizia-field">
+              <label>Ultima interazione (preview)</label>
+              <div class="notizia-lastnote" data-not-last="${id}">${last || '<span class="notizia-muted">Nessuna nota</span>'}</div>
+              <div class="notizia-row">
+                <span class="notizia-muted">${n.updatedAt ? ('Aggiornata: '+formatDateTimeIT(n.updatedAt)) : ''}</span>
+                <button type="button" class="btn btn-xs" data-not-toggle="${id}">Espandi/Comprimi</button>
+              </div>
+            </div>
+
+            <div class="notizia-field">
+              <label>Commento ultima interazione (modifica rapida)</label>
+              <textarea rows="2" data-not-lastcomment data-not-id="${id}" placeholder="Scrivi cosa vi siete detti...">${escapeHtml(n.ultimaInterazione || '')}</textarea>
+            </div>
+          </div>
+
+          <div class="notizia-right">
+            <div class="notizia-meta">
+              <span class="notizia-pill">👤 ${nomeProp}</span>
+              <span class="notizia-pill">📞 ${tel}</span>
+              <span class="notizia-pill">🧑‍💼 ${respName}</span>
+            </div>
+
+            <div class="notizia-row" style="margin-top:10px;">
+              <label class="notizia-checkbox">
+                <input type="checkbox" data-not-noanswer data-not-id="${id}" ${nonRisponde ? 'checked' : ''}>
+                Non risponde
+              </label>
+            </div>
+
+            <div class="notizia-field">
+              <label>Etichetta</label>
+              <input type="text" data-not-label data-not-id="${id}" placeholder="Es. caldo / freddo / hotel..." value="${et}">
+            </div>
+
+            <div class="notizia-field">
+              <label>Data ricontatto (15 min)</label>
+              <input type="datetime-local" data-not-recall data-not-id="${id}" value="${recall}">
+              <div class="notizia-muted" style="margin-top:6px;">Clic su “Agenda” crea/aggiorna un ricontatto da 15 minuti.</div>
+            </div>
+
+            <div class="notizia-actions">
+              <button type="button" class="btn btn-sm" data-not-save="${id}">Salva</button>
+              <button type="button" class="btn btn-sm" data-not-agenda="${id}">📅 Agenda</button>
+              <button type="button" class="btn btn-sm" data-not-edit="${id}">Apri scheda</button>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+function resetNotizieForm() {
     const form = document.getElementById('not-form');
     if (!form) return;
     form.reset();
@@ -1325,206 +1420,6 @@ function renderAgendaMonth() {
     const cancelBtn = document.getElementById('not-cancel-edit');
     if (cancelBtn) cancelBtn.style.display = 'none';
 
-  }
-
-
-  // ====== NOTIZIE: subview + quick edit da card ======
-  function toDatetimeLocalValue(iso) {
-    if (!iso) return '';
-    const d = new Date(iso);
-    if (isNaN(d)) return '';
-    const pad = n => String(n).padStart(2,'0');
-    const yyyy = d.getFullYear();
-    const mm = pad(d.getMonth()+1);
-    const dd = pad(d.getDate());
-    const hh = pad(d.getHours());
-    const mi = pad(d.getMinutes());
-    return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
-  }
-
-  function setNotizieSubview(sub) {
-    const wrapForm = document.getElementById('not-form-wrap');
-    const cardsWrap = document.getElementById('notizie-cards');
-    const subs = document.querySelectorAll('.notizie-subtab');
-    subs.forEach(b => {
-      const is = (b.getAttribute('data-sub') === sub);
-      b.classList.toggle('active', is);
-    });
-    if (wrapForm) wrapForm.style.display = (sub === 'form') ? '' : 'none';
-    if (cardsWrap) cardsWrap.style.display = (sub === 'lista') ? '' : 'none';
-  }
-
-  function openNotiziaEdit(id) {
-    // porta alla sezione, apre form, riempie campi
-    const n = (notizie || []).find(x => x && x.id === id);
-    if (!n) return;
-    setNotizieSubview('form');
-
-    document.getElementById('not-id').value = n.id || '';
-    document.getElementById('not-nome').value = n.nome || '';
-    document.getElementById('not-cognome').value = n.cognome || '';
-    document.getElementById('not-telefono').value = n.telefono || '';
-    document.getElementById('not-email').value = n.email || '';
-    document.getElementById('not-indirizzo').value = n.indirizzo || '';
-    document.getElementById('not-citta').value = n.citta || '';
-    document.getElementById('not-provincia').value = n.provincia || '';
-    const condEl = document.getElementById('not-condominio');
-    if (condEl) condEl.value = n.condominio || '';
-    const tipEl = document.getElementById('not-tipologia');
-    if (tipEl) tipEl.value = n.tipologia || '';
-    document.getElementById('not-piano').value = n.piano || '';
-    document.getElementById('not-mq').value = (n.mq != null ? n.mq : '');
-    document.getElementById('not-caldo').checked = !!n.caldo;
-    document.getElementById('not-note').value = n.note || '';
-    const saveBtn = document.getElementById('not-save-btn');
-    if (saveBtn) saveBtn.textContent = 'Salva modifiche';
-    const cancelBtn = document.getElementById('not-cancel-edit');
-    if (cancelBtn) cancelBtn.style.display = '';
-    try { document.getElementById('not-nome')?.focus(); } catch {}
-  }
-
-  function quickSaveNotiziaCard(id, opts={}) {
-    const n = (notizie || []).find(x => x && x.id === id);
-    if (!n) return;
-    const txt = document.querySelector(`[data-not-comment="${id}"]`);
-    const dt  = document.querySelector(`[data-not-ricontatto="${id}"]`);
-    const chk = document.querySelector(`[data-not-nonrisp="${id}"]`);
-
-    const comment = txt ? (txt.value || '').trim() : '';
-    const ricontattoVal = dt ? (dt.value || '') : '';
-    const ricontattoIso = ricontattoVal ? new Date(ricontattoVal).toISOString() : '';
-
-    n.ultimoCommento = comment;
-    n.nonRisponde = chk ? !!chk.checked : !!n.nonRisponde;
-    n.ricontattoAt = ricontattoIso || '';
-    if (!n.createdAt) n.createdAt = new Date().toISOString();
-    n.updatedAt = new Date().toISOString();
-
-    saveList(STORAGE_KEYS.notizie, notizie);
-
-    // Se richiesto, crea/aggiorna un appuntamento da 15 min in agenda
-    if (opts && opts.alsoAgenda) {
-      try {
-        createOrUpdateRicontattoInAgenda(n);
-      } catch (e) {
-        console.warn('[NOTIZIE] agenda ricontatto err', e);
-      }
-    }
-
-    renderNotizie();
-  }
-
-  function createOrUpdateRicontattoInAgenda(n) {
-    if (!n || !n.id) return;
-    if (!n.ricontattoAt) { alert('Imposta una data di ricontatto prima di inviare in agenda.'); return; }
-
-    if (!Array.isArray(attivita)) attivita = [];
-
-    const d = new Date(n.ricontattoAt);
-    if (isNaN(d)) return;
-
-    const isoDate = d.toISOString().slice(0,10);
-    const hh = String(d.getHours()).padStart(2,'0');
-    const mm = String(d.getMinutes()).padStart(2,'0');
-    const ora = `${hh}:${mm}`;
-
-    // end = +15'
-    const end = new Date(d.getTime() + 15*60*1000);
-    const eh = String(end.getHours()).padStart(2,'0');
-    const em = String(end.getMinutes()).padStart(2,'0');
-    const oraFine = `${eh}:${em}`;
-
-    const title = `Ricontatto: ${((n.nome||'')+' '+(n.cognome||'')).trim() || 'Proprietario'} — ${((n.indirizzo||'')+' '+(n.citta||'')).trim()}`.trim();
-
-    // se esiste già appuntamento ricontatto per questa notizia, aggiorna; altrimenti crea
-    let app = (attivita || []).find(a => a && a.tipo==='appuntamento' && a.linkNotiziaId === n.id && a.tipoDettaglio === 'ricontatto');
-    if (!app) {
-      app = {
-        id: genId('app'),
-        tipo: 'appuntamento',
-        tipoDettaglio: 'ricontatto',
-        data: isoDate,
-        ora: ora,
-        oraFine: oraFine,
-        titolo: title,
-        descrizione: (n.ultimoCommento || '').slice(0, 300),
-        responsabileId: n.responsabileId || ((staff[0] && staff[0].id) || null),
-        bollente: !!n.caldo,
-        linkNotiziaId: n.id
-      };
-      attivita.push(app);
-    } else {
-      app.data = isoDate;
-      app.ora = ora;
-      app.oraFine = oraFine;
-      app.titolo = title;
-      app.descrizione = (n.ultimoCommento || '').slice(0, 300);
-      if (!app.responsabileId) app.responsabileId = n.responsabileId || app.responsabileId;
-      app.bollente = !!n.caldo;
-    }
-
-    saveList(STORAGE_KEYS.attivita, attivita);
-
-    // se sei in agenda, aggiorna render
-    try { renderAgenda(); } catch {}
-  }
-
-  function bindNotizieUI() {
-    // subnav
-    document.querySelectorAll('.notizie-subtab').forEach(btn => {
-      if (btn.__bound) return;
-      btn.addEventListener('click', () => setNotizieSubview(btn.getAttribute('data-sub') || 'lista'));
-      btn.__bound = true;
-    });
-
-    // nuovi/annulla
-    const newBtn = document.getElementById('not-new-btn');
-    if (newBtn && !newBtn.__bound) {
-      newBtn.addEventListener('click', () => {
-        setNotizieSubview('form');
-        const section = document.getElementById('view-notizie');
-        if (section) section.scrollIntoView({ behavior: 'smooth' });
-        try { document.getElementById('not-nome')?.focus(); } catch {}
-      });
-      newBtn.__bound = true;
-    }
-
-    const cancelBtn = document.getElementById('not-cancel-edit');
-    if (cancelBtn && !cancelBtn.__bound) {
-      cancelBtn.addEventListener('click', () => {
-        resetNotizieForm();
-        setNotizieSubview('lista');
-        renderNotizie();
-      });
-      cancelBtn.__bound = true;
-    }
-
-    // filtri
-    const ids = ['not-filter-resp','not-sort','not-filter-label','not-search'];
-    ids.forEach(id => {
-      const el = document.getElementById(id);
-      if (!el) return;
-      const ev = (id === 'not-filter-label' || id === 'not-search') ? 'input' : 'change';
-      const key = '__bound_' + ev;
-      if (el[key]) return;
-      el.addEventListener(ev, () => renderNotizie());
-      el[key] = true;
-    });
-
-    const clearBtn = document.getElementById('not-filter-clear');
-    if (clearBtn && !clearBtn.__bound) {
-      clearBtn.addEventListener('click', () => {
-        const resp = document.getElementById('not-filter-resp'); if (resp) resp.value='tutti';
-        const sort = document.getElementById('not-sort'); if (sort) sort.value='inserimento_desc';
-        const lab  = document.getElementById('not-filter-label'); if (lab) lab.value='';
-        const sea  = document.getElementById('not-search'); if (sea) sea.value='';
-        renderNotizie();
-      });
-      clearBtn.__bound = true;
-    }
-
-    // default: home su lista
-    setNotizieSubview('lista');
   }
 
   // Apre la scheda di inserimento immobile precompilando i dati a partire da una notizia
@@ -1787,12 +1682,15 @@ function renderAgendaMonth() {
       const existingId = (document.getElementById('not-id')?.value || '').trim();
 
       const nowIso = new Date().toISOString();
-
       const notizia = {
         id: existingId || genId('not'),
-        createdAt: existingId ? ((notizie.find(x=>x&&x.id===existingId)?.createdAt) || nowIso) : nowIso,
+        createdAt: (existingId ? ((notizie.find(x=>x && x.id===existingId)||{}).createdAt || nowIso) : nowIso),
         updatedAt: nowIso,
-        nome: nome,
+        ultimaInterazione: (existingId ? ((notizie.find(x=>x && x.id===existingId)||{}).ultimaInterazione||'') : ''),
+        nonRisponde: (existingId ? !!((notizie.find(x=>x && x.id===existingId)||{}).nonRisponde) : false),
+        ricontattoAt: (existingId ? (((notizie.find(x=>x && x.id===existingId)||{}).ricontattoAt)||'') : ''),
+        etichetta: (existingId ? (((notizie.find(x=>x && x.id===existingId)||{}).etichetta)||'') : ''),
+nome: nome,
         cognome: cognome,
         telefono: telefono,
         email: email,
@@ -1820,13 +1718,11 @@ function renderAgendaMonth() {
       }
       renderNotizie();
       resetNotizieForm();
-      try { setNotizieSubview('lista'); } catch {}
     });
   }
 
-    // UI Notizie (subnav/filtri/cards)
-  bindNotizieUI();
-
+  document.getElementById('not-new-btn')?.addEventListener('click', () => {
+    const section = document.getElementById('view-notizie');
     if (section) {
       section.scrollIntoView({ behavior: 'smooth' });
     }
@@ -2811,7 +2707,7 @@ function closeAppuntamentoDialog() {
         td.className = 'muted';
         td.textContent = 'Nessuna operazione conclusa.';
         tr.appendChild(td);
-        tbody.appendChild(tr);
+        if (tbody) tbody.appendChild(tr);
         return;
       }
 
@@ -2828,7 +2724,7 @@ function closeAppuntamentoDialog() {
           <td>${valore ? formatEuro(valore) : ''}</td>
           <td>${provv ? formatEuro(provv) : ''}</td>
         `;
-        tbody.appendChild(tr);
+        if (tbody) tbody.appendChild(tr);
       });
     }
 
@@ -3101,228 +2997,71 @@ function closeSuggest(box) {
 }
 
 function setupAddressAutocomplete({ inputId, cityId, provId, capId }) {
-  // === Autocomplete indirizzo (FREE + performante) ===
-  // - Dropdown sempre visibile mentre scrivi
-  // - Compilazione SOLO su selezione
-  // - Photon (Komoot) + debounce + abort + cache
-  const input = document.getElementById(inputId);
-  if (!input) return;
+  const inputEl = document.getElementById(inputId);
+  if (!inputEl) return;
+  const box = ensureSuggestBox(inputEl);
+  const geocoder = getAddrGeocoder();
+  if (!box || !geocoder) return;
 
-  const cityEl = cityId ? document.getElementById(cityId) : null;
-  const provEl = provId ? document.getElementById(provId) : null;
-  const capEl  = capId  ? document.getElementById(capId)  : null;
+  let t = null;
+  let lastQ = '';
 
-  // evita doppio bind se la funzione viene richiamata più volte
-  if (input.__addrAutoBound) return;
-  input.__addrAutoBound = true;
+  const maybeSet = (el, val) => {
+    if (!el || !val) return;
+    const current = (el.value || '').trim();
+    if (!current) { el.value = val; return; }
+    if (current.toLowerCase() === val.toLowerCase()) return;
+    const ok = confirm(`Sovrascrivere "${current}" con "${val}"?`);
+    if (ok) el.value = val;
+  };
 
-  const MIN_CHARS = 3;
-  const DEBOUNCE_MS = 140;
-  const LIMIT = 7;
+  const applyParts = (parts) => {
+    // street va SEMPRE nel campo input (indirizzo)
+    if (parts.street) maybeSet(inputEl, parts.street);
+    if (cityId) maybeSet(document.getElementById(cityId), parts.citta);
+    if (provId) maybeSet(document.getElementById(provId), parts.provincia);
+    if (capId) maybeSet(document.getElementById(capId), parts.cap);
+  };
 
-  const cache = new Map(); // key -> results
-  let timer = null;
-  let controller = null;
-
-  // dropdown
-  const dd = document.createElement('div');
-  dd.className = 'address-autocomplete-dropdown';
-  dd.style.position = 'absolute';
-  dd.style.zIndex = 999999;
-  dd.style.display = 'none';
-  dd.style.minWidth = '260px';
-  dd.style.maxWidth = '520px';
-  dd.style.maxHeight = '260px';
-  dd.style.overflowY = 'auto';
-  dd.style.background = '#fff';
-  dd.style.border = '1px solid rgba(0,0,0,.18)';
-  dd.style.borderRadius = '10px';
-  dd.style.boxShadow = '0 10px 24px rgba(0,0,0,.16)';
-  dd.style.padding = '6px';
-  document.body.appendChild(dd);
-
-  function placeDropdown() {
-    const r = input.getBoundingClientRect();
-    dd.style.left = (window.scrollX + r.left) + 'px';
-    dd.style.top  = (window.scrollY + r.bottom + 6) + 'px';
-    dd.style.width = Math.max(r.width, 280) + 'px';
-  }
-
-  function openDropdown() {
-    placeDropdown();
-    dd.style.display = 'block';
-  }
-  function closeDropdown() {
-    dd.style.display = 'none';
-    dd.innerHTML = '';
-  }
-
-  function renderMessage(msg) {
-    dd.innerHTML = `<div style="padding:10px 10px; font-size:12px; opacity:.75;">${msg}</div>`;
-  }
-
-  function renderResults(results) {
-    dd.innerHTML = '';
-    if (!results || results.length === 0) {
-      renderMessage('Nessun risultato');
-      return;
-    }
-    results.forEach((item, idx) => {
-      const row = document.createElement('div');
-      row.style.padding = '10px';
-      row.style.borderRadius = '8px';
-      row.style.cursor = 'pointer';
-      row.addEventListener('mouseenter', () => row.style.background = 'rgba(0,0,0,.06)');
-      row.addEventListener('mouseleave', () => row.style.background = 'transparent');
-
-      const title = document.createElement('div');
-      title.style.fontSize = '13px';
-      title.style.fontWeight = '600';
-      title.textContent = item.label || item.name || '';
-      row.appendChild(title);
-
-      const sub = document.createElement('div');
-      sub.style.fontSize = '12px';
-      sub.style.opacity = '.75';
-      sub.textContent = item.meta || '';
-      row.appendChild(sub);
-
-      row.addEventListener('mousedown', (e) => {
-        // mousedown per non perdere il focus prima del click
-        e.preventDefault();
-
-        input.value = item.label || input.value;
-
-        if (capEl && item.cap) capEl.value = item.cap;
-        if (cityEl && item.city) cityEl.value = item.city;
-        if (provEl && item.prov) provEl.value = item.prov;
-
-        // prova anche a valorizzare lat/lon se esistono campi hidden standard
-        const latEl = document.getElementById(inputId + '-lat') || document.getElementById('lat') || null;
-        const lonEl = document.getElementById(inputId + '-lon') || document.getElementById('lng') || document.getElementById('lon') || null;
-        if (latEl && item.lat != null) latEl.value = item.lat;
-        if (lonEl && item.lon != null) lonEl.value = item.lon;
-
-        closeDropdown();
-        input.dispatchEvent(new Event('change', { bubbles: true }));
+  const renderOptions = (results) => {
+    box.innerHTML = '';
+    if (!results || !results.length) { closeSuggest(box); return; }
+    results.slice(0, 8).forEach((r) => {
+      const parts = extractPartsFromGeocodeResult(r);
+      const item = document.createElement('div');
+      item.className = 'addr-suggest__item';
+      item.innerHTML = `
+        <div class="addr-suggest__main">${escapeHtml(parts.street || parts.label || 'Risultato')}</div>
+        <div class="addr-suggest__sub">${escapeHtml([parts.cap, parts.citta, parts.provincia].filter(Boolean).join(' · '))}</div>
+      `;
+      item.addEventListener('mousedown', (ev) => {
+        ev.preventDefault();
+        applyParts(parts);
+        closeSuggest(box);
       });
-
-      dd.appendChild(row);
+      box.appendChild(item);
     });
-  }
+    box.style.display = 'block';
+  };
 
-  function norm(q) {
-    return (q || '').trim().toLowerCase().replace(/\s+/g, ' ');
-  }
+  const run = () => {
+    const q = (inputEl.value || '').trim();
+    if (q.length < 3) { closeSuggest(box); return; }
+    if (q === lastQ) return;
+    lastQ = q;
+    geocoder.geocode(q, (results) => renderOptions(results || []));
+  };
 
-  async function photonSearch(qRaw) {
-    const q = norm(qRaw);
-    if (q.length < MIN_CHARS) return [];
-    if (cache.has(q)) return cache.get(q);
-
-    if (controller) controller.abort();
-    controller = new AbortController();
-
-    const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=${LIMIT}`;
-    const res = await fetch(url, { signal: controller.signal, headers: { 'Accept': 'application/json' }});
-    if (!res.ok) return [];
-    const data = await res.json();
-
-    const out = (data.features || []).map(f => {
-      const p = f.properties || {};
-      const g = (f.geometry && f.geometry.coordinates) ? f.geometry.coordinates : [];
-      const name = (p.name || '').trim();
-      const street = (p.street || '').trim();
-      const housenumber = (p.housenumber || '').trim();
-      const postcode = (p.postcode || '').trim();
-      const city = (p.city || p.county || p.state || '').trim();
-      const prov = (p.state || '').trim(); // spesso non è la sigla, ma meglio di niente
-      const label = [street || name, housenumber, city].filter(Boolean).join(' ').trim();
-      const meta = [postcode, city, prov].filter(Boolean).join(' · ');
-      return { label, name, city, prov, cap: postcode, lat: g[1], lon: g[0], meta };
-    }).filter(x => x.label);
-
-    cache.set(q, out);
-    return out;
-  }
-
-
-  async function nominatimSearch(qRaw) {
-    const q = norm(qRaw);
-    if (q.length < MIN_CHARS) return [];
-    if (cache.has('n:'+q)) return cache.get('n:'+q);
-
-    // nota: Nominatim pubblico è più lento e con rate limit, usiamolo solo come fallback
-    const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=${LIMIT}&q=${encodeURIComponent(q)}`;
-    const res = await fetch(url, { headers: { 'Accept': 'application/json' }});
-    if (!res.ok) return [];
-    const data = await res.json();
-
-    const out = (data || []).map(item => {
-      const a = item.address || {};
-      const street = (a.road || a.pedestrian || a.cycleway || a.footway || a.path || '').trim();
-      const housenumber = (a.house_number || '').trim();
-      const postcode = (a.postcode || '').trim();
-      const city = (a.city || a.town || a.village || a.municipality || a.county || '').trim();
-      const prov = (a.state || a.province || '').trim();
-      const label = [street || item.display_name, housenumber, city].filter(Boolean).join(' ').trim();
-      const meta = [postcode, city, prov].filter(Boolean).join(' · ');
-      return {
-        label,
-        name: street || (item.display_name || ''),
-        city,
-        prov,
-        cap: postcode,
-        lat: item.lat ? parseFloat(item.lat) : null,
-        lon: item.lon ? parseFloat(item.lon) : null,
-        meta
-      };
-    }).filter(x => x.label);
-
-    cache.set('n:'+q, out);
-    return out;
-  }
-  // UI events
-  function scheduleSearch() {
-    const qRaw = input.value || '';
-    const qNorm = norm(qRaw);
-
-    openDropdown();
-
-    // Evita chiamate inutili (e 400) quando la query è troppo corta
-    if (qNorm.length < MIN_CHARS) {
-      clearTimeout(timer);
-      renderMessage(`Scrivi almeno ${MIN_CHARS} caratteri`);
-      return;
-    }
-
-    renderMessage('Ricerca…');
-
-    clearTimeout(timer);
-    timer = setTimeout(async () => {
-      try {
-        const results = await photonSearch(qNorm);
-        renderResults(results);
-      } catch (e) {
-        if (e && e.name === 'AbortError') return;
-        renderMessage('Errore ricerca');
-        console.error(e);
-      }
-    }, DEBOUNCE_MS);
-  }
-
-  input.addEventListener('input', scheduleSearch);
-  input.addEventListener('focus', () => { if ((input.value || '').trim().length >= MIN_CHARS) scheduleSearch(); });
-  window.addEventListener('scroll', () => { if (dd.style.display === 'block') placeDropdown(); }, true);
-  window.addEventListener('resize', () => { if (dd.style.display === 'block') placeDropdown(); });
-
-  // chiusura dropdown
-  document.addEventListener('mousedown', (e) => {
-    if (e.target === input) return;
-    if (dd.contains(e.target)) return;
-    closeDropdown();
+  inputEl.addEventListener('input', () => {
+    clearTimeout(t);
+    t = setTimeout(run, 220);
   });
-
+  inputEl.addEventListener('focus', () => {
+    if (box.innerHTML.trim()) box.style.display = 'block';
+  });
+  inputEl.addEventListener('blur', () => {
+    setTimeout(() => closeSuggest(box), 180);
+  });
 }
 
   // Autofill indirizzo da condominio (Notizie / Immobili)
@@ -3335,6 +3074,7 @@ function setupAddressAutocomplete({ inputId, cityId, provId, capId }) {
 
   // Editing notizie
   function startEditNotizia(notId) {
+    openNotizieModal();
     const n = (notizie || []).find(x => x && x.id === notId);
     if (!n) return;
     const view = document.getElementById('view-immobili');
@@ -3537,7 +3277,7 @@ function setupAddressAutocomplete({ inputId, cityId, provId, capId }) {
         tr.appendChild(tdContatti);
         tr.appendChild(tdStats);
         tr.appendChild(tdActions);
-        tbody.appendChild(tr);
+        if (tbody) tbody.appendChild(tr);
       });
 
       wrap.appendChild(table);
@@ -3732,7 +3472,7 @@ function setupAddressAutocomplete({ inputId, cityId, provId, capId }) {
             renderOmi();
           }
         });
-        tbody.appendChild(tr);
+        if (tbody) tbody.appendChild(tr);
       });
     }
 
@@ -4567,7 +4307,8 @@ function applyCondominioAddressTo(prefix, condoName) {
       '',
       'Differenze rilevate:',
       ...diffs.map(d => `- ${pretty(d.field)}: "${d.from}" → "${d.to}"`)
-    ].join('\n');
+    ].join('
+');
 
     if (confirm(msg)) {
       diffs.forEach(d => {

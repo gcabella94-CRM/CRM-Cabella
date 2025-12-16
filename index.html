@@ -620,9 +620,8 @@
                   </div>
                 </form>
               </div>
-              </div>
 
-              <div class="table-wrap" id="not-table-wrap" style="margin-top:12px; display:none;">
+              <div class="table-wrap" style="margin-top:12px;">
                 <table>
                   <thead>
                   <tr>
@@ -662,39 +661,39 @@
               </div>
 
               <div class="card-body">
-                
-                <!-- Sottosezioni Notizie -->
-                <div class="notizie-subnav">
-                  <button type="button" class="btn btn-xs notizie-subtab active" data-sub="lista">Lista notizie</button>
-                  <button type="button" class="btn btn-xs notizie-subtab" data-sub="form">Inserisci / Modifica</button>
-                </div>
-
-                <!-- Filtri & ordinamento -->
-                <div class="notizie-toolbar">
-                  <div class="notizie-toolbar-left">
-                    <select id="not-filter-resp" class="select-sm">
-                      <option value="tutti">Tutti i responsabili</option>
-                    </select>
-                    <select id="not-sort" class="select-sm">
-                      <option value="inserimento_desc">Ultimo inserimento</option>
-                      <option value="ricontatto_asc">Data ricontatto (vicina)</option>
-                      <option value="ricontatto_desc">Data ricontatto (lontana)</option>
-                      <option value="etichetta_asc">Etichetta (A→Z)</option>
-                    </select>
-                    <input id="not-filter-label" class="input-sm" placeholder="Filtra per etichetta (testo)">
+                <!-- HOME NOTIZIE: vista card singola (scroll-snap) -->
+                <div id="notizie-home-wrap">
+                  <div class="notizie-toolbar">
+                    <div class="notizie-filters">
+                      <select id="not-filter-resp" class="input-sm">
+                        <option value="">Tutti i responsabili</option>
+                      </select>
+                      <select id="not-filter-label" class="input-sm">
+                        <option value="">Tutte le etichette</option>
+                      </select>
+                      <select id="not-filter-sort" class="input-sm">
+                        <option value="created_desc">Ultimo inserimento</option>
+                        <option value="recall_asc">Data ricontatto</option>
+                        <option value="label_asc">Etichetta</option>
+                      </select>
+                      <input id="not-filter-search" class="input-sm" type="text" placeholder="Cerca (indirizzo, proprietario, note...)">
+                    </div>
                   </div>
-                  <div class="notizie-toolbar-right">
-                    <input id="not-search" class="input-sm" placeholder="Cerca (indirizzo / nome / telefono)">
-                    <button type="button" class="btn btn-xs" id="not-filter-clear">Pulisci</button>
+
+                  <div id="not-cards-viewport" class="notizie-cards-viewport" aria-label="Lista notizie a card">
+                    <div id="not-cards-container" class="notizie-cards-container"></div>
                   </div>
                 </div>
 
-                <!-- Lista cards (scroll social) -->
-                <div id="notizie-cards" class="notizie-cards"></div>
+                <!-- MODALE: inserimento/modifica notizia -->
+                <div class="modal-overlay" id="notizie-modal-overlay">
+                  <div class="modal notizie-modal">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;">
+                      <div style="font-weight:700;">Scheda Notizia</div>
+                      <button type="button" class="btn btn-xs" id="not-modal-close">✕</button>
+                    </div>
 
-                <!-- Form inserimento/modifica -->
-                <div id="not-form-wrap" class="notizie-form-wrap">
-                  <form id="not-form">
+                <form id="not-form">
                     <input type="hidden" id="not-id" value="">
                   <div class="form-grid" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;">
 
@@ -798,7 +797,7 @@
                 </form>
               </div>
 
-              <div class="table-wrap" id="not-table-wrap" style="margin-top:12px; display:none;">
+              <div class="table-wrap" style="margin-top:12px;">
                 <table>
                   <thead>
                   <tr>
@@ -815,7 +814,10 @@
                   </thead>
                   <tbody id="not-table-body"></tbody>
                 </table>
-              </div>
+              
+                  </div>
+                </div>
+</div>
             </div>
           </section>
 
@@ -1403,7 +1405,7 @@
             
 
 
-<script src="crm-app.js"></script>
+<script src="crm-app_fixed.js"></script>
 
 
   <!-- ====== MODALE: NUOVO CONDOMINIO (nome + indirizzo) ====== -->
