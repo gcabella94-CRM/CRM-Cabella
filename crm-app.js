@@ -2660,228 +2660,71 @@ function closeSuggest(box) {
 }
 
 function setupAddressAutocomplete({ inputId, cityId, provId, capId }) {
-  // === Autocomplete indirizzo (FREE + performante) ===
-  // - Dropdown sempre visibile mentre scrivi
-  // - Compilazione SOLO su selezione
-  // - Photon (Komoot) + debounce + abort + cache
-  const input = document.getElementById(inputId);
-  if (!input) return;
+  const inputEl = document.getElementById(inputId);
+  if (!inputEl) return;
+  const box = ensureSuggestBox(inputEl);
+  const geocoder = getAddrGeocoder();
+  if (!box || !geocoder) return;
 
-  const cityEl = cityId ? document.getElementById(cityId) : null;
-  const provEl = provId ? document.getElementById(provId) : null;
-  const capEl  = capId  ? document.getElementById(capId)  : null;
+  let t = null;
+  let lastQ = '';
 
-  // evita doppio bind se la funzione viene richiamata più volte
-  if (input.__addrAutoBound) return;
-  input.__addrAutoBound = true;
+  const maybeSet = (el, val) => {
+    if (!el || !val) return;
+    const current = (el.value || '').trim();
+    if (!current) { el.value = val; return; }
+    if (current.toLowerCase() === val.toLowerCase()) return;
+    const ok = confirm(`Sovrascrivere "${current}" con "${val}"?`);
+    if (ok) el.value = val;
+  };
 
-  const MIN_CHARS = 3;
-  const DEBOUNCE_MS = 140;
-  const LIMIT = 7;
+  const applyParts = (parts) => {
+    // street va SEMPRE nel campo input (indirizzo)
+    if (parts.street) maybeSet(inputEl, parts.street);
+    if (cityId) maybeSet(document.getElementById(cityId), parts.citta);
+    if (provId) maybeSet(document.getElementById(provId), parts.provincia);
+    if (capId) maybeSet(document.getElementById(capId), parts.cap);
+  };
 
-  const cache = new Map(); // key -> results
-  let timer = null;
-  let controller = null;
-
-  // dropdown
-  const dd = document.createElement('div');
-  dd.className = 'address-autocomplete-dropdown';
-  dd.style.position = 'absolute';
-  dd.style.zIndex = 999999;
-  dd.style.display = 'none';
-  dd.style.minWidth = '260px';
-  dd.style.maxWidth = '520px';
-  dd.style.maxHeight = '260px';
-  dd.style.overflowY = 'auto';
-  dd.style.background = '#fff';
-  dd.style.border = '1px solid rgba(0,0,0,.18)';
-  dd.style.borderRadius = '10px';
-  dd.style.boxShadow = '0 10px 24px rgba(0,0,0,.16)';
-  dd.style.padding = '6px';
-  document.body.appendChild(dd);
-
-  function placeDropdown() {
-    const r = input.getBoundingClientRect();
-    dd.style.left = (window.scrollX + r.left) + 'px';
-    dd.style.top  = (window.scrollY + r.bottom + 6) + 'px';
-    dd.style.width = Math.max(r.width, 280) + 'px';
-  }
-
-  function openDropdown() {
-    placeDropdown();
-    dd.style.display = 'block';
-  }
-  function closeDropdown() {
-    dd.style.display = 'none';
-    dd.innerHTML = '';
-  }
-
-  function renderMessage(msg) {
-    dd.innerHTML = `<div style="padding:10px 10px; font-size:12px; opacity:.75;">${msg}</div>`;
-  }
-
-  function renderResults(results) {
-    dd.innerHTML = '';
-    if (!results || results.length === 0) {
-      renderMessage('Nessun risultato');
-      return;
-    }
-    results.forEach((item, idx) => {
-      const row = document.createElement('div');
-      row.style.padding = '10px';
-      row.style.borderRadius = '8px';
-      row.style.cursor = 'pointer';
-      row.addEventListener('mouseenter', () => row.style.background = 'rgba(0,0,0,.06)');
-      row.addEventListener('mouseleave', () => row.style.background = 'transparent');
-
-      const title = document.createElement('div');
-      title.style.fontSize = '13px';
-      title.style.fontWeight = '600';
-      title.textContent = item.label || item.name || '';
-      row.appendChild(title);
-
-      const sub = document.createElement('div');
-      sub.style.fontSize = '12px';
-      sub.style.opacity = '.75';
-      sub.textContent = item.meta || '';
-      row.appendChild(sub);
-
-      row.addEventListener('mousedown', (e) => {
-        // mousedown per non perdere il focus prima del click
-        e.preventDefault();
-
-        input.value = item.label || input.value;
-
-        if (capEl && item.cap) capEl.value = item.cap;
-        if (cityEl && item.city) cityEl.value = item.city;
-        if (provEl && item.prov) provEl.value = item.prov;
-
-        // prova anche a valorizzare lat/lon se esistono campi hidden standard
-        const latEl = document.getElementById(inputId + '-lat') || document.getElementById('lat') || null;
-        const lonEl = document.getElementById(inputId + '-lon') || document.getElementById('lng') || document.getElementById('lon') || null;
-        if (latEl && item.lat != null) latEl.value = item.lat;
-        if (lonEl && item.lon != null) lonEl.value = item.lon;
-
-        closeDropdown();
-        input.dispatchEvent(new Event('change', { bubbles: true }));
+  const renderOptions = (results) => {
+    box.innerHTML = '';
+    if (!results || !results.length) { closeSuggest(box); return; }
+    results.slice(0, 8).forEach((r) => {
+      const parts = extractPartsFromGeocodeResult(r);
+      const item = document.createElement('div');
+      item.className = 'addr-suggest__item';
+      item.innerHTML = `
+        <div class="addr-suggest__main">${escapeHtml(parts.street || parts.label || 'Risultato')}</div>
+        <div class="addr-suggest__sub">${escapeHtml([parts.cap, parts.citta, parts.provincia].filter(Boolean).join(' · '))}</div>
+      `;
+      item.addEventListener('mousedown', (ev) => {
+        ev.preventDefault();
+        applyParts(parts);
+        closeSuggest(box);
       });
-
-      dd.appendChild(row);
+      box.appendChild(item);
     });
-  }
+    box.style.display = 'block';
+  };
 
-  function norm(q) {
-    return (q || '').trim().toLowerCase().replace(/\s+/g, ' ');
-  }
+  const run = () => {
+    const q = (inputEl.value || '').trim();
+    if (q.length < 3) { closeSuggest(box); return; }
+    if (q === lastQ) return;
+    lastQ = q;
+    geocoder.geocode(q, (results) => renderOptions(results || []));
+  };
 
-  async function photonSearch(qRaw) {
-    const q = norm(qRaw);
-    if (q.length < MIN_CHARS) return [];
-    if (cache.has(q)) return cache.get(q);
-
-    if (controller) controller.abort();
-    controller = new AbortController();
-
-    const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=${LIMIT}`;
-    const res = await fetch(url, { signal: controller.signal, headers: { 'Accept': 'application/json' }});
-    if (!res.ok) return [];
-    const data = await res.json();
-
-    const out = (data.features || []).map(f => {
-      const p = f.properties || {};
-      const g = (f.geometry && f.geometry.coordinates) ? f.geometry.coordinates : [];
-      const name = (p.name || '').trim();
-      const street = (p.street || '').trim();
-      const housenumber = (p.housenumber || '').trim();
-      const postcode = (p.postcode || '').trim();
-      const city = (p.city || p.county || p.state || '').trim();
-      const prov = (p.state || '').trim(); // spesso non è la sigla, ma meglio di niente
-      const label = [street || name, housenumber, city].filter(Boolean).join(' ').trim();
-      const meta = [postcode, city, prov].filter(Boolean).join(' · ');
-      return { label, name, city, prov, cap: postcode, lat: g[1], lon: g[0], meta };
-    }).filter(x => x.label);
-
-    cache.set(q, out);
-    return out;
-  }
-
-
-  async function nominatimSearch(qRaw) {
-    const q = norm(qRaw);
-    if (q.length < MIN_CHARS) return [];
-    if (cache.has('n:'+q)) return cache.get('n:'+q);
-
-    // nota: Nominatim pubblico è più lento e con rate limit, usiamolo solo come fallback
-    const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=${LIMIT}&q=${encodeURIComponent(q)}`;
-    const res = await fetch(url, { headers: { 'Accept': 'application/json' }});
-    if (!res.ok) return [];
-    const data = await res.json();
-
-    const out = (data || []).map(item => {
-      const a = item.address || {};
-      const street = (a.road || a.pedestrian || a.cycleway || a.footway || a.path || '').trim();
-      const housenumber = (a.house_number || '').trim();
-      const postcode = (a.postcode || '').trim();
-      const city = (a.city || a.town || a.village || a.municipality || a.county || '').trim();
-      const prov = (a.state || a.province || '').trim();
-      const label = [street || item.display_name, housenumber, city].filter(Boolean).join(' ').trim();
-      const meta = [postcode, city, prov].filter(Boolean).join(' · ');
-      return {
-        label,
-        name: street || (item.display_name || ''),
-        city,
-        prov,
-        cap: postcode,
-        lat: item.lat ? parseFloat(item.lat) : null,
-        lon: item.lon ? parseFloat(item.lon) : null,
-        meta
-      };
-    }).filter(x => x.label);
-
-    cache.set('n:'+q, out);
-    return out;
-  }
-  // UI events
-  function scheduleSearch() {
-    const qRaw = input.value || '';
-    const qNorm = norm(qRaw);
-
-    openDropdown();
-
-    // Evita chiamate inutili (e 400) quando la query è troppo corta
-    if (qNorm.length < MIN_CHARS) {
-      clearTimeout(timer);
-      renderMessage(`Scrivi almeno ${MIN_CHARS} caratteri`);
-      return;
-    }
-
-    renderMessage('Ricerca…');
-
-    clearTimeout(timer);
-    timer = setTimeout(async () => {
-      try {
-        const results = await photonSearch(qNorm);
-        renderResults(results);
-      } catch (e) {
-        if (e && e.name === 'AbortError') return;
-        renderMessage('Errore ricerca');
-        console.error(e);
-      }
-    }, DEBOUNCE_MS);
-  }
-
-  input.addEventListener('input', scheduleSearch);
-  input.addEventListener('focus', () => { if ((input.value || '').trim().length >= MIN_CHARS) scheduleSearch(); });
-  window.addEventListener('scroll', () => { if (dd.style.display === 'block') placeDropdown(); }, true);
-  window.addEventListener('resize', () => { if (dd.style.display === 'block') placeDropdown(); });
-
-  // chiusura dropdown
-  document.addEventListener('mousedown', (e) => {
-    if (e.target === input) return;
-    if (dd.contains(e.target)) return;
-    closeDropdown();
+  inputEl.addEventListener('input', () => {
+    clearTimeout(t);
+    t = setTimeout(run, 220);
   });
-
+  inputEl.addEventListener('focus', () => {
+    if (box.innerHTML.trim()) box.style.display = 'block';
+  });
+  inputEl.addEventListener('blur', () => {
+    setTimeout(() => closeSuggest(box), 180);
+  });
 }
 
   // Autofill indirizzo da condominio (Notizie / Immobili)
@@ -4126,7 +3969,8 @@ function applyCondominioAddressTo(prefix, condoName) {
       '',
       'Differenze rilevate:',
       ...diffs.map(d => `- ${pretty(d.field)}: "${d.from}" → "${d.to}"`)
-    ].join('\n');
+    ].join('
+');
 
     if (confirm(msg)) {
       diffs.forEach(d => {
