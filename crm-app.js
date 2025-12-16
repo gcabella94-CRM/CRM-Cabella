@@ -868,7 +868,7 @@ function renderAgendaMonth() {
           tr.appendChild(td);
         }
 
-        if (tbody) tbody.appendChild(tr);
+        tbody.appendChild(tr);
       }
 
       table.appendChild(tbody);
@@ -933,7 +933,7 @@ function renderAgendaMonth() {
           <button class="btn btn-xs" data-imm-att="${imm.id || ''}" title="Crea attività collegata">➕ Attività</button>
         </td>
       `;
-      if (tbody) tbody.appendChild(tr);
+      tbody.appendChild(tr);
     });
   }
 
@@ -1040,12 +1040,9 @@ function renderAgendaMonth() {
   /* ====== NOTIZIE ====== */
 
   function renderNotizie() {
-    ensureNotizieFeedUI();
     const tbody = document.getElementById('not-table-body');
-    if (tbody) {
-      tbody.innerHTML = '';
-    }
-
+    if (!tbody) return;
+    tbody.innerHTML = '';
 
     (notizie || []).forEach(n => {
       const tr = document.createElement('tr');
@@ -1074,338 +1071,11 @@ function renderAgendaMonth() {
           <button class="btn btn-xs" data-not-imm="${n.id || ''}" title="Apri scheda inserimento immobile">🏠 Immobile</button>
         </td>
       `;
-      if (tbody) tbody.appendChild(tr);
-    });
-  
-    // Vista home a card
-    try { renderNotizieFeed(notizie || []); } catch (e) { console.warn('[NOTIZIE] feed render error', e); }
-}
-
-  
-  /* ====== NOTIZIE FEED (CARD SINGOLA + FILTRI) ====== */
-  let NOTIZIE_FEED_INITED = false;
-
-  function ensureNotizieFeedUI() {
-    if (NOTIZIE_FEED_INITED) return;
-    NOTIZIE_FEED_INITED = true;
-
-    const selResp = document.getElementById('not-filter-resp');
-    const selLabel = document.getElementById('not-filter-label');
-    const selSort = document.getElementById('not-filter-sort');
-    const qInput = document.getElementById('not-filter-search');
-
-    const overlay = document.getElementById('notizie-modal-overlay');
-    const closeBtn = document.getElementById('not-modal-close');
-
-    if (closeBtn && overlay) {
-      closeBtn.addEventListener('click', () => { overlay.style.display = 'none'; });
-    }
-    if (overlay) {
-      overlay.addEventListener('click', (e) => {
-        if (e.target === overlay) overlay.style.display = 'none';
-      });
-    }
-
-    const onChange = () => renderNotizie();
-    selResp?.addEventListener('change', onChange);
-    selLabel?.addEventListener('change', onChange);
-    selSort?.addEventListener('change', onChange);
-    qInput?.addEventListener('input', () => {
-      // debounce leggero
-      clearTimeout(window.__notizieQTimer);
-      window.__notizieQTimer = setTimeout(onChange, 120);
-    });
-
-    // Delegation card actions
-    const container = document.getElementById('not-cards-container');
-    if (container) {
-      container.addEventListener('click', (e) => {
-        const t = e.target;
-
-        const toggle = t.closest('[data-not-toggle]');
-        if (toggle) {
-          const id = toggle.getAttribute('data-not-toggle');
-          const box = container.querySelector('[data-not-last="'+id+'"]');
-          if (box) box.classList.toggle('expanded');
-          return;
-        }
-
-        const editBtn = t.closest('[data-not-edit]');
-        if (editBtn) {
-          const id = editBtn.getAttribute('data-not-edit');
-          if (id) startEditNotizia(id);
-          return;
-        }
-
-        const saveBtn = t.closest('[data-not-save]');
-        if (saveBtn) {
-          const id = saveBtn.getAttribute('data-not-save');
-          if (id) saveNotiziaFromCard(id);
-          return;
-        }
-
-        const agendaBtn = t.closest('[data-not-agenda]');
-        if (agendaBtn) {
-          const id = agendaBtn.getAttribute('data-not-agenda');
-          if (id) createRicontattoInAgenda(id);
-          return;
-        }
-      });
-
-      container.addEventListener('change', (e) => {
-        const el = e.target;
-        const id = el?.getAttribute?.('data-not-id') || el?.dataset?.notId;
-        if (!id) return;
-
-        if (el.matches('[data-not-noanswer]')) {
-          updateNotiziaPartial(id, { nonRisponde: !!el.checked });
-        }
-        if (el.matches('[data-not-recall]')) {
-          updateNotiziaPartial(id, { ricontattoAt: el.value || '' });
-        }
-      });
-    }
-  }
-
-  function openNotizieModal() {
-    const overlay = document.getElementById('notizie-modal-overlay');
-    if (overlay) overlay.style.display = 'flex';
-  }
-
-  function updateNotiziaPartial(id, patch) {
-    const ix = (notizie || []).findIndex(n => n && n.id === id);
-    if (ix < 0) return;
-    const prev = notizie[ix] || {};
-    notizie[ix] = { ...prev, ...patch, updatedAt: new Date().toISOString() };
-    saveList(STORAGE_KEYS.notizie, notizie);
-    // rerender (mantiene feed aggiornato)
-    renderNotizie();
-  }
-
-  function saveNotiziaFromCard(id) {
-    const container = document.getElementById('not-cards-container');
-    if (!container) return;
-    const card = container.querySelector('.notizia-card[data-id="'+id+'"]');
-    if (!card) return;
-
-    const last = card.querySelector('[data-not-lastcomment]');
-    const label = card.querySelector('[data-not-label]');
-    const note = (last && last.value != null) ? last.value : '';
-
-    updateNotiziaPartial(id, {
-      ultimaInterazione: note,
-      etichetta: label ? (label.value || '') : (undefined)
+      tbody.appendChild(tr);
     });
   }
 
-  function createRicontattoInAgenda(notiziaId) {
-    const n = (notizie || []).find(x => x && x.id === notiziaId);
-    if (!n) return;
-
-    const when = n.ricontattoAt || '';
-    if (!when) {
-      alert('Imposta una data di ricontatto prima di inviare in agenda.');
-      return;
-    }
-    const d = new Date(when);
-    if (isNaN(d)) {
-      alert('Data ricontatto non valida.');
-      return;
-    }
-
-    const pad = (x) => String(x).padStart(2,'0');
-    const dateIso = d.toISOString().slice(0,10);
-    const startMins = d.getHours()*60 + d.getMinutes();
-    const endMins = startMins + 15;
-
-    const fmt = (mins) => {
-      const h = Math.floor(mins/60);
-      const m = mins%60;
-      return pad(h)+':'+pad(m);
-    };
-
-    const staffId = n.responsabileId || ((staff[0] && staff[0].id) || '');
-    const nomeProp = ((n.nome||'')+' '+(n.cognome||'')).trim() || 'Proprietario';
-    const titleAddr = (n.indirizzo || '').trim() || 'Indirizzo';
-    const descr = `Ricontatto: ${nomeProp} · ${titleAddr} · ${n.telefono||''}`;
-
-    // cerca se esiste già un ricontatto per questa notizia
-    const existingIx = (attivita || []).findIndex(a => a && a.tipo==='appuntamento' && a.linkedNotiziaId === notiziaId && a.tipoDettaglio === 'ricontatto');
-    const app = {
-      id: (existingIx>=0 ? attivita[existingIx].id : genId('app')),
-      data: dateIso,
-      ora: fmt(startMins),
-      oraFine: fmt(endMins),
-      tipo: 'appuntamento',
-      tipoDettaglio: 'ricontatto',
-      descrizione: descr,
-      responsabileId: staffId,
-      clienteId: '',
-      stato: 'aperta',
-      linkedNotiziaId: notiziaId
-    };
-
-    if (existingIx>=0) attivita[existingIx] = { ...attivita[existingIx], ...app };
-    else attivita.push(app);
-
-    saveList(STORAGE_KEYS.attivita, attivita);
-    try { renderAttivita(); } catch {}
-    try { renderAgendaWeek(); } catch {}
-    try { renderAgendaMonth(); } catch {}
-
-    alert('Ricontatto inserito in agenda (15 min).');
-  }
-
-  function getNotizieFilteredSorted(list) {
-    const selResp = document.getElementById('not-filter-resp');
-    const selLabel = document.getElementById('not-filter-label');
-    const selSort = document.getElementById('not-filter-sort');
-    const qInput = document.getElementById('not-filter-search');
-
-    const resp = selResp ? selResp.value : '';
-    const lab = selLabel ? selLabel.value : '';
-    const q = (qInput ? qInput.value : '').trim().toLowerCase();
-    const sort = selSort ? selSort.value : 'created_desc';
-
-    let out = (list || []).slice();
-
-    if (resp) out = out.filter(n => (n.responsabileId || '') === resp);
-
-    if (lab) {
-      out = out.filter(n => ((n.etichetta || n.label || '')+'').trim().toLowerCase() === lab.toLowerCase());
-    }
-
-    if (q) {
-      out = out.filter(n => {
-        const blob = [
-          n.indirizzo, n.citta, n.provincia, n.tipologia, n.mq,
-          n.nome, n.cognome, n.telefono, n.email,
-          n.note, n.ultimaInterazione, n.etichetta
-        ].filter(Boolean).join(' ').toLowerCase();
-        return blob.includes(q);
-      });
-    }
-
-    const getCreated = (n) => {
-      const v = n.createdAt || n.dataInserimento || n.date || '';
-      const d = new Date(v);
-      return isNaN(d) ? 0 : d.getTime();
-    };
-    const getRecall = (n) => {
-      const d = new Date(n.ricontattoAt || '');
-      return isNaN(d) ? Infinity : d.getTime();
-    };
-    const getLabel = (n) => ((n.etichetta || n.label || '')+'').toLowerCase();
-
-    if (sort === 'created_desc') out.sort((a,b)=>getCreated(b)-getCreated(a));
-    else if (sort === 'recall_asc') out.sort((a,b)=>getRecall(a)-getRecall(b));
-    else if (sort === 'label_asc') out.sort((a,b)=>getLabel(a).localeCompare(getLabel(b)));
-
-    return out;
-  }
-
-  function renderNotizieFeed(list) {
-    const container = document.getElementById('not-cards-container');
-    if (!container) return;
-
-    // populate filters options
-    const selResp = document.getElementById('not-filter-resp');
-    if (selResp) {
-      const current = selResp.value;
-      selResp.innerHTML = '<option value="">Tutti i responsabili</option>' + (staff||[]).map(s => (
-        `<option value="${s.id}">${escapeHtml(s.nome||s.nomeCompleto||'Staff')}</option>`
-      )).join('');
-      selResp.value = current;
-    }
-
-    const labels = Array.from(new Set((notizie||[]).map(n => (n.etichetta || n.label || '')).filter(x => (x||'').trim()))).sort((a,b)=>a.localeCompare(b));
-    const selLabel = document.getElementById('not-filter-label');
-    if (selLabel) {
-      const current = selLabel.value;
-      selLabel.innerHTML = '<option value="">Tutte le etichette</option>' + labels.map(l => `<option value="${escapeHtml(l)}">${escapeHtml(l)}</option>`).join('');
-      selLabel.value = current;
-    }
-
-    const data = getNotizieFilteredSorted(list);
-
-    container.innerHTML = data.map(n => {
-      const id = n.id || '';
-      const nomeProp = escapeHtml((((n.nome||'')+' '+(n.cognome||'')).trim()) || '—');
-      const tel = escapeHtml(n.telefono || '—');
-      const addr = escapeHtml(n.indirizzo || '—');
-      const tip = escapeHtml(n.tipologia || '—');
-      const mq = (n.mq != null && n.mq !== '') ? escapeHtml(String(n.mq)) : '—';
-      const citta = escapeHtml(n.citta || '');
-      const prov = escapeHtml(n.provincia || '');
-      const staffObj = (staff||[]).find(s => s.id === n.responsabileId);
-      const respName = escapeHtml(staffObj ? (staffObj.nome || staffObj.nomeCompleto || 'Staff') : '—');
-      const last = escapeHtml(n.ultimaInterazione || n.note || '');
-      const et = escapeHtml(n.etichetta || n.label || '');
-      const nonRisponde = !!n.nonRisponde;
-      const recall = escapeHtml(n.ricontattoAt || '');
-
-      return `
-      <div class="notizia-card" data-id="${id}">
-        <div class="notizia-card-inner">
-          <div>
-            <div class="notizia-title">${addr}${citta ? ' · '+citta : ''}${prov ? ' ('+prov+')' : ''}</div>
-            <div class="notizia-meta">
-              <span class="notizia-pill">🏷️ ${tip}</span>
-              <span class="notizia-pill">📐 ${mq} mq</span>
-              ${et ? `<span class="notizia-pill">🧷 ${et}</span>` : ``}
-            </div>
-
-            <div class="notizia-field">
-              <label>Ultima interazione (preview)</label>
-              <div class="notizia-lastnote" data-not-last="${id}">${last || '<span class="notizia-muted">Nessuna nota</span>'}</div>
-              <div class="notizia-row">
-                <span class="notizia-muted">${n.updatedAt ? ('Aggiornata: '+formatDateTimeIT(n.updatedAt)) : ''}</span>
-                <button type="button" class="btn btn-xs" data-not-toggle="${id}">Espandi/Comprimi</button>
-              </div>
-            </div>
-
-            <div class="notizia-field">
-              <label>Commento ultima interazione (modifica rapida)</label>
-              <textarea rows="2" data-not-lastcomment data-not-id="${id}" placeholder="Scrivi cosa vi siete detti...">${escapeHtml(n.ultimaInterazione || '')}</textarea>
-            </div>
-          </div>
-
-          <div class="notizia-right">
-            <div class="notizia-meta">
-              <span class="notizia-pill">👤 ${nomeProp}</span>
-              <span class="notizia-pill">📞 ${tel}</span>
-              <span class="notizia-pill">🧑‍💼 ${respName}</span>
-            </div>
-
-            <div class="notizia-row" style="margin-top:10px;">
-              <label class="notizia-checkbox">
-                <input type="checkbox" data-not-noanswer data-not-id="${id}" ${nonRisponde ? 'checked' : ''}>
-                Non risponde
-              </label>
-            </div>
-
-            <div class="notizia-field">
-              <label>Etichetta</label>
-              <input type="text" data-not-label data-not-id="${id}" placeholder="Es. caldo / freddo / hotel..." value="${et}">
-            </div>
-
-            <div class="notizia-field">
-              <label>Data ricontatto (15 min)</label>
-              <input type="datetime-local" data-not-recall data-not-id="${id}" value="${recall}">
-              <div class="notizia-muted" style="margin-top:6px;">Clic su “Agenda” crea/aggiorna un ricontatto da 15 minuti.</div>
-            </div>
-
-            <div class="notizia-actions">
-              <button type="button" class="btn btn-sm" data-not-save="${id}">Salva</button>
-              <button type="button" class="btn btn-sm" data-not-agenda="${id}">📅 Agenda</button>
-              <button type="button" class="btn btn-sm" data-not-edit="${id}">Apri scheda</button>
-            </div>
-          </div>
-        </div>
-      </div>`;
-    }).join('');
-  }
-function resetNotizieForm() {
+  function resetNotizieForm() {
     const form = document.getElementById('not-form');
     if (!form) return;
     form.reset();
@@ -1681,16 +1351,9 @@ function resetNotizieForm() {
 
       const existingId = (document.getElementById('not-id')?.value || '').trim();
 
-      const nowIso = new Date().toISOString();
       const notizia = {
         id: existingId || genId('not'),
-        createdAt: (existingId ? ((notizie.find(x=>x && x.id===existingId)||{}).createdAt || nowIso) : nowIso),
-        updatedAt: nowIso,
-        ultimaInterazione: (existingId ? ((notizie.find(x=>x && x.id===existingId)||{}).ultimaInterazione||'') : ''),
-        nonRisponde: (existingId ? !!((notizie.find(x=>x && x.id===existingId)||{}).nonRisponde) : false),
-        ricontattoAt: (existingId ? (((notizie.find(x=>x && x.id===existingId)||{}).ricontattoAt)||'') : ''),
-        etichetta: (existingId ? (((notizie.find(x=>x && x.id===existingId)||{}).etichetta)||'') : ''),
-nome: nome,
+        nome: nome,
         cognome: cognome,
         telefono: telefono,
         email: email,
@@ -2707,7 +2370,7 @@ function closeAppuntamentoDialog() {
         td.className = 'muted';
         td.textContent = 'Nessuna operazione conclusa.';
         tr.appendChild(td);
-        if (tbody) tbody.appendChild(tr);
+        tbody.appendChild(tr);
         return;
       }
 
@@ -2724,7 +2387,7 @@ function closeAppuntamentoDialog() {
           <td>${valore ? formatEuro(valore) : ''}</td>
           <td>${provv ? formatEuro(provv) : ''}</td>
         `;
-        if (tbody) tbody.appendChild(tr);
+        tbody.appendChild(tr);
       });
     }
 
@@ -3074,7 +2737,6 @@ function setupAddressAutocomplete({ inputId, cityId, provId, capId }) {
 
   // Editing notizie
   function startEditNotizia(notId) {
-    openNotizieModal();
     const n = (notizie || []).find(x => x && x.id === notId);
     if (!n) return;
     const view = document.getElementById('view-immobili');
@@ -3277,7 +2939,7 @@ function setupAddressAutocomplete({ inputId, cityId, provId, capId }) {
         tr.appendChild(tdContatti);
         tr.appendChild(tdStats);
         tr.appendChild(tdActions);
-        if (tbody) tbody.appendChild(tr);
+        tbody.appendChild(tr);
       });
 
       wrap.appendChild(table);
@@ -3472,7 +3134,7 @@ function setupAddressAutocomplete({ inputId, cityId, provId, capId }) {
             renderOmi();
           }
         });
-        if (tbody) tbody.appendChild(tr);
+        tbody.appendChild(tr);
       });
     }
 
@@ -4307,8 +3969,7 @@ function applyCondominioAddressTo(prefix, condoName) {
       '',
       'Differenze rilevate:',
       ...diffs.map(d => `- ${pretty(d.field)}: "${d.from}" → "${d.to}"`)
-    ].join('
-');
+    ].join('\n');
 
     if (confirm(msg)) {
       diffs.forEach(d => {
