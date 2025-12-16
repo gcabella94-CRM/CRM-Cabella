@@ -1090,4 +1090,30 @@
 .leaflet-control-geocoder-alternatives::-webkit-scrollbar{ width:10px; }
 .leaflet-control-geocoder-alternatives::-webkit-scrollbar-thumb{ background:#334155; border-radius:8px; }
 .leaflet-control-geocoder-alternatives::-webkit-scrollbar-track{ background:#0b1220; }
+/* =====================================================
+   FIX LEGGIBILITÀ TESTO – TENDINA RICERCA INDIRIZZI
+   (sfondo invariato)
+   ===================================================== */
+
+/* Testo principale (Via + civico) */
+.leaflet-control-geocoder-alternatives li a {
+  color: #1f2937 !important;      /* grigio scuro */
+  font-weight: 600 !important;
+}
+
+/* Testo secondario (CAP · città · provincia · regione) */
+.leaflet-control-geocoder-alternatives li a span {
+  color: #4b5563 !important;      /* grigio medio */
+  font-weight: 400 !important;
+}
+
+/* Hover: aumenta contrasto ma resta su fondo chiaro */
+.leaflet-control-geocoder-alternatives li a:hover {
+  background-color: #e5e7eb !important;  /* grigio chiaro */
+  color: #111827 !important;
+}
+
+.leaflet-control-geocoder-alternatives li a:hover span {
+  color: #374151 !important;
+}
 
