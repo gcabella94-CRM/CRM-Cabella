@@ -1563,3 +1563,15 @@
 .address-autocomplete-dropdown .item:hover,.address-autocomplete-dropdown > div:hover{background:#e5e7eb !important;}
 
 .address-autocomplete-dropdown, .address-autocomplete-dropdown *{color:#111827 !important; opacity:1 !important;}
+
+
+/* === PATCH: testo scuro nella tendina indirizzi (autocomplete custom) === */
+.address-autocomplete-dropdown,
+.address-autocomplete-dropdown * {
+  color: #111827 !important;
+  opacity: 1 !important;
+}
+.address-autocomplete-dropdown .address-item-sub,
+.address-autocomplete-dropdown small {
+  color: #374151 !important;
+}

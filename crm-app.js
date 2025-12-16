@@ -113,7 +113,7 @@
         attivita: ['Attività', 'Task e appuntamenti.'],
         operazioni: ['Operazioni concluse', 'Operazioni da immobili venduti/affittati.'],
         staff: ['Staff', 'Colori agenda e carichi.'],
-        omi: ['Valori OMI', 'Range €/mq per zona.'],
+        omi: ['Valori OMI', 'Range EUR/mq per zona.'],
         mappa: ['Mappa', 'Immobili e notizie sulla mappa.']
       };
 
@@ -216,9 +216,9 @@
             btn.innerHTML = `
               <span style="display:flex;align-items:center;gap:4px;">
                 ${colorDot}
-                <span>${ora || '—'} · ${a.tipoDettaglio || a.tipo || 'Appuntamento'}</span>
+                <span>${ora || '-'} * ${a.tipoDettaglio || a.tipo || 'Appuntamento'}</span>
               </span>
-              <span style="font-size:10px;opacity:0.7;">Apri scheda appuntamento ›</span>
+              <span style="font-size:10px;opacity:0.7;">Apri scheda appuntamento ></span>
             `;
             btn.addEventListener('click', () => {
               openAppuntamentoDialogById(a.id);
@@ -307,7 +307,7 @@
         row.style.width = '100%';
         row.style.justifyContent = 'space-between';
         row.style.marginBottom = '2px';
-        const left = `${a.ora || '—'} · ${a.tipoDettaglio || a.tipo || 'Attività'}`;
+        const left = `${a.ora || '-'} * ${a.tipoDettaglio || a.tipo || 'Attività'}`;
         const right = a.stato === 'chiusa' ? 'Chiusa' : 'Aperta';
         row.innerHTML = `<span>${left}</span><span style="font-size:10px;opacity:0.7;">${right}</span>`;
         row.addEventListener('click', () => setView('attivita'));
@@ -331,7 +331,7 @@
 
       const label = document.createElement('div');
       label.className = 'metric-label';
-      label.textContent = `Oggi · ${today.toLocaleDateString('it-IT')}`;
+      label.textContent = `Oggi * ${today.toLocaleDateString('it-IT')}`;
 
       const main = document.createElement('div');
       main.className = 'metric-value';
@@ -391,7 +391,7 @@
       const weekStart = agendaWeekAnchor;
       const weekEnd = addDays(weekStart, 6);
       if (labelEl) {
-        labelEl.textContent = `Settimana ${weekStart.toLocaleDateString('it-IT')} – ${weekEnd.toLocaleDateString('it-IT')}`;
+        labelEl.textContent = `Settimana ${weekStart.toLocaleDateString('it-IT')} - ${weekEnd.toLocaleDateString('it-IT')}`;
       }
 
       grid.innerHTML = '';
@@ -579,7 +579,7 @@
           const cell = firstCell;
           cell.classList.add('agenda-slot-app-start');
 
-          const rangeLabel = `${a.ora || ''}${a.oraFine ? '–' + a.oraFine : ''}`.trim();
+          const rangeLabel = `${a.ora || ''}${a.oraFine ? '-' + a.oraFine : ''}`.trim();
           const tipologia = (a.tipoDettaglio || a.tipo || '').toString();
 
           // luogo
@@ -594,13 +594,13 @@
           const respObj = a.responsabileId ? staffMap[a.responsabileId] : null;
           const respLabel = respObj && respObj.nome ? respObj.nome : '';
 
-          // componi testo: ora · luogo · responsabile
+          // componi testo: ora * luogo * responsabile
           const parts = [];
           if (rangeLabel) parts.push(rangeLabel);
           if (luogoLabel) parts.push(luogoLabel);
           if (respLabel) parts.push(respLabel);
 
-          let text = parts.join(' · ');
+          let text = parts.join(' * ');
           if (!text) {
             text = `${rangeLabel} ${tipologia}`.trim();
           }
@@ -624,7 +624,7 @@
           // contenuto testo + icona fiamma se bollente
           let labelText = text;
           if (a.bollente) {
-            labelText = '🔥 ' + labelText;
+            labelText = ' ' + labelText;
             block.classList.add('agenda-block-hot');
           }
           block.textContent = labelText;
@@ -913,7 +913,7 @@ function renderAgendaMonth() {
     (immobili || []).forEach(imm => {
       const tr = document.createElement('tr');
       const staffObj = staff.find(s => s.id === imm.responsabileId);
-      const caldoLabel = imm.caldo ? '🔥' : '';  
+      const caldoLabel = imm.caldo ? '' : '';  
       tr.dataset.phone = imm.proprietarioTelefono || '';
       tr.dataset.email = imm.proprietarioEmail || '';
       if ((imm.condominio || '').trim()) tr.classList.add('in-condominio-immobile');
@@ -1048,16 +1048,16 @@ function renderAgendaMonth() {
       const tr = document.createElement('tr');
       const staffObj = staff.find(s => s.id === n.responsabileId);
       const nomeCompleto = ((n.nome || '') + ' ' + (n.cognome || '')).trim();
-      const caldoLabel = n.caldo ? '🔥' : '';
+      const caldoLabel = n.caldo ? '' : '';
       const indirizzoCompleto = [n.indirizzo || '', n.citta || ''].filter(Boolean).join(' - ');
       const condoName = (n.condominio || '').trim();
       if (condoName) tr.classList.add('in-condominio-notizia');
-      const condoBadge = condoName ? ` <span class="badge-condominio badge-condominio--notizia">🏢 ${escapeHtml(condoName)}</span>` : '';
+      const condoBadge = condoName ? ` <span class="badge-condominio badge-condominio--notizia"> ${escapeHtml(condoName)}</span>` : '';
       tr.dataset.phone = n.telefono || '';
       tr.dataset.email = n.email || '';
 
       tr.innerHTML = `
-        <td>${nomeCompleto || '—'}</td>
+        <td>${nomeCompleto || '-'}</td>
         <td>${n.telefono || ''}</td>
         <td>${escapeHtml(indirizzoCompleto)}${condoBadge}</td>
         <td>${n.tipologia || ''}</td>
@@ -1068,7 +1068,7 @@ function renderAgendaMonth() {
         <td>
           <button class="btn btn-xs" data-not-edit="${n.id || ''}" title="Modifica notizia">✏️ Modifica</button>
           <button class="btn btn-xs" data-not-att="${n.id || ''}" title="Crea attività collegata">➕ Attività</button>
-          <button class="btn btn-xs" data-not-imm="${n.id || ''}" title="Apri scheda inserimento immobile">🏠 Immobile</button>
+          <button class="btn btn-xs" data-not-imm="${n.id || ''}" title="Apri scheda inserimento immobile"> Immobile</button>
         </td>
       `;
       tbody.appendChild(tr);
@@ -1515,7 +1515,7 @@ function renderRubrica() {
   const altroCount = all.filter(c => c && c.isAltro).length;
   const counterEl = document.getElementById('rubrica-counter');
   if (counterEl) {
-    counterEl.textContent = `Contatti totali: ${totalCount} · Acquirenti: ${acqCount} · Venditori: ${vendCount} · Collaboratori: ${collCount} · Altro: ${altroCount}`;
+    counterEl.textContent = `Contatti totali: ${totalCount} * Acquirenti: ${acqCount} * Venditori: ${vendCount} * Collaboratori: ${collCount} * Altro: ${altroCount}`;
   }
 
   let groups = groupRubrica(all).filter(g =>
@@ -1536,15 +1536,15 @@ function renderRubrica() {
   }
 
   list.innerHTML = groups.map(g => {
-    const last = g.ultimoContatto ? formatDateTimeIT(g.ultimoContatto) : '—';
+    const last = g.ultimoContatto ? formatDateTimeIT(g.ultimoContatto) : '-';
     const eventi = g.eventi || [];
     const logHtml = eventi.length
       ? eventi.map(ev => {
           const when = formatDateTimeIT(ev.data);
           const tipo = escapeHtml(ev.tipo || 'evento');
-          const nota = ev.nota ? ' – ' + escapeHtml(ev.nota) : '';
+          const nota = ev.nota ? ' - ' + escapeHtml(ev.nota) : '';
           return `<div style="font-size:11px; margin-bottom:2px;">
-                    <span class="muted">${when}</span> · <strong>${tipo}</strong>${nota}
+                    <span class="muted">${when}</span> * <strong>${tipo}</strong>${nota}
                   </div>`;
         }).join('')
       : `<div class="muted" style="font-size:11px;">Nessun evento registrato.</div>`;
@@ -1575,7 +1575,7 @@ function renderRubrica() {
           </div>
           <div class="rubrica-actions">
             <button class="btn btn-xs" data-edit="${g.key}" title="Modifica nome">✏️</button>
-            <button class="btn btn-xs" data-touch="${g.key}" title="Segna contatto effettuato">📌</button>
+            <button class="btn btn-xs" data-touch="${g.key}" title="Segna contatto effettuato"></button>
             <button class="btn btn-xs" data-delete="${g.key}" title="Elimina contatto">🗑️</button>
           </div>
         </div>
@@ -1933,7 +1933,7 @@ document.getElementById('rubrica-form')?.addEventListener('submit', e => {
         respSel.innerHTML = '';
         const optNone = document.createElement('option');
         optNone.value = '';
-        optNone.textContent = '— Nessun responsabile —';
+        optNone.textContent = '- Nessun responsabile -';
         respSel.appendChild(optNone);
 
         (staff || []).forEach(s => {
@@ -1951,7 +1951,7 @@ document.getElementById('rubrica-form')?.addEventListener('submit', e => {
         cliSel.innerHTML = '';
         const optNoneC = document.createElement('option');
         optNoneC.value = '';
-        optNoneC.textContent = '— Nessun cliente collegato —';
+        optNoneC.textContent = '- Nessun cliente collegato -';
         cliSel.appendChild(optNoneC);
 
         (contatti || []).forEach(c => {
@@ -1961,7 +1961,7 @@ document.getElementById('rubrica-form')?.addEventListener('submit', e => {
           const parts = [];
           if (c.nome) parts.push(c.nome);
           if (c.telefono) parts.push(c.telefono);
-          o.textContent = parts.join(' · ') || c.id;
+          o.textContent = parts.join(' * ') || c.id;
           cliSel.appendChild(o);
         });
 
@@ -1973,7 +1973,7 @@ document.getElementById('rubrica-form')?.addEventListener('submit', e => {
         immSel.innerHTML = '';
         const optNoneI = document.createElement('option');
         optNoneI.value = '';
-        optNoneI.textContent = '— Nessun immobile collegato —';
+        optNoneI.textContent = '- Nessun immobile collegato -';
         immSel.appendChild(optNoneI);
 
         (immobili || []).forEach(imm => {
@@ -1983,7 +1983,7 @@ document.getElementById('rubrica-form')?.addEventListener('submit', e => {
           const parts = [];
           if (imm.rif) parts.push(imm.rif);
           if (imm.indirizzo) parts.push(imm.indirizzo);
-          o.textContent = parts.join(' · ') || imm.id;
+          o.textContent = parts.join(' * ') || imm.id;
           immSel.appendChild(o);
         });
 
@@ -1998,7 +1998,7 @@ document.getElementById('rubrica-form')?.addEventListener('submit', e => {
         notSel.innerHTML = '';
         const optNoneN = document.createElement('option');
         optNoneN.value = '';
-        optNoneN.textContent = '— Nessuna notizia collegata —';
+        optNoneN.textContent = '- Nessuna notizia collegata -';
         notSel.appendChild(optNoneN);
 
         (notizie || []).forEach(n => {
@@ -2009,7 +2009,7 @@ document.getElementById('rubrica-form')?.addEventListener('submit', e => {
           if (n.nome) parts.push(n.nome);
           if (n.cognome) parts.push(n.cognome);
           if (n.indirizzo) parts.push(n.indirizzo);
-          o.textContent = parts.join(' · ') || n.id;
+          o.textContent = parts.join(' * ') || n.id;
           notSel.appendChild(o);
         });
 
@@ -2188,7 +2188,7 @@ function closeAppuntamentoDialog() {
             <td>${statoLabel}</td>
             <td>
               ${meta.baseStatus !== 'chiusa'
-                ? `<button class="btn btn-xs" data-att-done="${a.id}" title="Segna chiusa">✅</button>`
+                ? `<button class="btn btn-xs" data-att-done="${a.id}" title="Segna chiusa"></button>`
                 : ''
               }
               <button class="btn btn-xs" data-att-delete="${a.id}" title="Elimina">🗑️</button>
@@ -2439,8 +2439,8 @@ function closeAppuntamentoDialog() {
       }
 
       addMetric('Operazioni concluse', String(ops.length));
-      addMetric('Provvigioni totali', totaleProvv ? formatEuro(totaleProvv) : '—');
-      addMetric('Contanti / Tracciato', (totaleContanti ? formatEuro(totaleContanti) : '—') + ' · ' + (totaleTracciato ? formatEuro(totaleTracciato) : '—'));
+      addMetric('Provvigioni totali', totaleProvv ? formatEuro(totaleProvv) : '-');
+      addMetric('Contanti / Tracciato', (totaleContanti ? formatEuro(totaleContanti) : '-') + ' * ' + (totaleTracciato ? formatEuro(totaleTracciato) : '-'));
 
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
@@ -2797,7 +2797,7 @@ function setupAddressAutocomplete({ inputId, cityId, provId, capId }) {
       const city = (p.city || p.county || p.state || '').trim();
       const prov = (p.state || '').trim(); // spesso non è la sigla, ma meglio di niente
       const label = [street || name, housenumber, city].filter(Boolean).join(' ').trim();
-      const meta = [postcode, city, prov].filter(Boolean).join(' · ');
+      const meta = [postcode, city, prov].filter(Boolean).join(' * ');
       return { label, name, city, prov, cap: postcode, lat: g[1], lon: g[0], meta };
     }).filter(x => x.label);
 
@@ -2825,7 +2825,7 @@ function setupAddressAutocomplete({ inputId, cityId, provId, capId }) {
       const city = (a.city || a.town || a.village || a.municipality || a.county || '').trim();
       const prov = (a.state || a.province || '').trim();
       const label = [street || item.display_name, housenumber, city].filter(Boolean).join(' ').trim();
-      const meta = [postcode, city, prov].filter(Boolean).join(' · ');
+      const meta = [postcode, city, prov].filter(Boolean).join(' * ');
       return {
         label,
         name: street || (item.display_name || ''),
@@ -2855,7 +2855,7 @@ function setupAddressAutocomplete({ inputId, cityId, provId, capId }) {
       return;
     }
 
-    renderMessage('Ricerca…');
+    renderMessage('Ricerca...');
 
     clearTimeout(timer);
     timer = setTimeout(async () => {
@@ -3039,7 +3039,7 @@ function setupAddressAutocomplete({ inputId, cityId, provId, capId }) {
         const parts = [];
         if (m.telefono) parts.push('📞 ' + m.telefono);
         if (m.email) parts.push('✉️ ' + m.email);
-        tdContatti.textContent = parts.join(' · ');
+        tdContatti.textContent = parts.join(' * ');
 
         const tdStats = document.createElement('td');
         tdStats.innerHTML = `
@@ -3048,13 +3048,13 @@ function setupAddressAutocomplete({ inputId, cityId, provId, capId }) {
               🔎 Notizie: <strong>${stats.notizie}</strong>
             </button>
             <button class="btn btn-ghost btn-sm" data-staff="${m.id}" data-tipo="immobili" style="justify-content:flex-start;padding:2px 4px;">
-              🏠 Immobili: <strong>${stats.immobili}</strong>
+               Immobili: <strong>${stats.immobili}</strong>
             </button>
             <button class="btn btn-ghost btn-sm" data-staff="${m.id}" data-tipo="attivita" style="justify-content:flex-start;padding:2px 4px;">
-              ✅ Attività: <strong>${stats.attivita}</strong>
+               Attività: <strong>${stats.attivita}</strong>
             </button>
             <button class="btn btn-ghost btn-sm" data-staff="${m.id}" data-tipo="appuntamenti" style="justify-content:flex-start;padding:2px 4px;">
-              📅 Appuntamenti: <strong>${stats.appuntamenti}</strong>
+               Appuntamenti: <strong>${stats.appuntamenti}</strong>
             </button>
           </div>
         `;
@@ -3176,7 +3176,7 @@ function setupAddressAutocomplete({ inputId, cityId, provId, capId }) {
       if (tipo === 'immobili') list = immobili || [];
       else if (tipo === 'notizie') list = notizie || [];
       else list = attivita || [];
-      selectEl.innerHTML = '<option value="">Seleziona…</option>';
+      selectEl.innerHTML = '<option value="">Seleziona...</option>';
       list.forEach(el => {
         if (!el || !el.id) return;
         const opt = document.createElement('option');
@@ -3299,9 +3299,9 @@ function setupAddressAutocomplete({ inputId, cityId, provId, capId }) {
       const citta = prompt('Città:');
       if (!citta) return;
       const zona = prompt('Zona:') || '';
-      const tipo = prompt('Tipologia (residenziale, commerciale…):', 'residenziale') || 'residenziale';
-      const min = Number(prompt('€/mq minimo:', '3000') || 0);
-      const max = Number(prompt('€/mq massimo:', '6000') || 0);
+      const tipo = prompt('Tipologia (residenziale, commerciale...):', 'residenziale') || 'residenziale';
+      const min = Number(prompt('EUR/mq minimo:', '3000') || 0);
+      const max = Number(prompt('EUR/mq massimo:', '6000') || 0);
       omi.push({ id: genId('omi'), citta, zona, tipologia: tipo, min, max });
       saveList(STORAGE_KEYS.omi, omi);
       renderOmi();
@@ -3352,7 +3352,7 @@ function setupAddressAutocomplete({ inputId, cityId, provId, capId }) {
     systemPrompt += ` Tono: ${tone}. Tipo di testo: ${type}. Lunghezza: ${len}. Lingua: ${lang}.`;
     if (ctx) systemPrompt += ` Contesto aggiuntivo: ${ctx}.`;
 
-    aiSetStatus('Contatto il modello locale (Mistral via Ollama)…');
+    aiSetStatus('Contatto il modello locale (Mistral via Ollama)...');
 
     try {
       const res = await fetch(LOCAL_LLM_ENDPOINT, {
@@ -3392,7 +3392,7 @@ function setupAddressAutocomplete({ inputId, cityId, provId, capId }) {
     if (promptEl) promptEl.value = '';
     if (ctxEl) ctxEl.value = '';
     if (out) {
-      out.textContent = 'Nessun testo ancora generato. Inserisci un prompt e premi “Genera testo”.';
+      out.textContent = 'Nessun testo ancora generato. Inserisci un prompt e premi "Genera testo".';
     }
     aiSetStatus('Pronto. Assicurati che Mistral sia avviato in Ollama su http://localhost:11434/.');
   });
@@ -3429,7 +3429,7 @@ function setupAddressAutocomplete({ inputId, cityId, provId, capId }) {
       select.innerHTML = '';
       const baseOpt = document.createElement('option');
       baseOpt.value = '';
-      baseOpt.textContent = 'Seleziona modello intestazione…';
+      baseOpt.textContent = 'Seleziona modello intestazione...';
       select.appendChild(baseOpt);
 
       (intestazioni || []).forEach(t => {
@@ -3764,7 +3764,7 @@ ${footerHtml}
       const input = document.createElement('input');
       input.type = 'text';
       input.id = 'mappa-search';
-      input.placeholder = 'Cerca indirizzo…';
+      input.placeholder = 'Cerca indirizzo...';
       input.style.width = '100%';
 
       const btnRow = document.createElement('div');
@@ -3833,7 +3833,7 @@ ${footerHtml}
         btnCondo.className = 'btn btn-sm';
         btnCondo.id = 'btn-draw-condo';
         btnCondo.title = 'Disegna poligono condominio';
-        btnCondo.textContent = '🏢 Condominio';
+        btnCondo.textContent = ' Condominio';
 
         const btnToggle = document.createElement('button');
         btnToggle.type = 'button';
@@ -3903,7 +3903,7 @@ function initMappa() {
       // UI ricerca indirizzo
       ensureMappaSearchUI();
 
-      // Se la mappa esiste già: evita re-init e forza ricalcolo dimensioni (Leaflet in tab nascosti fa spesso “mappa grigia”)
+      // Se la mappa esiste già: evita re-init e forza ricalcolo dimensioni (Leaflet in tab nascosti fa spesso "mappa grigia")
       if (mappa) {
         setTimeout(() => { try { mappa.invalidateSize(true); } catch {} }, 120);
         renderMappa();
@@ -3919,7 +3919,7 @@ function initMappa() {
         attribution: '© OpenStreetMap'
       });
 
-      // Satellite (Esri World Imagery) – no API key
+      // Satellite (Esri World Imagery) - no API key
       mappaBaseSatellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
         maxZoom: 19,
         attribution: 'Tiles © Esri'
@@ -3944,7 +3944,7 @@ function initMappa() {
       mappaCluster = L.markerClusterGroup();
       mappa.addLayer(mappaCluster);
 
-      // Traccia interazioni utente: se l’utente ha mosso/zoomato, non rifacciamo fitBounds a ogni filtro
+      // Traccia interazioni utente: se l'utente ha mosso/zoomato, non rifacciamo fitBounds a ogni filtro
       mappa.on('movestart', () => { mappaUserInteracted = true; });
       mappa.on('zoomstart', () => { mappaUserInteracted = true; });
 
@@ -3969,7 +3969,7 @@ function initMappa() {
           const key = `__bound_${id}_${ev}`;
           if (el[key]) return;
           el.addEventListener(ev, () => {
-            // quando si cambia filtro, permettiamo un fit (una tantum) se l’utente non ha ancora interagito
+            // quando si cambia filtro, permettiamo un fit (una tantum) se l'utente non ha ancora interagito
             mappaAutoFitted = false;
             renderMappa();
           });
@@ -4007,7 +4007,7 @@ function initMappa() {
 
 
 /* ======================================================
-   MAPPA – LIVELLO POLIGONI (AREE + CONDOMINI)
+   MAPPA - LIVELLO POLIGONI (AREE + CONDOMINI)
    - 2 tipi: "area" (delimitazione ricerca), "condominio" (cartella)
    - chiusura poligono: clic sul 1° vertice (ancora) oppure doppio click
    - alla chiusura "condominio" apre UI (nome + indirizzo) e salva in archivio
@@ -4330,7 +4330,7 @@ async function finalizePolygon() {
   const latlngs = [...drawingPoints];
   const kind = drawingMode;
 
-  // Reset drawing UI immediately (così non resta “appeso”)
+  // Reset drawing UI immediately (così non resta "appeso")
   stopDrawing(true);
 
   if (kind === 'condominio') {
@@ -4435,7 +4435,7 @@ function renderCondominiList() {
     item.innerHTML = `
       <div class="condominio-item__name">${escapeHtml(c.nome || 'Condominio')}</div>
       <div class="condominio-item__addr">${escapeHtml(formatCondominioAddress(c) || '')}</div>
-      <div class="condominio-item__meta">${immCount} immobili · ${notCount} notizie</div>
+      <div class="condominio-item__meta">${immCount} immobili * ${notCount} notizie</div>
     `;
     item.addEventListener('click', () => {
       try {
@@ -4471,11 +4471,11 @@ function openCondominioPanel(condoId) {
         <div class="condominio-detail__name">${escapeHtml(c.nome || 'Condominio')}</div>
         <div class="condominio-detail__addr">${escapeHtml(formatCondominioAddress(c) || '')}</div>
       </div>
-      <div class="condominio-detail__count">${contenutiImm.length} immobili · ${contenutiNot.length} notizie</div>
+      <div class="condominio-detail__count">${contenutiImm.length} immobili * ${contenutiNot.length} notizie</div>
     </div>
 
     <div class="condominio-detail__section">
-      <div class="condominio-detail__section-title">🏠 Immobili</div>
+      <div class="condominio-detail__section-title"> Immobili</div>
       <div class="condominio-detail__list">
         ${contenutiImm.map(im => `
           <div class="condominio-imm in-condominio-immobile">
@@ -4485,7 +4485,7 @@ function openCondominioPanel(condoId) {
             </div>
             <button type="button" class="btn btn-sm" data-open-imm="${escapeHtml(im.id)}">Apri</button>
           </div>
-        `).join('') || `<div class="muted">Nessun immobile associato (compila il campo “Condominio” nella scheda immobile).</div>`}
+        `).join('') || `<div class="muted">Nessun immobile associato (compila il campo "Condominio" nella scheda immobile).</div>`}
       </div>
     </div>
 
@@ -4493,7 +4493,7 @@ function openCondominioPanel(condoId) {
       <div class="condominio-detail__section-title">🧾 Notizie</div>
       <div class="condominio-detail__list">
         ${contenutiNot.map(n => {
-          const nome = ((n.nome || '') + ' ' + (n.cognome || '')).trim() || '—';
+          const nome = ((n.nome || '') + ' ' + (n.cognome || '')).trim() || '-';
           const addr = [n.indirizzo || '', n.citta || ''].filter(Boolean).join(' - ');
           return `
             <div class="condominio-imm condominio-notizia">
@@ -4504,7 +4504,7 @@ function openCondominioPanel(condoId) {
               <button type="button" class="btn btn-sm" data-open-not="${escapeHtml(n.id)}">Apri</button>
             </div>
           `;
-        }).join('') || `<div class="muted">Nessuna notizia associata (compila il campo “Condominio” nella scheda notizia).</div>`}
+        }).join('') || `<div class="muted">Nessuna notizia associata (compila il campo "Condominio" nella scheda notizia).</div>`}
       </div>
     </div>
   `;
@@ -4596,7 +4596,7 @@ function initPoligoniModule() {
         ? (item.rif || item.indirizzo || 'Immobile')
         : ((item.nome || '') + ' ' + (item.cognome || '')).trim() || (item.indirizzo || 'Notizia');
 
-      titleEl.textContent = `${tipoLabel} · ${titolo}`;
+      titleEl.textContent = `${tipoLabel} * ${titolo}`;
 
       const rows = [];
       const ind = [item.indirizzo || '', item.citta || '', item.provincia || ''].filter(Boolean).join(', ');
@@ -4605,7 +4605,7 @@ function initPoligoniModule() {
       if (item.mq != null) rows.push(`<div><strong>mq:</strong> ${item.mq}</div>`);
       if (item.prezzo != null) rows.push(`<div><strong>Prezzo:</strong> ${formatEuro(item.prezzo)}</div>`);
       if (item.stato) rows.push(`<div><strong>Stato:</strong> ${escapeHtml(item.stato)}</div>`);
-      if (item.caldo) rows.push(`<div><strong>Stato commerciale:</strong> 🔥 caldo</div>`);
+      if (item.caldo) rows.push(`<div><strong>Stato commerciale:</strong>  caldo</div>`);
 
       bodyEl.innerHTML = rows.join('') || '<div class="muted">Nessun dettaglio aggiuntivo.</div>';
 
@@ -4710,7 +4710,7 @@ function initPoligoniModule() {
         mappaCluster.addLayer(marker);
       });
 
-      // FitBounds “intelligente”: non resettiamo la mappa a ogni filtro se l’utente sta navigando
+      // FitBounds "intelligente": non resettiamo la mappa a ogni filtro se l'utente sta navigando
       if (filtered.length > 0) {
         const bounds = mappaCluster.getBounds();
         const sig = `${filtered.length}:${filters.fTipo}:${filters.fTipologia}:${filters.fStato}:${filters.fCaldo}:${filters.fPrezzoMin ?? ''}-${filters.fPrezzoMax ?? ''}:${filters.fMqMin ?? ''}-${filters.fMqMax ?? ''}`;
@@ -5132,7 +5132,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function updateCounter(all) {
     const acq = all.filter(c => c.acquirente).length;
     const ven = all.filter(c => c.venditore).length;
-    counter.textContent = `Totale: ${all.length} · Acquirenti: ${acq} · Venditori: ${ven}`;
+    counter.textContent = `Totale: ${all.length} * Acquirenti: ${acq} * Venditori: ${ven}`;
   }
 
   // inizializza
@@ -5187,11 +5187,11 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     counter.innerHTML = `
       <div class="rubrica-dashboard">
-        <div class="rubrica-kpi" data-go="lista">👥 Tutti<br><strong>${stats.all}</strong></div>
+        <div class="rubrica-kpi" data-go="lista"> Tutti<br><strong>${stats.all}</strong></div>
         <div class="rubrica-kpi" data-go="acquirenti">🏡 Acquirenti<br><strong>${stats.acq}</strong></div>
-        <div class="rubrica-kpi" data-go="venditori">🏠 Venditori<br><strong>${stats.ven}</strong></div>
+        <div class="rubrica-kpi" data-go="venditori"> Venditori<br><strong>${stats.ven}</strong></div>
         <div class="rubrica-kpi" data-go="collaboratori">🤝 Collaboratori<br><strong>${stats.coll}</strong></div>
-        <div class="rubrica-kpi" data-go="altro">📌 Altro<br><strong>${stats.other}</strong></div>
+        <div class="rubrica-kpi" data-go="altro"> Altro<br><strong>${stats.other}</strong></div>
       </div>`;
     counter.querySelectorAll('.rubrica-kpi').forEach(k=>{
       k.addEventListener('click', ()=>showRubrica(k.dataset.go));
@@ -5656,7 +5656,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <header>
             <div>
               <h3 id="rubrica-pro-title">Scheda Contatto</h3>
-              <div class="sub" id="rubrica-pro-sub">—</div>
+              <div class="sub" id="rubrica-pro-sub">-</div>
             </div>
             <div class="rubrica-pro-actions">
               <button class="btn btn-xs" id="rubrica-pro-call">📞 Chiama</button>
@@ -5673,7 +5673,7 @@ document.addEventListener('DOMContentLoaded', () => {
                   <div>
                     <label>Stato contatto</label>
                     <select id="rp-stato">
-                      <option value="">—</option>
+                      <option value="">-</option>
                       <option value="lead">Lead</option>
                       <option value="qualificato">Qualificato</option>
                       <option value="attivo">Attivo</option>
@@ -5684,7 +5684,7 @@ document.addEventListener('DOMContentLoaded', () => {
                   <div>
                     <label>Priorità</label>
                     <select id="rp-priority">
-                      <option value="">—</option>
+                      <option value="">-</option>
                       <option value="alta">Alta</option>
                       <option value="media">Media</option>
                       <option value="bassa">Bassa</option>
@@ -5703,7 +5703,7 @@ document.addEventListener('DOMContentLoaded', () => {
                   <div>
                     <label>Operazione</label>
                     <select id="rp-op">
-                      <option value="">—</option>
+                      <option value="">-</option>
                       <option value="vendita">Vendita</option>
                       <option value="affitto">Affitto</option>
                     </select>
@@ -5722,11 +5722,11 @@ document.addEventListener('DOMContentLoaded', () => {
                   </div>
                   <div>
                     <label>Budget min</label>
-                    <input id="rp-bmin" type="number" min="0" step="1000" placeholder="€"/>
+                    <input id="rp-bmin" type="number" min="0" step="1000" placeholder="EUR"/>
                   </div>
                   <div>
                     <label>Budget max</label>
-                    <input id="rp-bmax" type="number" min="0" step="1000" placeholder="€"/>
+                    <input id="rp-bmax" type="number" min="0" step="1000" placeholder="EUR"/>
                   </div>
                   <div>
                     <label>Mq min</label>
@@ -5752,12 +5752,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
               <div class="rubrica-pro-card">
                 <h4>Follow-up</h4>
-                <div class="muted" style="font-size:12px;margin-bottom:8px" id="rp-follow">—</div>
+                <div class="muted" style="font-size:12px;margin-bottom:8px" id="rp-follow">-</div>
                 <div style="display:flex;gap:8px;flex-wrap:wrap">
-                  <button class="btn btn-xs" id="rp-touch">📌 Segna contatto</button>
+                  <button class="btn btn-xs" id="rp-touch"> Segna contatto</button>
                   <button class="btn btn-xs" id="rp-logcall">☎️ Log telefonata</button>
                   <button class="btn btn-xs" id="rp-logmail">✉️ Log email</button>
-                  <button class="btn btn-xs" id="rp-logvisit">🏠 Log visita</button>
+                  <button class="btn btn-xs" id="rp-logvisit"> Log visita</button>
                 </div>
               </div>
             </div>
@@ -5890,9 +5890,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const title = (i.titolo || i.nome || i.indirizzo || ('Immobile ' + (i.id || ''))) + '';
         const meta = [
           f.citta || '',
-          f.zona ? ('· ' + f.zona) : '',
-          f.prezzo != null ? ('· €' + f.prezzo.toLocaleString('it-IT')) : '',
-          f.mq != null ? ('· ' + f.mq + ' mq') : ''
+          f.zona ? ('* ' + f.zona) : '',
+          f.prezzo != null ? ('* EUR' + f.prezzo.toLocaleString('it-IT')) : '',
+          f.mq != null ? ('* ' + f.mq + ' mq') : ''
         ].join(' ');
         li.innerHTML = `
           <div style="min-width:0">
@@ -5925,7 +5925,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (g.telefono) subParts.push(g.telefono);
       if (g.email) subParts.push(g.email);
       if (g.citta || g.provincia) subParts.push([g.citta, g.provincia].filter(Boolean).join(' '));
-      if (subEl) subEl.textContent = subParts.join(' · ') || '—';
+      if (subEl) subEl.textContent = subParts.join(' * ') || '-';
 
       // fill fields
       const $ = (id) => document.getElementById(id);
@@ -5946,7 +5946,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const follow = $('rp-follow');
       if (follow) {
         follow.textContent = (days == null)
-          ? 'Nessun contatto registrato. Suggerimento: logga un evento o usa 📌 Segna contatto.'
+          ? 'Nessun contatto registrato. Suggerimento: logga un evento o usa  Segna contatto.'
           : (days <= 3 ? `Ultimo contatto: ${days} gg fa (ok).` : `Ultimo contatto: ${days} gg fa → follow-up consigliato.`);
       }
 
@@ -6100,7 +6100,7 @@ document.addEventListener('DOMContentLoaded', () => {
   })();
 
 /* ======================================================
-   MAPPA ADDON – STABILITÀ + RICERCA + SATELLITE
+   MAPPA ADDON - STABILITÀ + RICERCA + SATELLITE
    NON modifica altre sezioni del CRM
 ====================================================== */
 
@@ -6172,7 +6172,7 @@ document.addEventListener('DOMContentLoaded', () => {
       div.innerHTML = `
         <input id="map-address-search"
                type="text"
-               placeholder="Cerca indirizzo…"
+               placeholder="Cerca indirizzo..."
                style="width:180px;padding:4px;border-radius:6px;border:1px solid #374151;">
       `;
 
