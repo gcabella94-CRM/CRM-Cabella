@@ -1,1451 +1,1338 @@
 <!DOCTYPE html>
+
 <html lang="it">
 <head>
-  <meta charset="UTF-8">
-  <title>CRM Immobiliare 10.3</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="stylesheet" href="crm.css">
-
+<meta charset="utf-8"/>
+<title>CRM Immobiliare 10.3</title>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/><link href="https://unpkg.com" rel="preconnect"/><link href="https://cdnjs.cloudflare.com" rel="preconnect"/><link href="https://www.gstatic.com" rel="preconnect"/>
+<link href="crm.css" rel="stylesheet"/>
 <!-- jsPDF per export PDF -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <!-- Leaflet map & clustering -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.css"/>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.Default.css"/>
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-  <script src="https://unpkg.com/leaflet.markercluster/dist/leaflet.markercluster.js"></script>
-
-  <!-- Leaflet Control Geocoder (autocomplete indirizzi) -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css"/>
-  <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
-
-
-  <!-- Firebase Realtime Database (compat) -->
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-  <script src="firebase-sync.js"></script>
-</head>
+<script defer="defer" src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<!-- Leaflet map & clustering -->
+<link href="https://unpkg.com/leaflet/dist/leaflet.css" rel="stylesheet">
+<link href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.css" rel="stylesheet"/>
+<link href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.Default.css" rel="stylesheet"/>
+<script defer="defer" src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script defer="defer" src="https://unpkg.com/leaflet.markercluster/dist/leaflet.markercluster.js"></script>
+<!-- Leaflet Control Geocoder (autocomplete indirizzi) -->
+<link href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" rel="stylesheet"/>
+<script defer="defer" src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+<!-- Firebase Realtime Database (compat) -->
+<script defer="defer" src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script defer="defer" src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<script defer="defer" src="firebase-sync.js"></script>
+</link><link href="https://unpkg.com" rel="dns-prefetch"/><link href="https://cdnjs.cloudflare.com" rel="dns-prefetch"/><link href="https://www.gstatic.com" rel="dns-prefetch"/></head>
 <body>
-  <div class="app-shell">
-    <aside class="sidebar">
-      <div class="sidebar-header">
-        <div class="sidebar-logo">CR</div>
-        <div class="sidebar-header-text">
-          <span>Studio Immobiliare</span>
-          <span>CRM 10.3 · locale</span>
-        </div>
-      </div>
-
-      <div class="nav-section-label">Panoramica</div>
-      <div class="nav-group">
-        <div class="nav-item active" data-view="home">
-          <div class="nav-item-main">
-            <div class="nav-icon">🏠</div>
-            <div>
-              <div class="nav-label-title">Dashboard</div>
-              <div class="nav-label-sub">Settimana & attività</div>
-            </div>
-          </div>
-          <div class="nav-pill">LIVE</div>
-        </div>
-        <div class="nav-item" data-view="agenda">
-          <div class="nav-item-main">
-            <div class="nav-icon">📅</div>
-            <div>
-              <div class="nav-label-title">Agenda</div>
-              <div class="nav-label-sub">Settimana + mese</div>
-            </div>
-          </div>
-        </div>
-        <div class="nav-item" data-view="ai">
-          <div class="nav-item-main">
-            <div class="nav-icon">🤖</div>
-            <div>
-              <div class="nav-label-title">Assistente IA</div>
-              <div class="nav-label-sub">Testi & documenti</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-        <div class="nav-section-label">Dati</div>
-      <div class="nav-group">
-
-        <div class="nav-item" data-view="immobili">
-          <div class="nav-item-main">
-            <div class="nav-icon">🏢</div>
-            <div>
-              <div class="nav-label-title">Immobili</div>
-              <div class="nav-label-sub">Schede base</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="nav-item" data-view="notizie">
-          <div class="nav-item-main">
-            <div class="nav-icon">🧩</div>
-            <div>
-              <div class="nav-label-title">Notizie</div>
-              <div class="nav-label-sub">Fonti potenziali</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="nav-item" data-view="rubrica">
-          <div class="nav-item-main">
-            <div class="nav-icon">📇</div>
-            <div>
-              <div class="nav-label-title">Rubrica</div>
-              <div class="nav-label-sub">Proprietari & contatti</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Sottosezioni Rubrica (appaiono quando Rubrica è attiva) -->
-        
-
-        <div class="nav-item" data-view="attivita">
-          <div class="nav-item-main">
-            <div class="nav-icon">📌</div>
-            <div>
-              <div class="nav-label-title">Attività</div>
-              <div class="nav-label-sub">Task & follow-up</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- NUOVA VOCE MAPPA -->
-        <div class="nav-item" data-view="mappa">
-          <div class="nav-item-main">
-            <div class="nav-icon">🗺️</div>
-            <div>
-              <div class="nav-label-title">Mappa</div>
-              <div class="nav-label-sub">Immobili & notizie</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="nav-item" data-view="operazioni">
-          <div class="nav-item-main">
-            <div class="nav-icon">📑</div>
-            <div>
-              <div class="nav-label-title">Operazioni</div>
-              <div class="nav-label-sub">Concluse</div>
-            </div>
-          </div>
-        </div>
-
-      </div>
-
-
-      <div class="nav-section-label">Strumenti</div>
-      <div class="nav-group">
-        <div class="nav-item" data-view="staff">
-          <div class="nav-item-main">
-            <div class="nav-icon">👥</div>
-            <div>
-              <div class="nav-label-title">Staff</div>
-              <div class="nav-label-sub">Colori & carichi</div>
-            </div>
-          </div>
-        </div>
-        <div class="nav-item" data-view="omi">
-          <div class="nav-item-main">
-            <div class="nav-icon">📊</div>
-            <div>
-              <div class="nav-label-title">OMI</div>
-              <div class="nav-label-sub">Valori €/mq</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="sidebar-footer">
-        <div>Profilo: <strong>Locale · offline</strong></div>
-        <div>IA locale prevista su <strong>Ollama</strong> (llama3.1).</div>
-      </div>
-    </aside>
-
-    <main class="main">
-      <div class="topbar">
-        <div>
-          <div class="topbar-title">
-            <span id="topbar-title">Dashboard</span>
-            <span class="pill pill-strong">10.3</span>
-          </div>
-          <div class="topbar-sub" id="topbar-sub">Riepilogo della settimana in corso.</div>
-        </div>
-        <div class="search-bar">
-          <input id="global-search" class="search-input" type="text" placeholder="Cerca in tutto il CRM…">
-          <button class="btn btn-sm" id="btn-clear-search">Pulisci</button>
-          <button class="btn btn-sm" id="btn-print-view">Stampa vista</button>
-        </div>
-      </div>
-
-      <div class="content">
-        <div class="views">
-          <!-- DASHBOARD -->
-          <section class="view active" id="view-home">
-            <!-- riga: riepilogo settimanale appuntamenti -->
-            <div class="card">
-              <div class="card-header">
-                <div>
-                  <div class="card-title">
-                    <span>📅 Settimana in corso</span>
-                  </div>
-                  <div class="card-subtitle">
+<div class="app-shell">
+<aside class="sidebar">
+<div class="sidebar-header">
+<div class="sidebar-logo">CR</div>
+<div class="sidebar-header-text">
+<span>Studio Immobiliare</span>
+<span>CRM 10.3 · locale</span>
+</div>
+</div>
+<div class="nav-section-label">Panoramica</div>
+<div class="nav-group">
+<div class="nav-item active" data-view="home">
+<div class="nav-item-main">
+<div class="nav-icon">🏠</div>
+<div>
+<div class="nav-label-title">Dashboard</div>
+<div class="nav-label-sub">Settimana &amp; attività</div>
+</div>
+</div>
+<div class="nav-pill">LIVE</div>
+</div>
+<div class="nav-item" data-view="agenda">
+<div class="nav-item-main">
+<div class="nav-icon">📅</div>
+<div>
+<div class="nav-label-title">Agenda</div>
+<div class="nav-label-sub">Settimana + mese</div>
+</div>
+</div>
+</div>
+<div class="nav-item" data-view="ai">
+<div class="nav-item-main">
+<div class="nav-icon">🤖</div>
+<div>
+<div class="nav-label-title">Assistente IA</div>
+<div class="nav-label-sub">Testi &amp; documenti</div>
+</div>
+</div>
+</div>
+</div>
+<div class="nav-section-label">Dati</div>
+<div class="nav-group">
+<div class="nav-item" data-view="immobili">
+<div class="nav-item-main">
+<div class="nav-icon">🏢</div>
+<div>
+<div class="nav-label-title">Immobili</div>
+<div class="nav-label-sub">Schede base</div>
+</div>
+</div>
+</div>
+<div class="nav-item" data-view="notizie">
+<div class="nav-item-main">
+<div class="nav-icon">🧩</div>
+<div>
+<div class="nav-label-title">Notizie</div>
+<div class="nav-label-sub">Fonti potenziali</div>
+</div>
+</div>
+</div>
+<div class="nav-item" data-view="rubrica">
+<div class="nav-item-main">
+<div class="nav-icon">📇</div>
+<div>
+<div class="nav-label-title">Rubrica</div>
+<div class="nav-label-sub">Proprietari &amp; contatti</div>
+</div>
+</div>
+</div>
+<!-- Sottosezioni Rubrica (appaiono quando Rubrica è attiva) -->
+<div class="nav-item" data-view="attivita">
+<div class="nav-item-main">
+<div class="nav-icon">📌</div>
+<div>
+<div class="nav-label-title">Attività</div>
+<div class="nav-label-sub">Task &amp; follow-up</div>
+</div>
+</div>
+</div>
+<!-- NUOVA VOCE MAPPA -->
+<div class="nav-item" data-view="mappa">
+<div class="nav-item-main">
+<div class="nav-icon">🗺️</div>
+<div>
+<div class="nav-label-title">Mappa</div>
+<div class="nav-label-sub">Immobili &amp; notizie</div>
+</div>
+</div>
+</div>
+<div class="nav-item" data-view="operazioni">
+<div class="nav-item-main">
+<div class="nav-icon">📑</div>
+<div>
+<div class="nav-label-title">Operazioni</div>
+<div class="nav-label-sub">Concluse</div>
+</div>
+</div>
+</div>
+</div>
+<div class="nav-section-label">Strumenti</div>
+<div class="nav-group">
+<div class="nav-item" data-view="staff">
+<div class="nav-item-main">
+<div class="nav-icon">👥</div>
+<div>
+<div class="nav-label-title">Staff</div>
+<div class="nav-label-sub">Colori &amp; carichi</div>
+</div>
+</div>
+</div>
+<div class="nav-item" data-view="omi">
+<div class="nav-item-main">
+<div class="nav-icon">📊</div>
+<div>
+<div class="nav-label-title">OMI</div>
+<div class="nav-label-sub">Valori €/mq</div>
+</div>
+</div>
+</div>
+</div>
+<div class="sidebar-footer">
+<div>Profilo: <strong>Locale · offline</strong></div>
+<div>IA locale prevista su <strong>Ollama</strong> (llama3.1).</div>
+</div>
+</aside>
+<main class="main">
+<div class="topbar">
+<div>
+<div class="topbar-title">
+<span id="topbar-title">Dashboard</span>
+<span class="pill pill-strong">10.3</span>
+</div>
+<div class="topbar-sub" id="topbar-sub">Riepilogo della settimana in corso.</div>
+</div>
+<div class="search-bar">
+<input class="search-input" id="global-search" placeholder="Cerca in tutto il CRM…" type="text"/>
+<button class="btn btn-sm" id="btn-clear-search">Pulisci</button>
+<button class="btn btn-sm" id="btn-print-view">Stampa vista</button>
+</div>
+</div>
+<div class="content">
+<div class="views">
+<!-- DASHBOARD -->
+<section class="view active" id="view-home">
+<!-- riga: riepilogo settimanale appuntamenti -->
+<div class="card">
+<div class="card-header">
+<div>
+<div class="card-title">
+<span>📅 Settimana in corso</span>
+</div>
+<div class="card-subtitle">
                     Appuntamenti disposti a riga, un colonna per giorno.
                   </div>
-                </div>
-                <div class="card-actions">
-                  <button class="btn btn-sm" id="dash-prev-week">‹ Settimana precedente</button>
-                  <button class="btn btn-sm" id="dash-today-week">Oggi</button>
-                  <button class="btn btn-sm" id="dash-next-week">Settimana successiva ›</button>
-                </div>
-              </div>
-              <div id="dashboard-week-row" class="grid-7"></div>
-            </div>
-
-            <!-- riga: cruscotto immobili -->
-            <div class="card">
-              <div class="card-header">
-                <div>
-                  <div class="card-title">
-                    <span>🏢 Cruscotto immobili</span>
-                  </div>
-                  <div class="card-subtitle">
+</div>
+<div class="card-actions">
+<button class="btn btn-sm" id="dash-prev-week">‹ Settimana precedente</button>
+<button class="btn btn-sm" id="dash-today-week">Oggi</button>
+<button class="btn btn-sm" id="dash-next-week">Settimana successiva ›</button>
+</div>
+</div>
+<div class="grid-7" id="dashboard-week-row"></div>
+</div>
+<!-- riga: cruscotto immobili -->
+<div class="card">
+<div class="card-header">
+<div>
+<div class="card-title">
+<span>🏢 Cruscotto immobili</span>
+</div>
+<div class="card-subtitle">
                     Conteggi per tipologia (vendita / affitto / in trattativa / conclusi).
                   </div>
-                </div>
-              </div>
-              <div class="grid-responsive" id="dashboard-immobili-summary"></div>
-            </div>
-
-            <!-- riquadri: attività giornaliere + riassunto giorno -->
-            <div class="grid-2">
-              <div class="card">
-                <div class="card-header">
-                  <div>
-                    <div class="card-title">✅ Attività di oggi</div>
-                    <div class="card-subtitle">Task filtrabili per stato e tipo.</div>
-                  </div>
-                  <div class="card-actions">
-                    <select id="dash-activity-filter">
-                      <option value="tutte">Tutte</option>
-                      <option value="aperte">Solo aperte</option>
-                      <option value="chiuse">Solo chiuse</option>
-                    </select>
-                  </div>
-                </div>
-                <div id="dashboard-today-activities"></div>
-              </div>
-
-              <div class="card">
-                <div class="card-header">
-                  <div>
-                    <div class="card-title">📌 Riassunto della giornata</div>
-                    <div class="card-subtitle">Appuntamenti e attività in evidenza.</div>
-                  </div>
-                </div>
-                <div id="dashboard-day-summary"></div>
-              </div>
-            </div>
-          
-            <!-- cruscotto provvigioni / operazioni concluse -->
-            <div class="card">
-              <div class="card-header">
-                <div>
-                  <div class="card-title">💶 Cruscotto provvigioni</div>
-                  <div class="card-subtitle">Sintesi operazioni concluse e provvigioni generate.</div>
-                </div>
-              </div>
-              <div class="card-body">
-                <div class="grid-3" id="dashboard-provvigioni-metrics"></div>
-                <div style="margin-top:12px;">
-                  <canvas id="dashboard-provvigioni-chart" height="140"></canvas>
-                </div>
-              </div>
-            </div>
+</div>
+</div>
+<div class="grid-responsive" id="dashboard-immobili-summary"></div>
+</div>
+<!-- riquadri: attività giornaliere + riassunto giorno -->
+<div class="grid-2">
+<div class="card">
+<div class="card-header">
+<div>
+<div class="card-title">✅ Attività di oggi</div>
+<div class="card-subtitle">Task filtrabili per stato e tipo.</div>
+</div>
+<div class="card-actions">
+<select id="dash-activity-filter">
+<option value="tutte">Tutte</option>
+<option value="aperte">Solo aperte</option>
+<option value="chiuse">Solo chiuse</option>
+</select>
+</div>
+</div>
+<div id="dashboard-today-activities"></div>
+</div>
+<div class="card">
+<div class="card-header">
+<div>
+<div class="card-title">📌 Riassunto della giornata</div>
+<div class="card-subtitle">Appuntamenti e attività in evidenza.</div>
+</div>
+</div>
+<div id="dashboard-day-summary"></div>
+</div>
+</div>
+<!-- cruscotto provvigioni / operazioni concluse -->
+<div class="card">
+<div class="card-header">
+<div>
+<div class="card-title">💶 Cruscotto provvigioni</div>
+<div class="card-subtitle">Sintesi operazioni concluse e provvigioni generate.</div>
+</div>
+</div>
+<div class="card-body">
+<div class="grid-3" id="dashboard-provvigioni-metrics"></div>
+<div style="margin-top:12px;">
+<canvas height="140" id="dashboard-provvigioni-chart"></canvas>
+</div>
+</div>
+</div>
 </section>
-
-          <!-- AGENDA -->
-          <section class="view" id="view-agenda">
-
-            <div class="card">
-              <div class="card-header">
-                <div>
-                  <div class="card-title">🗓 Vista mensile</div>
-                  <div class="card-subtitle">Mese sintetico con contatore appuntamenti per giorno.</div>
-                </div>
-              </div>
-              <div id="agenda-month-summary" class="grid-responsive"></div>
-            </div>
-            <div class="card">
-              <div class="card-header">
-                <div>
-                  <div class="card-title">📅 Agenda settimanale</div>
-                  <div class="card-subtitle">
+<!-- AGENDA -->
+<section class="view" id="view-agenda">
+<div class="card">
+<div class="card-header">
+<div>
+<div class="card-title">🗓 Vista mensile</div>
+<div class="card-subtitle">Mese sintetico con contatore appuntamenti per giorno.</div>
+</div>
+</div>
+<div class="grid-responsive" id="agenda-month-summary"></div>
+</div>
+<div class="card">
+<div class="card-header">
+<div>
+<div class="card-title">📅 Agenda settimanale</div>
+<div class="card-subtitle">
                     Vista a riga: colonne per giorni, righe per le ore. Clicca su uno slot vuoto per inserire un appuntamento oppure usa "Nuovo appuntamento".
                   </div>
-                </div>
-                <div class="card-actions">
-                  <button class="btn btn-sm" id="agenda-new-appointment">+ Nuovo appuntamento</button>
-                  <button class="btn btn-sm" id="agenda-prev-week">‹ Precedente</button>
-                  <button class="btn btn-sm" id="agenda-today-week">Oggi</button>
-                  <button class="btn btn-sm" id="agenda-next-week">Successiva ›</button>
-                </div>
-              </div>
-              <div class="agenda-week">
-                <div class="agenda-week-header">
-                  <div class="muted" id="agenda-week-label"></div>
-                  <div class="agenda-filters">
-                    <label>Tipo:</label>
-                    <select id="agenda-type-filter" style="width:auto;">
-                      <option value="tutti">Tutti</option>
-                      <option value="sopralluogo">Sopralluogo</option>
-                      <option value="stima">Stima / valutazione</option>
-                      <option value="trattativa">Trattativa</option>
-                      <option value="altro">Altro</option>
-                    </select>
-                    <label>Staff:</label>
-                    <select id="agenda-staff-filter" style="width:auto;">
-                      <option value="tutti">Tutti</option>
-                    </select>
-                  </div>
-                </div>
-                <div id="agenda-week-grid" class="agenda-week-grid"></div>
-              </div>
-            </div>
-          </section>
-
-          <!-- ASSISTENTE IA -->
-          <section class="view" id="view-ai">
-            <div class="card">
-              <div class="card-header">
-                <div>
-                  <div class="card-title">🤖 Assistente IA locale</div>
-                  <div class="card-subtitle">
+</div>
+<div class="card-actions">
+<button class="btn btn-sm" id="agenda-new-appointment">+ Nuovo appuntamento</button>
+<button class="btn btn-sm" id="agenda-prev-week">‹ Precedente</button>
+<button class="btn btn-sm" id="agenda-today-week">Oggi</button>
+<button class="btn btn-sm" id="agenda-next-week">Successiva ›</button>
+</div>
+</div>
+<div class="agenda-week">
+<div class="agenda-week-header">
+<div class="muted" id="agenda-week-label"></div>
+<div class="agenda-filters">
+<label>Tipo:</label>
+<select id="agenda-type-filter" style="width:auto;">
+<option value="tutti">Tutti</option>
+<option value="sopralluogo">Sopralluogo</option>
+<option value="stima">Stima / valutazione</option>
+<option value="trattativa">Trattativa</option>
+<option value="altro">Altro</option>
+</select>
+<label>Staff:</label>
+<select id="agenda-staff-filter" style="width:auto;">
+<option value="tutti">Tutti</option>
+</select>
+</div>
+</div>
+<div class="agenda-week-grid" id="agenda-week-grid"></div>
+</div>
+</div>
+</section>
+<!-- ASSISTENTE IA -->
+<section class="view" id="view-ai">
+<div class="card">
+<div class="card-header">
+<div>
+<div class="card-title">🤖 Assistente IA locale</div>
+<div class="card-subtitle">
                     Genera impegni provvigionali, contratti di locazione, preliminari e descrizioni annunci.
                   </div>
-                </div>
-                <div class="card-actions muted" id="ai-status">
+</div>
+<div class="card-actions muted" id="ai-status">
                   Pronto. Assicurati che il modello locale (Ollama / Mistral) sia avviato.
                 </div>
-              </div>
-
-              <div class="ai-layout">
-                <div>
-                  <div class="form-group">
-                    <label>Prompt</label>
-                    <textarea id="ai-prompt" placeholder="Scrivi cosa ti serve: es. &quot;Prepara impegno provvigionale per vendita appartamento in via .&quot;"></textarea>
-                  </div>
-                  <div class="form-grid-2">
-                    <div class="form-group">
-                      <label>Tono</label>
-                      <select id="ai-tone">
-                        <option value="professionale">Professionale</option>
-                        <option value="formale">Formale</option>
-                        <option value="amichevole">Amichevole</option>
-                        <option value="tecnico">Tecnico / giuridico</option>
-                      </select>
-                    </div>
-                    <div class="form-group">
-                      <label>Tipo di testo</label>
-                      <select id="ai-output-type">
-                        <option value="impegno provvigionale">Impegno provvigionale</option>
-                        <option value="contratto locazione">Contratto di locazione</option>
-                        <option value="preliminare">Preliminare di compravendita</option>
-                        <option value="descrizione annuncio">Descrizione annuncio</option>
-                        <option value="email">Email</option>
-                        <option value="altro">Altro</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div class="form-grid-2">
-                    <div class="form-group">
-                      <label>Lunghezza</label>
-                      <select id="ai-length">
-                        <option value="breve">Breve</option>
-                        <option value="media" selected>Media</option>
-                        <option value="lunga">Lunga</option>
-                      </select>
-                    </div>
-                    <div class="form-group">
-                      <label>Lingua</label>
-                      <select id="ai-language">
-                        <option value="italiano" selected>Italiano</option>
-                        <option value="inglese">Inglese</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div class="form-group">
-                    <label>Contesto aggiuntivo (facoltativo)</label>
-                    <textarea id="ai-context" rows="2" placeholder="Dati utili: nomi parti, indirizzi, valori, clausole particolari, ecc."></textarea>
-                  </div>
-                  <div class="card-actions">
-                    <button class="btn btn-primary" id="ai-generate-btn">Genera testo</button>
-                    <button class="btn btn-secondary" id="ai-clear-btn">Pulisci</button>
-                  </div>
-                </div>
-
-                <div>
-                  <div class="form-group">
-                    <label>Output generato</label>
-                    <div id="ai-output" class="ai-output">
+</div>
+<div class="ai-layout">
+<div>
+<div class="form-group">
+<label>Prompt</label>
+<textarea id="ai-prompt" placeholder='Scrivi cosa ti serve: es. "Prepara impegno provvigionale per vendita appartamento in via ."'></textarea>
+</div>
+<div class="form-grid-2">
+<div class="form-group">
+<label>Tono</label>
+<select id="ai-tone">
+<option value="professionale">Professionale</option>
+<option value="formale">Formale</option>
+<option value="amichevole">Amichevole</option>
+<option value="tecnico">Tecnico / giuridico</option>
+</select>
+</div>
+<div class="form-group">
+<label>Tipo di testo</label>
+<select id="ai-output-type">
+<option value="impegno provvigionale">Impegno provvigionale</option>
+<option value="contratto locazione">Contratto di locazione</option>
+<option value="preliminare">Preliminare di compravendita</option>
+<option value="descrizione annuncio">Descrizione annuncio</option>
+<option value="email">Email</option>
+<option value="altro">Altro</option>
+</select>
+</div>
+</div>
+<div class="form-grid-2">
+<div class="form-group">
+<label>Lunghezza</label>
+<select id="ai-length">
+<option value="breve">Breve</option>
+<option selected="" value="media">Media</option>
+<option value="lunga">Lunga</option>
+</select>
+</div>
+<div class="form-group">
+<label>Lingua</label>
+<select id="ai-language">
+<option selected="" value="italiano">Italiano</option>
+<option value="inglese">Inglese</option>
+</select>
+</div>
+</div>
+<div class="form-group">
+<label>Contesto aggiuntivo (facoltativo)</label>
+<textarea id="ai-context" placeholder="Dati utili: nomi parti, indirizzi, valori, clausole particolari, ecc." rows="2"></textarea>
+</div>
+<div class="card-actions">
+<button class="btn btn-primary" id="ai-generate-btn">Genera testo</button>
+<button class="btn btn-secondary" id="ai-clear-btn">Pulisci</button>
+</div>
+</div>
+<div>
+<div class="form-group">
+<label>Output generato</label>
+<div class="ai-output" id="ai-output">
                       Nessun testo ancora generato. Inserisci un prompt e premi “Genera testo”.
                     </div>
-                  </div>
-                  <div class="card-actions">
-                    <button class="btn btn-sm" id="ai-copy-btn">📋 Copia testo</button>
-                  </div>
-                </div>
-              </div>
-
-              <hr style="margin:16px 0;border-color:#1f2937;">
-
-              <!-- Gestione intestazioni + export -->
-              <div class="grid-2">
-                <!-- Colonna sinistra: nome file + scelta intestazione + export -->
-                <div>
-                  <div class="form-group">
-                    <label>Nome file / titolo documento</label>
-                    <input type="text" id="ai-doc-title" placeholder="Es. impegno_provvigionale_Rossi">
-                  </div>
-
-                  <div class="form-group">
-                    <label>Intestazione documento</label>
-                    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-                      <label style="display:flex;align-items:center;gap:4px;font-size:12px;">
-                        <input type="checkbox" id="ai-use-letterhead">
-                        <span>Usa intestazione</span>
-                      </label>
-                      <select id="ai-letterhead-select" style="min-width:200px;">
-                        <option value="">Seleziona modello intestazione…</option>
-                      </select>
-                    </div>
-                    <div class="muted" style="margin-top:4px;font-size:11px;">
+</div>
+<div class="card-actions">
+<button class="btn btn-sm" id="ai-copy-btn">📋 Copia testo</button>
+</div>
+</div>
+</div>
+<hr style="margin:16px 0;border-color:#1f2937;"/>
+<!-- Gestione intestazioni + export -->
+<div class="grid-2">
+<!-- Colonna sinistra: nome file + scelta intestazione + export -->
+<div>
+<div class="form-group">
+<label>Nome file / titolo documento</label>
+<input id="ai-doc-title" placeholder="Es. impegno_provvigionale_Rossi" type="text"/>
+</div>
+<div class="form-group">
+<label>Intestazione documento</label>
+<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+<label style="display:flex;align-items:center;gap:4px;font-size:12px;">
+<input id="ai-use-letterhead" type="checkbox"/>
+<span>Usa intestazione</span>
+</label>
+<select id="ai-letterhead-select" style="min-width:200px;">
+<option value="">Seleziona modello intestazione…</option>
+</select>
+</div>
+<div class="muted" style="margin-top:4px;font-size:11px;">
                       Se attivata, l'intestazione verrà applicata sia al Word che al PDF.  
                       Per ora sono supportate immagini (JPG/PNG) come header e footer.
                     </div>
-                  </div>
-
-                  <div class="card-actions" style="justify-content:flex-start;gap:8px;margin-top:4px;">
-                    <button class="btn btn-sm" id="ai-word-btn">⬇️ Esporta Word (.doc)</button>
-                    <button class="btn btn-sm" id="ai-pdf-btn">⬇️ Esporta PDF</button>
-                  </div>
-                </div>
-
-                <!-- Colonna destra: archivio intestazioni -->
-                <div>
-                  <div class="form-group">
-                    <label>Archivio intestazioni (header + footer)</label>
-                    <input type="text" id="ai-template-name" placeholder="Nome modello, es. Carta intestata Studio">
-                  </div>
-
-                  <div class="form-grid-2">
-                    <div class="form-group">
-                      <label>Header (immagine)</label>
-                      <input type="file" id="ai-template-header" accept="image/*">
-                    </div>
-                    <div class="form-group">
-                      <label>Footer (immagine)</label>
-                      <input type="file" id="ai-template-footer" accept="image/*">
-                    </div>
-                  </div>
-
-                  <div class="card-actions" style="justify-content:flex-start;gap:8px;margin-top:4px;">
-                    <button class="btn btn-sm" id="ai-add-template-btn">➕ Salva modello intestazione</button>
-                  </div>
-
-                  <div id="ai-templates-list" class="muted" style="margin-top:6px;font-size:11px;max-height:140px;overflow:auto;">
+</div>
+<div class="card-actions" style="justify-content:flex-start;gap:8px;margin-top:4px;">
+<button class="btn btn-sm" id="ai-word-btn">⬇️ Esporta Word (.doc)</button>
+<button class="btn btn-sm" id="ai-pdf-btn">⬇️ Esporta PDF</button>
+</div>
+</div>
+<!-- Colonna destra: archivio intestazioni -->
+<div>
+<div class="form-group">
+<label>Archivio intestazioni (header + footer)</label>
+<input id="ai-template-name" placeholder="Nome modello, es. Carta intestata Studio" type="text"/>
+</div>
+<div class="form-grid-2">
+<div class="form-group">
+<label>Header (immagine)</label>
+<input accept="image/*" id="ai-template-header" type="file"/>
+</div>
+<div class="form-group">
+<label>Footer (immagine)</label>
+<input accept="image/*" id="ai-template-footer" type="file"/>
+</div>
+</div>
+<div class="card-actions" style="justify-content:flex-start;gap:8px;margin-top:4px;">
+<button class="btn btn-sm" id="ai-add-template-btn">➕ Salva modello intestazione</button>
+</div>
+<div class="muted" id="ai-templates-list" style="margin-top:6px;font-size:11px;max-height:140px;overflow:auto;">
                     Nessun modello intestazione salvato.
                   </div>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <!-- IMMOBILI (scheda super semplice per avere qualcosa da agganciare) -->
-          <!-- IMMOBILI -->
-          <section class="view" id="view-immobili">
-            <div class="card">
-              <div class="card-header">
-                <div>
-                  <div class="card-title">🏢 Immobili</div>
-                  <div class="card-subtitle">
+</div>
+</div>
+</div>
+</section>
+<!-- IMMOBILI (scheda super semplice per avere qualcosa da agganciare) -->
+<!-- IMMOBILI -->
+<section class="view" id="view-immobili">
+<div class="card">
+<div class="card-header">
+<div>
+<div class="card-title">🏢 Immobili</div>
+<div class="card-subtitle">
                     Schede immobili più dettagliate: dati proprietario, caratteristiche principali e file.
                   </div>
-                </div>
-                <div class="card-actions">
-                  <button class="btn btn-sm" id="imm-new-btn">Nuovo immobile</button>
-                  <button class="btn btn-sm" id="imm-export-csv">Esporta CSV</button>
-                </div>
-              </div>
-
-              <div class="card-body">
-                <form id="imm-form">
-                  <div class="form-grid" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;">
-
-                    <!-- Riferimento + stato -->
-                    <div class="form-group">
-                      <label>Riferimento immobile *</label>
-                      <input type="text" id="imm-rif" placeholder="Es. MI-BORR-01">
-                    </div>
-                    <div class="form-group">
-                      <label>Stato</label>
-                      <select id="imm-stato">
-                        <option value="in carico" selected>In carico</option>
-                        <option value="trattativa">In trattativa</option>
-                        <option value="venduto">Venduto</option>
-                        <option value="affittato">Affittato</option>
-                        <option value="altro">Altro</option>
-                      </select>
-                    </div>
-
-                    <!-- Proprietario -->
-                    <div class="form-group">
-                      <label>Nome proprietario</label>
-                      <input type="text" id="imm-prop-nome" placeholder="Nome e cognome">
-                    </div>
-                    <div class="form-group">
-                      <label>Telefono proprietario</label>
-                      <input type="tel" id="imm-prop-telefono" placeholder="+39 ...">
-                    </div>
-
-                    <div class="form-group">
-                      <label>Email proprietario</label>
-                      <input type="email" id="imm-prop-email" placeholder="nome@esempio.it">
-                    </div>
-                    <div class="form-group">
-                      <label>Indirizzo</label>
-                      <input type="text" id="imm-indirizzo" placeholder="Es. via micca 5 torino (autocomplete)" autocomplete="off" autocomplete="off">
-                    </div>
-
-                    <div class="form-group">
-                      <label>Condominio</label>
-                      <input type="text" id="imm-condominio" placeholder="Nome condominio (per associare alla cartella/poligono)">
-                    </div>
-
-                    <div class="form-group">
-                      <label>Città</label>
-                      <input type="text" id="imm-citta" placeholder="Città">
-                    </div>
-                    <div class="form-group">
-                      <label>Provincia</label>
-                      <input type="text" id="imm-provincia" placeholder="Es. MI">
-                    </div>
-
-                    
-
-                    <div class="form-group">
-                      <label>CAP</label>
-                      <input type="text" id="imm-cap" placeholder="Es. 10121">
-                    </div>
+</div>
+<div class="card-actions">
+<button class="btn btn-sm" id="imm-new-btn">Nuovo immobile</button>
+<button class="btn btn-sm" id="imm-export-csv">Esporta CSV</button>
+</div>
+</div>
+<div class="card-body">
+<form id="imm-form">
+<div class="form-grid" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;">
+<!-- Riferimento + stato -->
+<div class="form-group">
+<label>Riferimento immobile *</label>
+<input id="imm-rif" placeholder="Es. MI-BORR-01" type="text"/>
+</div>
+<div class="form-group">
+<label>Stato</label>
+<select id="imm-stato">
+<option selected="" value="in carico">In carico</option>
+<option value="trattativa">In trattativa</option>
+<option value="venduto">Venduto</option>
+<option value="affittato">Affittato</option>
+<option value="altro">Altro</option>
+</select>
+</div>
+<!-- Proprietario -->
+<div class="form-group">
+<label>Nome proprietario</label>
+<input id="imm-prop-nome" placeholder="Nome e cognome" type="text"/>
+</div>
+<div class="form-group">
+<label>Telefono proprietario</label>
+<input id="imm-prop-telefono" placeholder="+39 ..." type="tel"/>
+</div>
+<div class="form-group">
+<label>Email proprietario</label>
+<input id="imm-prop-email" placeholder="nome@esempio.it" type="email"/>
+</div>
+<div class="form-group">
+<label>Indirizzo</label>
+<input autocomplete="off" id="imm-indirizzo" placeholder="Es. via micca 5 torino (autocomplete)" type="text"/>
+</div>
+<div class="form-group">
+<label>Condominio</label>
+<input id="imm-condominio" placeholder="Nome condominio (per associare alla cartella/poligono)" type="text"/>
+</div>
+<div class="form-group">
+<label>Città</label>
+<input id="imm-citta" placeholder="Città" type="text"/>
+</div>
+<div class="form-group">
+<label>Provincia</label>
+<input id="imm-provincia" placeholder="Es. MI" type="text"/>
+</div>
+<div class="form-group">
+<label>CAP</label>
+<input id="imm-cap" placeholder="Es. 10121" type="text"/>
+</div>
 <!-- Tipologia / categoria -->
-                    <div class="form-group">
-                      <label>Tipologia contratto</label>
-                      <select id="imm-tipologia">
-                        <option value="vendita" selected>Vendita</option>
-                        <option value="affitto">Affitto</option>
-                      </select>
-                    </div>
-                    <div class="form-group">
-                      <label>Categoria immobile</label>
-                      <select id="imm-categoria">
-                        <option value="">—</option>
-                        <option value="Appartamento">Appartamento</option>
-                        <option value="Attico/Mansarda">Attico / Mansarda</option>
-                        <option value="Villa">Villa</option>
-                        <option value="Villetta a schiera">Villetta a schiera</option>
-                        <option value="Loft/Open space">Loft / Open space</option>
-                        <option value="Box/Autorimessa">Box / Autorimessa</option>
-                        <option value="Negozio/Ufficio">Negozio / Ufficio</option>
-                        <option value="Terreno">Terreno</option>
-                        <option value="Altro">Altro</option>
-                      </select>
-                    </div>
-
-                    <!-- Dimensioni -->
-                    <div class="form-group">
-                      <label>Piano</label>
-                      <input type="text" id="imm-piano" placeholder="Es. 3, rialzato, T/1">
-                    </div>
-                    <div class="form-group">
-                      <label>Metri quadri</label>
-                      <input type="number" id="imm-mq" min="0" step="1" placeholder="Es. 120">
-                    </div>
-
-                    <div class="form-group">
-                      <label>Locali</label>
-                      <input type="number" id="imm-locali" min="0" step="1">
-                    </div>
-                    <div class="form-group">
-                      <label>Bagni</label>
-                      <input type="number" id="imm-bagni" min="0" step="1">
-                    </div>
-
-                    <!-- Prezzo + caldo -->
-                    <div class="form-group">
-                      <label>Prezzo richiesto (€/totale)</label>
-                      <input type="number" id="imm-prezzo" min="0" step="1000" placeholder="Es. 750000">
-                    </div>
-                    <div class="form-group">
-                      <label>Flag caldo</label>
-                      <div style="display:flex;align-items:center;gap:6px;">
-                        <input type="checkbox" id="imm-caldo">
-                        <span style="font-size:12px;">Segna come segnalazione <strong>calda</strong> 🔥</span>
-                      </div>
-                    </div>
-
-                    <!-- File -->
-                    <div class="form-group">
-                      <label>Foto (solo nomi file memorizzati)</label>
-                      <input type="file" id="imm-foto" multiple accept="image/*">
-                    </div>
-                    <div class="form-group">
-                      <label>Documenti (PDF)</label>
-                      <input type="file" id="imm-docs" multiple accept="application/pdf">
-                    </div>
-
-                    <!-- Note -->
-                    <div class="form-group" style="grid-column:1 / -1;">
-                      <label>Note interne</label>
-                      <textarea id="imm-note" rows="2" placeholder="Annotazioni sintetiche sull'immobile, stato trattative, ecc."></textarea>
-                    </div>
-                  </div>
-
-                  <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:8px;">
-                    <button type="button" class="btn btn-sm" onclick="resetImmobiliForm()">Pulisci</button>
-                    <button type="submit" class="btn btn-primary btn-sm">Salva immobile</button>
-                  </div>
-                </form>
-              </div>
-
-              <div class="table-wrap" style="margin-top:12px;">
-                <table>
-                  <thead>
-                  <tr>
-                    <th>Rif.</th>
-                    <th>Indirizzo</th>
-                    <th>Città</th>
-                    <th>Contratto</th>
-                    <th>Categoria</th>
-                    <th>mq</th>
-                    <th>Prezzo</th>
-                    <th>Stato</th>
-                    <th>Caldo</th>
-                    <th>Responsabile</th>
-                    <th>Azioni</th>
-                  </tr>
-                  </thead>
-                  <tbody id="imm-table-body"></tbody>
-                </table>
-              </div>
-            </div>
-          </section>
-
-          <!-- NOTIZIE -->
-          <section class="view" id="view-notizie">
-            <div class="card">
-              <div class="card-header">
-                <div>
-                  <div class="card-title">🧩 Notizie</div>
-                  <div class="card-subtitle">
+<div class="form-group">
+<label>Tipologia contratto</label>
+<select id="imm-tipologia">
+<option selected="" value="vendita">Vendita</option>
+<option value="affitto">Affitto</option>
+</select>
+</div>
+<div class="form-group">
+<label>Categoria immobile</label>
+<select id="imm-categoria">
+<option value="">—</option>
+<option value="Appartamento">Appartamento</option>
+<option value="Attico/Mansarda">Attico / Mansarda</option>
+<option value="Villa">Villa</option>
+<option value="Villetta a schiera">Villetta a schiera</option>
+<option value="Loft/Open space">Loft / Open space</option>
+<option value="Box/Autorimessa">Box / Autorimessa</option>
+<option value="Negozio/Ufficio">Negozio / Ufficio</option>
+<option value="Terreno">Terreno</option>
+<option value="Altro">Altro</option>
+</select>
+</div>
+<!-- Dimensioni -->
+<div class="form-group">
+<label>Piano</label>
+<input id="imm-piano" placeholder="Es. 3, rialzato, T/1" type="text"/>
+</div>
+<div class="form-group">
+<label>Metri quadri</label>
+<input id="imm-mq" min="0" placeholder="Es. 120" step="1" type="number"/>
+</div>
+<div class="form-group">
+<label>Locali</label>
+<input id="imm-locali" min="0" step="1" type="number"/>
+</div>
+<div class="form-group">
+<label>Bagni</label>
+<input id="imm-bagni" min="0" step="1" type="number"/>
+</div>
+<!-- Prezzo + caldo -->
+<div class="form-group">
+<label>Prezzo richiesto (€/totale)</label>
+<input id="imm-prezzo" min="0" placeholder="Es. 750000" step="1000" type="number"/>
+</div>
+<div class="form-group">
+<label>Flag caldo</label>
+<div style="display:flex;align-items:center;gap:6px;">
+<input id="imm-caldo" type="checkbox"/>
+<span style="font-size:12px;">Segna come segnalazione <strong>calda</strong> 🔥</span>
+</div>
+</div>
+<!-- File -->
+<div class="form-group">
+<label>Foto (solo nomi file memorizzati)</label>
+<input accept="image/*" id="imm-foto" multiple="" type="file"/>
+</div>
+<div class="form-group">
+<label>Documenti (PDF)</label>
+<input accept="application/pdf" id="imm-docs" multiple="" type="file"/>
+</div>
+<!-- Note -->
+<div class="form-group" style="grid-column:1 / -1;">
+<label>Note interne</label>
+<textarea id="imm-note" placeholder="Annotazioni sintetiche sull'immobile, stato trattative, ecc." rows="2"></textarea>
+</div>
+</div>
+<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:8px;">
+<button class="btn btn-sm" onclick="resetImmobiliForm()" type="button">Pulisci</button>
+<button class="btn btn-primary btn-sm" type="submit">Salva immobile</button>
+</div>
+</form>
+</div>
+<div class="table-wrap" style="margin-top:12px;">
+<table>
+<thead>
+<tr>
+<th>Rif.</th>
+<th>Indirizzo</th>
+<th>Città</th>
+<th>Contratto</th>
+<th>Categoria</th>
+<th>mq</th>
+<th>Prezzo</th>
+<th>Stato</th>
+<th>Caldo</th>
+<th>Responsabile</th>
+<th>Azioni</th>
+</tr>
+</thead>
+<tbody id="imm-table-body"></tbody>
+</table>
+</div>
+</div>
+</section>
+<!-- NOTIZIE -->
+<section class="view" id="view-notizie">
+<div class="card">
+<div class="card-header">
+<div>
+<div class="card-title">🧩 Notizie</div>
+<div class="card-subtitle">
                     Contatti proprietari + info base sull'immobile potenziale. Puoi creare anche il contatto in rubrica.
                   </div>
-                </div>
-                <div class="card-actions">
-                  <button class="btn btn-sm" id="not-new-btn">Nuova notizia</button>
-                  <button class="btn btn-sm" id="not-export-csv">Esporta CSV</button>
-                </div>
-              </div>
-
-              <div class="card-body">
-                <!-- HOME NOTIZIE: vista card singola (scroll-snap) -->
-                <div id="notizie-home-wrap">
-                  <div class="notizie-toolbar">
-                    <div class="notizie-filters">
-                      <select id="not-filter-resp" class="input-sm">
-                        <option value="">Tutti i responsabili</option>
-                      </select>
-                      <select id="not-filter-label" class="input-sm">
-                        <option value="">Tutte le etichette</option>
-                      </select>
-                      <select id="not-filter-sort" class="input-sm">
-                        <option value="created_desc">Ultimo inserimento</option>
-                        <option value="recall_asc">Data ricontatto</option>
-                        <option value="label_asc">Etichetta</option>
-                      </select>
-                      <input id="not-filter-search" class="input-sm" type="text" placeholder="Cerca (indirizzo, proprietario, note...)">
-                    </div>
-                  </div>
-
-                  <div id="not-cards-viewport" class="notizie-cards-viewport" aria-label="Lista notizie a card">
-                    <div id="not-cards-container" class="notizie-cards-container"></div>
-                  </div>
-                </div>
-
-                <!-- MODALE: inserimento/modifica notizia -->
-                <div class="modal-overlay" id="notizie-modal-overlay">
-                  <div class="modal notizie-modal">
-                    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;">
-                      <div style="font-weight:700;">Scheda Notizia</div>
-                      <button type="button" class="btn btn-xs" id="not-modal-close">✕</button>
-                    </div>
-
-                <form id="not-form">
-                    <input type="hidden" id="not-id" value="">
-                  <div class="form-grid" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;">
-
-                    <!-- Contatto proprietario -->
-                    <div class="form-group">
-                      <label>Nome proprietario *</label>
-                      <input type="text" id="not-nome" placeholder="Nome">
-                    </div>
-                    <div class="form-group">
-                      <label>Cognome proprietario</label>
-                      <input type="text" id="not-cognome" placeholder="Cognome">
-                    </div>
-
-                    <div class="form-group">
-                      <label>Telefono</label>
-                      <input type="tel" id="not-telefono" placeholder="+39 ...">
-                    </div>
-                    <div class="form-group">
-                      <label>Email</label>
-                      <input type="email" id="not-email" placeholder="nome@esempio.it">
-                    </div>
-
-                    <div class="form-group" style="grid-column:1 / -1;">
-                      <label>
-                        <input type="checkbox" id="not-crea-contatto" checked>
-                        <span style="font-size:12px;margin-left:4px;">
+</div>
+<div class="card-actions">
+<button class="btn btn-sm" id="not-new-btn">Nuova notizia</button>
+<button class="btn btn-sm" id="not-export-csv">Esporta CSV</button>
+</div>
+</div>
+<div class="card-body">
+<!-- HOME NOTIZIE: vista card singola (scroll-snap) -->
+<div id="notizie-home-wrap">
+<div class="notizie-toolbar">
+<div class="notizie-filters">
+<select class="input-sm" id="not-filter-resp">
+<option value="">Tutti i responsabili</option>
+</select>
+<select class="input-sm" id="not-filter-label">
+<option value="">Tutte le etichette</option>
+</select>
+<select class="input-sm" id="not-filter-sort">
+<option value="created_desc">Ultimo inserimento</option>
+<option value="recall_asc">Data ricontatto</option>
+<option value="label_asc">Etichetta</option>
+</select>
+<input class="input-sm" id="not-filter-search" placeholder="Cerca (indirizzo, proprietario, note...)" type="text"/>
+</div>
+</div>
+<div aria-label="Lista notizie a card" class="notizie-cards-viewport" id="not-cards-viewport">
+<div class="notizie-cards-container" id="not-cards-container"></div>
+</div>
+</div>
+<!-- MODALE: inserimento/modifica notizia -->
+<div class="modal-overlay" id="notizie-modal-overlay">
+<div class="modal notizie-modal">
+<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;">
+<div style="font-weight:700;">Scheda Notizia</div>
+<button class="btn btn-xs" id="not-modal-close" type="button">✕</button>
+</div>
+<form id="not-form">
+<input id="not-id" type="hidden" value=""/>
+<div class="form-grid" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;">
+<!-- Contatto proprietario -->
+<div class="form-group">
+<label>Nome proprietario *</label>
+<input id="not-nome" placeholder="Nome" type="text"/>
+</div>
+<div class="form-group">
+<label>Cognome proprietario</label>
+<input id="not-cognome" placeholder="Cognome" type="text"/>
+</div>
+<div class="form-group">
+<label>Telefono</label>
+<input id="not-telefono" placeholder="+39 ..." type="tel"/>
+</div>
+<div class="form-group">
+<label>Email</label>
+<input id="not-email" placeholder="nome@esempio.it" type="email"/>
+</div>
+<div class="form-group" style="grid-column:1 / -1;">
+<label>
+<input checked="" id="not-crea-contatto" type="checkbox"/>
+<span style="font-size:12px;margin-left:4px;">
                           Crea anche un contatto in rubrica per questo proprietario
                         </span>
-                      </label>
-                    </div>
-
-                    <!-- Dati immobile potenziale -->
-                    <div class="form-group">
-                      <label>Indirizzo immobile</label>
-                      <input type="text" id="not-indirizzo" placeholder="Es. via micca 5 torino (autocomplete)" autocomplete="off" autocomplete="off">
-                    </div>
-                    <div class="form-group">
-                      <label>Città</label>
-                      <input type="text" id="not-citta" placeholder="Città">
-                    </div>
-
-                    <div class="form-group">
-                      <label>Provincia</label>
-                      <input type="text" id="not-provincia" placeholder="Es. MI">
-                    </div>
-
-                    
-
-                    <div class="form-group">
-                      <label>CAP</label>
-                      <input type="text" id="not-cap" placeholder="Es. 10121">
-                    </div>
-<div class="form-group">
-                      <label>Condominio (opz.)</label>
-                      <input type="text" id="not-condominio" list="condomini-datalist" placeholder="Seleziona o scrivi nome condominio">
-                    </div>
-                    <div class="form-group">
-                      <label>Tipologia immobile</label>
-                      <select id="not-tipologia">
-                        <option value="">—</option>
-                        <option value="Appartamento">Appartamento</option>
-                        <option value="Attico/Mansarda">Attico / Mansarda</option>
-                        <option value="Villa">Villa</option>
-                        <option value="Villetta a schiera">Villetta a schiera</option>
-                        <option value="Loft/Open space">Loft / Open space</option>
-                        <option value="Box/Autorimessa">Box / Autorimessa</option>
-                        <option value="Negozio/Ufficio">Negozio / Ufficio</option>
-                        <option value="Terreno">Terreno</option>
-                        <option value="Altro">Altro</option>
-                      </select>
-                    </div>
-
-                    <div class="form-group">
-                      <label>Piano</label>
-                      <input type="text" id="not-piano" placeholder="Es. rialzato, 2, T/1">
-                    </div>
-                    <div class="form-group">
-                      <label>Metri quadri</label>
-                      <input type="number" id="not-mq" min="0" step="1" placeholder="Es. 90">
-                    </div>
-
-                    <div class="form-group">
-                      <label>Flag caldo</label>
-                      <div style="display:flex;align-items:center;gap:6px;">
-                        <input type="checkbox" id="not-caldo">
-                        <span style="font-size:12px;">Segnalazione <strong>calda</strong> 🔥</span>
-                      </div>
-                    </div>
-
-                    <div class="form-group" style="grid-column:1 / -1;">
-                      <label>Note</label>
-                      <textarea id="not-note" rows="2" placeholder="Note sulla notizia, grado di interesse, prossimi passi, ecc."></textarea>
-                    </div>
-                  </div>
-
-                  <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:8px;">
-                    <button type="button" class="btn btn-sm" onclick="resetNotizieForm()">Pulisci</button>
-                    <button type="button" class="btn btn-sm" id="not-cancel-edit" style="display:none;">Annulla modifica</button>
-                    <button type="submit" class="btn btn-primary btn-sm" id="not-save-btn">Salva notizia</button>
-                  </div>
-                </form>
-              </div>
-
-              <div class="table-wrap" style="margin-top:12px;">
-                <table>
-                  <thead>
-                  <tr>
-                    <th>Contatto</th>
-                    <th>Telefono</th>
-                    <th>Indirizzo / Città</th>
-                    <th>Tipologia</th>
-                    <th>Piano</th>
-                    <th>mq</th>
-                    <th>Caldo</th>
-                    <th>Responsabile</th>
-                    <th>Azioni</th>
-                  </tr>
-                  </thead>
-                  <tbody id="not-table-body"></tbody>
-                </table>
-              
-                  </div>
-                </div>
+</label>
 </div>
-            </div>
-          </section>
-
+<!-- Dati immobile potenziale -->
+<div class="form-group">
+<label>Indirizzo immobile</label>
+<input autocomplete="off" id="not-indirizzo" placeholder="Es. via micca 5 torino (autocomplete)" type="text"/>
+</div>
+<div class="form-group">
+<label>Città</label>
+<input id="not-citta" placeholder="Città" type="text"/>
+</div>
+<div class="form-group">
+<label>Provincia</label>
+<input id="not-provincia" placeholder="Es. MI" type="text"/>
+</div>
+<div class="form-group">
+<label>CAP</label>
+<input id="not-cap" placeholder="Es. 10121" type="text"/>
+</div>
+<div class="form-group">
+<label>Condominio (opz.)</label>
+<input id="not-condominio" list="condomini-datalist" placeholder="Seleziona o scrivi nome condominio" type="text"/>
+</div>
+<div class="form-group">
+<label>Tipologia immobile</label>
+<select id="not-tipologia">
+<option value="">—</option>
+<option value="Appartamento">Appartamento</option>
+<option value="Attico/Mansarda">Attico / Mansarda</option>
+<option value="Villa">Villa</option>
+<option value="Villetta a schiera">Villetta a schiera</option>
+<option value="Loft/Open space">Loft / Open space</option>
+<option value="Box/Autorimessa">Box / Autorimessa</option>
+<option value="Negozio/Ufficio">Negozio / Ufficio</option>
+<option value="Terreno">Terreno</option>
+<option value="Altro">Altro</option>
+</select>
+</div>
+<div class="form-group">
+<label>Piano</label>
+<input id="not-piano" placeholder="Es. rialzato, 2, T/1" type="text"/>
+</div>
+<div class="form-group">
+<label>Metri quadri</label>
+<input id="not-mq" min="0" placeholder="Es. 90" step="1" type="number"/>
+</div>
+<div class="form-group">
+<label>Flag caldo</label>
+<div style="display:flex;align-items:center;gap:6px;">
+<input id="not-caldo" type="checkbox"/>
+<span style="font-size:12px;">Segnalazione <strong>calda</strong> 🔥</span>
+</div>
+</div>
+<div class="form-group" style="grid-column:1 / -1;">
+<label>Note</label>
+<textarea id="not-note" placeholder="Note sulla notizia, grado di interesse, prossimi passi, ecc." rows="2"></textarea>
+</div>
+</div>
+<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:8px;">
+<button class="btn btn-sm" onclick="resetNotizieForm()" type="button">Pulisci</button>
+<button class="btn btn-sm" id="not-cancel-edit" style="display:none;" type="button">Annulla modifica</button>
+<button class="btn btn-primary btn-sm" id="not-save-btn" type="submit">Salva notizia</button>
+</div>
+</form>
+</div>
+<div class="table-wrap" style="margin-top:12px;">
+<table>
+<thead>
+<tr>
+<th>Contatto</th>
+<th>Telefono</th>
+<th>Indirizzo / Città</th>
+<th>Tipologia</th>
+<th>Piano</th>
+<th>mq</th>
+<th>Caldo</th>
+<th>Responsabile</th>
+<th>Azioni</th>
+</tr>
+</thead>
+<tbody id="not-table-body"></tbody>
+</table>
+</div>
+</div>
+</div>
+</div>
+</section>
 <!-- RUBRICA / CONTATTI -->
 <section class="view" id="view-rubrica">
-  <div class="card">
-    <div class="card-header">
-      <div>
-        <div class="card-title">📇 Rubrica Contatti</div>
-        <div class="card-subtitle">
-          Proprietari & collegamenti con notizie e immobili. Sottosezioni: lista contatti, acquirenti, venditori.
+<div class="card">
+<div class="card-header">
+<div>
+<div class="card-title">📇 Rubrica Contatti</div>
+<div class="card-subtitle">
+          Proprietari &amp; collegamenti con notizie e immobili. Sottosezioni: lista contatti, acquirenti, venditori.
         </div>
-        <div class="muted" id="rubrica-counter" style="margin-top:4px;font-size:12px;">
-          <!-- Contatore contatti aggiornato da JS -->
-        </div>
-      </div>
-      <div class="card-actions">
-        <button class="btn btn-sm" id="rubrica-new-btn">Nuovo contatto</button>
-        <button class="btn btn-sm" id="rubrica-export-csv">Esporta CSV</button>
-      </div>
-    </div>
-
-    <div class="card-body">
-
-      <!-- Sottosezioni Rubrica: lista contatti / inserisci / acquirenti / venditori -->
-      <div class="rubrica-subnav">
-        <button type="button" class="btn btn-xs rubrica-subtab active" data-sub="lista">
+<div class="muted" id="rubrica-counter" style="margin-top:4px;font-size:12px;">
+<!-- Contatore contatti aggiornato da JS -->
+</div>
+</div>
+<div class="card-actions">
+<button class="btn btn-sm" id="rubrica-new-btn">Nuovo contatto</button>
+<button class="btn btn-sm" id="rubrica-export-csv">Esporta CSV</button>
+</div>
+</div>
+<div class="card-body">
+<!-- Sottosezioni Rubrica: lista contatti / inserisci / acquirenti / venditori -->
+<div class="rubrica-subnav">
+<button class="btn btn-xs rubrica-subtab active" data-sub="lista" type="button">
           Lista contatti
         </button>
-        <button type="button" class="btn btn-xs rubrica-subtab" data-sub="nuovo">
+<button class="btn btn-xs rubrica-subtab" data-sub="nuovo" type="button">
           Inserisci contatto
         </button>
-        <button type="button" class="btn btn-xs rubrica-subtab" data-sub="acquirenti">
+<button class="btn btn-xs rubrica-subtab" data-sub="acquirenti" type="button">
           Lista acquirenti
         </button>
-        <button type="button" class="btn btn-xs rubrica-subtab" data-sub="venditori">
+<button class="btn btn-xs rubrica-subtab" data-sub="venditori" type="button">
           Lista venditori
         </button>
-      </div>
-
-      <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;">
-        <input id="rubrica-filter" class="search-input" placeholder="Filtra per nome / telefono / email">
-        <button class="btn btn-sm" id="rubrica-filter-clear">Pulisci</button>
-      </div>
-
-      <div id="rubrica-list"></div>
-
-    </div>
-  </div>
-</section>
-
-
-
-<!-- MODALE NUOVO CONTATTO -->
-<div id="rubrica-dialog-overlay" class="modal-overlay" style="display:none;">
-  <div class="modal">
-    <div class="modal-header">
-      <div>
-        <div class="modal-title">➕ Aggiungi Contatto</div>
-        <div class="modal-subtitle">Inserisci i dati del proprietario / contatto</div>
-      </div>
-      <button class="btn btn-sm" id="rubrica-dialog-close">✕</button>
-    </div>
-
-    <form id="rubrica-form">
-      <div class="form-grid-2">
-        <div class="form-group">
-          <label>Nome e cognome *</label>
-          <input id="rubrica-nome" required>
-        </div>
-        <div class="form-group">
-          <label>Telefono</label>
-          <input id="rubrica-telefono" type="tel" placeholder="+39 ...">
-        </div>
-        <div class="form-group">
-          <label>Email</label>
-          <input id="rubrica-email" type="email">
-        </div>
-        <div class="form-group">
-          <label>Indirizzo</label>
-          <input id="rubrica-indirizzo">
-        </div>
-        <div class="form-group">
-          <label>Città</label>
-          <input id="rubrica-citta">
-        </div>
-        <div class="form-group">
-          <label>Provincia</label>
-          <input id="rubrica-provincia">
-        </div>
-
-        <div class="form-group" style="grid-column:1 / -1;">
-          <label>Ruolo del contatto</label>
-          <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
-            <label style="display:flex;align-items:center;gap:4px;font-size:12px;">
-              <input type="checkbox" id="rubrica-flag-acq">
-              <span>Acquirente</span>
-            </label>
-            <label style="display:flex;align-items:center;gap:4px;font-size:12px;">
-              <input type="checkbox" id="rubrica-flag-vend">
-              <span>Venditore</span>
-            </label>
-            <label style="display:flex;align-items:center;gap:4px;font-size:12px;">
-              <input type="checkbox" id="rubrica-flag-coll">
-              <span>Collaboratore</span>
-            </label>
-            <label style="display:flex;align-items:center;gap:4px;font-size:12px;">
-              <input type="checkbox" id="rubrica-flag-altro">
-              <span>Altro</span>
-            </label>
-          </div>
-        </div>
-
-        <div class="form-group" style="grid-column:1 / -1;">
-          <label>Note / provenienza contatto</label>
-          <textarea id="rubrica-note" rows="2" placeholder="Note su come hai ottenuto il contatto, interessi, ecc."></textarea>
-        </div>
-      </div>
-
-      <div style="display:flex;justify-content:flex-end;gap:8px;">
-        <button type="button" class="btn btn-sm" id="rubrica-dialog-cancel">Annulla</button>
-        <button class="btn btn-primary btn-sm" type="submit">Salva contatto</button>
-      </div>
-    </form>
-
-  </div>
 </div>
-
-
+<div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;">
+<input class="search-input" id="rubrica-filter" placeholder="Filtra per nome / telefono / email"/>
+<button class="btn btn-sm" id="rubrica-filter-clear">Pulisci</button>
+</div>
+<div id="rubrica-list"></div>
+</div>
+</div>
+</section>
+<!-- MODALE NUOVO CONTATTO -->
+<div class="modal-overlay" id="rubrica-dialog-overlay" style="display:none;">
+<div class="modal">
+<div class="modal-header">
+<div>
+<div class="modal-title">➕ Aggiungi Contatto</div>
+<div class="modal-subtitle">Inserisci i dati del proprietario / contatto</div>
+</div>
+<button class="btn btn-sm" id="rubrica-dialog-close">✕</button>
+</div>
+<form id="rubrica-form">
+<div class="form-grid-2">
+<div class="form-group">
+<label>Nome e cognome *</label>
+<input id="rubrica-nome" required=""/>
+</div>
+<div class="form-group">
+<label>Telefono</label>
+<input id="rubrica-telefono" placeholder="+39 ..." type="tel"/>
+</div>
+<div class="form-group">
+<label>Email</label>
+<input id="rubrica-email" type="email"/>
+</div>
+<div class="form-group">
+<label>Indirizzo</label>
+<input id="rubrica-indirizzo"/>
+</div>
+<div class="form-group">
+<label>Città</label>
+<input id="rubrica-citta"/>
+</div>
+<div class="form-group">
+<label>Provincia</label>
+<input id="rubrica-provincia"/>
+</div>
+<div class="form-group" style="grid-column:1 / -1;">
+<label>Ruolo del contatto</label>
+<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+<label style="display:flex;align-items:center;gap:4px;font-size:12px;">
+<input id="rubrica-flag-acq" type="checkbox"/>
+<span>Acquirente</span>
+</label>
+<label style="display:flex;align-items:center;gap:4px;font-size:12px;">
+<input id="rubrica-flag-vend" type="checkbox"/>
+<span>Venditore</span>
+</label>
+<label style="display:flex;align-items:center;gap:4px;font-size:12px;">
+<input id="rubrica-flag-coll" type="checkbox"/>
+<span>Collaboratore</span>
+</label>
+<label style="display:flex;align-items:center;gap:4px;font-size:12px;">
+<input id="rubrica-flag-altro" type="checkbox"/>
+<span>Altro</span>
+</label>
+</div>
+</div>
+<div class="form-group" style="grid-column:1 / -1;">
+<label>Note / provenienza contatto</label>
+<textarea id="rubrica-note" placeholder="Note su come hai ottenuto il contatto, interessi, ecc." rows="2"></textarea>
+</div>
+</div>
+<div style="display:flex;justify-content:flex-end;gap:8px;">
+<button class="btn btn-sm" id="rubrica-dialog-cancel" type="button">Annulla</button>
+<button class="btn btn-primary btn-sm" type="submit">Salva contatto</button>
+</div>
+</form>
+</div>
+</div>
 <!-- ATTIVITÀ -->
-          <section class="view" id="view-attivita">
-            <div class="card">
-              <div class="card-header">
-                <div>
-                  <div class="card-title">✅ Attività</div>
-                  <div class="card-subtitle">Task e appuntamenti collegati ad agenda, con reminder locali.</div>
-                </div>
-                <div class="card-actions">
-                  <button class="btn btn-sm" id="att-new-btn">Nuova attività</button>
-                  <button class="btn btn-sm" id="att-new-app-btn">Nuovo appuntamento</button>
-                </div>
-              </div>
-
-              <div class="card-body">
-                <!-- Riepilogo -->
-                <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;font-size:12px;">
-                  <div class="badge">Totali: <span id="att-count-tot">0</span></div>
-                  <div class="badge">Aperte: <span id="att-count-aperte">0</span></div>
-                  <div class="badge">Oggi: <span id="att-count-oggi">0</span></div>
-                  <div class="badge">Scadute: <span id="att-count-scadute">0</span></div>
-                </div>
-
-                <!-- Filtri -->
-                <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
-                  <div class="form-group" style="flex:0 0 160px;min-width:140px;">
-                    <label>Stato</label>
-                    <select id="att-filter-stato">
-                      <option value="tutte">Tutte</option>
-                      <option value="aperte">Aperte</option>
-                      <option value="chiuse">Chiuse</option>
-                      <option value="oggi">Oggi</option>
-                      <option value="scadute">Scadute</option>
-                    </select>
-                  </div>
-                  <div class="form-group" style="flex:0 0 200px;min-width:160px;">
-                    <label>Responsabile</label>
-                    <select id="att-filter-resp">
-                      <option value="tutti">Tutti</option>
-                    </select>
-                  </div>
-                  <div class="form-group" style="flex:1 1 220px;min-width:180px;">
-                    <label>Testo</label>
-                    <input type="text" id="att-filter-text" placeholder="Cerca in tipo/descrizione…">
-                  </div>
-                  <div class="form-group" style="align-self:flex-end;">
-                    <button class="btn btn-sm" id="att-filter-clear">Pulisci filtri</button>
-                  </div>
-                </div>
-
-                <!-- Tabella -->
-                <div class="table-wrap">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Data</th>
-                        <th>Ora</th>
-                        <th>Tipo</th>
-                        <th>Descrizione</th>
-                        <th>Responsabile</th>
-                        <th>Stato</th>
-                        <th>Azioni</th>
-                      </tr>
-                    </thead>
-                    <tbody id="att-table-body"></tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <!-- OPERAZIONI CONCLUSE -->
-          <section class="view" id="view-operazioni">
-            <div class="card">
-              <div class="card-header">
-                <div>
-                  <div class="card-title">📑 Operazioni concluse</div>
-                  <div class="card-subtitle">Ricavate dagli immobili marcati come venduti/affittati.</div>
-                </div>
-                <div class="card-actions">
-                  <button class="btn btn-sm" id="operazioni-export-csv">Esporta CSV</button>
-                </div>
-              </div>
-              <div class="table-wrap">
-                <table>
-                  <thead>
-                  <tr>
-                    <th>Rif.</th>
-                    <th>Indirizzo</th>
-                    <th>Data stipula</th>
-                    <th>Tipo</th>
-                    <th>Valore</th>
-                    <th>Provvigione</th>
-                  </tr>
-                  </thead>
-                  <tbody id="operazioni-body"></tbody>
-                </table>
-              </div>
-            </div>
-          </section>
-          <!-- MAPPA -->
-          <section class="view" id="view-mappa">
-            <div class="card">
-              <div class="card-header">
-                <div>
-                  <div class="card-title">🗺️ Mappa Immobili e Notizie</div>
-                  <div class="card-subtitle">
+<section class="view" id="view-attivita">
+<div class="card">
+<div class="card-header">
+<div>
+<div class="card-title">✅ Attività</div>
+<div class="card-subtitle">Task e appuntamenti collegati ad agenda, con reminder locali.</div>
+</div>
+<div class="card-actions">
+<button class="btn btn-sm" id="att-new-btn">Nuova attività</button>
+<button class="btn btn-sm" id="att-new-app-btn">Nuovo appuntamento</button>
+</div>
+</div>
+<div class="card-body">
+<!-- Riepilogo -->
+<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;font-size:12px;">
+<div class="badge">Totali: <span id="att-count-tot">0</span></div>
+<div class="badge">Aperte: <span id="att-count-aperte">0</span></div>
+<div class="badge">Oggi: <span id="att-count-oggi">0</span></div>
+<div class="badge">Scadute: <span id="att-count-scadute">0</span></div>
+</div>
+<!-- Filtri -->
+<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+<div class="form-group" style="flex:0 0 160px;min-width:140px;">
+<label>Stato</label>
+<select id="att-filter-stato">
+<option value="tutte">Tutte</option>
+<option value="aperte">Aperte</option>
+<option value="chiuse">Chiuse</option>
+<option value="oggi">Oggi</option>
+<option value="scadute">Scadute</option>
+</select>
+</div>
+<div class="form-group" style="flex:0 0 200px;min-width:160px;">
+<label>Responsabile</label>
+<select id="att-filter-resp">
+<option value="tutti">Tutti</option>
+</select>
+</div>
+<div class="form-group" style="flex:1 1 220px;min-width:180px;">
+<label>Testo</label>
+<input id="att-filter-text" placeholder="Cerca in tipo/descrizione…" type="text"/>
+</div>
+<div class="form-group" style="align-self:flex-end;">
+<button class="btn btn-sm" id="att-filter-clear">Pulisci filtri</button>
+</div>
+</div>
+<!-- Tabella -->
+<div class="table-wrap">
+<table>
+<thead>
+<tr>
+<th>Data</th>
+<th>Ora</th>
+<th>Tipo</th>
+<th>Descrizione</th>
+<th>Responsabile</th>
+<th>Stato</th>
+<th>Azioni</th>
+</tr>
+</thead>
+<tbody id="att-table-body"></tbody>
+</table>
+</div>
+</div>
+</div>
+</section>
+<!-- OPERAZIONI CONCLUSE -->
+<section class="view" id="view-operazioni">
+<div class="card">
+<div class="card-header">
+<div>
+<div class="card-title">📑 Operazioni concluse</div>
+<div class="card-subtitle">Ricavate dagli immobili marcati come venduti/affittati.</div>
+</div>
+<div class="card-actions">
+<button class="btn btn-sm" id="operazioni-export-csv">Esporta CSV</button>
+</div>
+</div>
+<div class="table-wrap">
+<table>
+<thead>
+<tr>
+<th>Rif.</th>
+<th>Indirizzo</th>
+<th>Data stipula</th>
+<th>Tipo</th>
+<th>Valore</th>
+<th>Provvigione</th>
+</tr>
+</thead>
+<tbody id="operazioni-body"></tbody>
+</table>
+</div>
+</div>
+</section>
+<!-- MAPPA -->
+<section class="view" id="view-mappa">
+<div class="card">
+<div class="card-header">
+<div>
+<div class="card-title">🗺️ Mappa Immobili e Notizie</div>
+<div class="card-subtitle">
                     Geolocalizza immobili e notizie, filtra e apri le schede. Usa la geocodifica automatica per indirizzi senza coordinate.
                   </div>
-                </div>
-                <div class="card-actions" style="flex-wrap:wrap;gap:6px;">
-                  <div class="form-group" style="min-width:140px;">
-                    <select id="mappa-filter">
-                      <option value="tutti">Tutti</option>
-                      <option value="immobili">Solo Immobili</option>
-                      <option value="notizie">Solo Notizie</option>
-                    </select>
-                  </div>
-                  <div class="form-group" style="min-width:150px;">
-                    <select id="mappa-tipologia">
-                      <option value="tutte">Tipologia: tutte</option>
-                      <option value="appartamento">Appartamento</option>
-                      <option value="villa">Villa</option>
-                      <option value="attico">Attico</option>
-                      <option value="ufficio">Ufficio</option>
-                    </select>
-                  </div>
-                  <div class="form-group" style="min-width:130px;">
-                    <select id="mappa-stato">
-                      <option value="tutti">Stato: tutti</option>
-                      <option value="in carico">In carico</option>
-                      <option value="trattativa">In trattativa</option>
-                      <option value="venduto">Venduto</option>
-                      <option value="affittato">Affittato</option>
-                      <option value="altro">Altro</option>
-                    </select>
-                  </div>
-                  <div class="form-group" style="min-width:110px;font-size:11px;">
-                    <label><input type="checkbox" id="mappa-solo-caldo"> Solo caldo</label>
-                  </div>
-                  <div class="form-group" style="min-width:150px;">
-                    <input type="number" id="mappa-prezzo-min" placeholder="€ min" style="width:100%;">
-                  </div>
-                  <div class="form-group" style="min-width:150px;">
-                    <input type="number" id="mappa-prezzo-max" placeholder="€ max" style="width:100%;">
-                  </div>
-                  <div class="form-group" style="min-width:100px;">
-                    <input type="number" id="mappa-mq-min" placeholder="mq min" style="width:100%;">
-                  </div>
-                  <div class="form-group" style="min-width:100px;">
-                    <input type="number" id="mappa-mq-max" placeholder="mq max" style="width:100%;">
-                  </div>
-                  <button class="btn btn-sm" id="mappa-geocode-imm">Geocod. immobili</button>
-                  <button class="btn btn-sm" id="mappa-geocode-not">Geocod. notizie</button>
-                </div>
-              </div>
-
-              <div class="card-body" style="padding:0;">
-                <div id="map" style="width:100%;height:480px;border-radius:0 0 8px 8px;"></div>
-
-                <div class="map-legend">
-                  <div class="map-legend-row">
-                    <span class="map-legend-dot" style="background:#22c55e;"></span>
-                    <span>Immobili</span>
-                  </div>
-                  <div class="map-legend-row">
-                    <span class="map-legend-dot" style="background:#f97316;"></span>
-                    <span>Notizie</span>
-                  </div>
-                </div>
-
-                <!-- Pannello dettaglio -->
-                <div id="map-detail-panel" class="map-detail-panel hidden">
-                  <div class="map-detail-header">
-                    <div class="map-detail-title" id="map-detail-title">Dettaglio</div>
-                    <button class="map-detail-close" id="map-detail-close">✕</button>
-                  </div>
-                  <div class="map-detail-body" id="map-detail-body"></div>
-                  <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:4px;">
-                    <button class="btn btn-xs" id="map-detail-open-btn">Apri scheda</button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <!-- STAFF -->
-          <section class="view" id="view-staff">
-            <div class="card">
-              <div class="card-header">
-                <div>
-                  <div class="card-title">👥 Staff studio</div>
-                  <div class="card-subtitle">
+</div>
+<div class="card-actions" style="flex-wrap:wrap;gap:6px;">
+<div class="form-group" style="min-width:140px;">
+<select id="mappa-filter">
+<option value="tutti">Tutti</option>
+<option value="immobili">Solo Immobili</option>
+<option value="notizie">Solo Notizie</option>
+</select>
+</div>
+<div class="form-group" style="min-width:150px;">
+<select id="mappa-tipologia">
+<option value="tutte">Tipologia: tutte</option>
+<option value="appartamento">Appartamento</option>
+<option value="villa">Villa</option>
+<option value="attico">Attico</option>
+<option value="ufficio">Ufficio</option>
+</select>
+</div>
+<div class="form-group" style="min-width:130px;">
+<select id="mappa-stato">
+<option value="tutti">Stato: tutti</option>
+<option value="in carico">In carico</option>
+<option value="trattativa">In trattativa</option>
+<option value="venduto">Venduto</option>
+<option value="affittato">Affittato</option>
+<option value="altro">Altro</option>
+</select>
+</div>
+<div class="form-group" style="min-width:110px;font-size:11px;">
+<label><input id="mappa-solo-caldo" type="checkbox"/> Solo caldo</label>
+</div>
+<div class="form-group" style="min-width:150px;">
+<input id="mappa-prezzo-min" placeholder="€ min" style="width:100%;" type="number"/>
+</div>
+<div class="form-group" style="min-width:150px;">
+<input id="mappa-prezzo-max" placeholder="€ max" style="width:100%;" type="number"/>
+</div>
+<div class="form-group" style="min-width:100px;">
+<input id="mappa-mq-min" placeholder="mq min" style="width:100%;" type="number"/>
+</div>
+<div class="form-group" style="min-width:100px;">
+<input id="mappa-mq-max" placeholder="mq max" style="width:100%;" type="number"/>
+</div>
+<button class="btn btn-sm" id="mappa-geocode-imm">Geocod. immobili</button>
+<button class="btn btn-sm" id="mappa-geocode-not">Geocod. notizie</button>
+</div>
+</div>
+<div class="card-body" style="padding:0;">
+<div id="map" style="width:100%;height:480px;border-radius:0 0 8px 8px;"></div>
+<div class="map-legend">
+<div class="map-legend-row">
+<span class="map-legend-dot" style="background:#22c55e;"></span>
+<span>Immobili</span>
+</div>
+<div class="map-legend-row">
+<span class="map-legend-dot" style="background:#f97316;"></span>
+<span>Notizie</span>
+</div>
+</div>
+<!-- Pannello dettaglio -->
+<div class="map-detail-panel hidden" id="map-detail-panel">
+<div class="map-detail-header">
+<div class="map-detail-title" id="map-detail-title">Dettaglio</div>
+<button class="map-detail-close" id="map-detail-close">✕</button>
+</div>
+<div class="map-detail-body" id="map-detail-body"></div>
+<div style="display:flex;justify-content:flex-end;gap:6px;margin-top:4px;">
+<button class="btn btn-xs" id="map-detail-open-btn">Apri scheda</button>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- STAFF -->
+<section class="view" id="view-staff">
+<div class="card">
+<div class="card-header">
+<div>
+<div class="card-title">👥 Staff studio</div>
+<div class="card-subtitle">
                     Ogni membro ha un colore agenda e un riepilogo di notizie, immobili, attività e appuntamenti assegnati.
                   </div>
-                </div>
-              </div>
-              <div id="staff-list-container"></div>
-            </div>
-
-            <!-- floating button -->
-            <button id="btn-staff-add"
-                    class="btn btn-primary btn-sm"
-                    style="position:fixed;right:22px;bottom:22px;z-index:40;">
+</div>
+</div>
+<div id="staff-list-container"></div>
+</div>
+<!-- floating button -->
+<button class="btn btn-primary btn-sm" id="btn-staff-add" style="position:fixed;right:22px;bottom:22px;z-index:40;">
               ＋ Nuovo membro
             </button>
-
-            <!-- MODALE STAFF -->
-            <div id="staff-dialog-overlay" class="modal-overlay">
-              <div class="modal">
-                <div class="modal-header">
-                  <div>
-                    <div class="modal-title">
-                      <span>🧑‍💼</span>
-                      <span id="staff-dialog-title">Nuovo membro staff</span>
-                    </div>
-                    <div class="modal-subtitle">
+<!-- MODALE STAFF -->
+<div class="modal-overlay" id="staff-dialog-overlay">
+<div class="modal">
+<div class="modal-header">
+<div>
+<div class="modal-title">
+<span>🧑‍💼</span>
+<span id="staff-dialog-title">Nuovo membro staff</span>
+</div>
+<div class="modal-subtitle">
                       Dati anagrafici e colore da associare agli appuntamenti.
                     </div>
-                  </div>
-                  <button class="btn btn-ghost btn-sm" id="staff-dialog-close">✕</button>
-                </div>
-                <form id="staff-form">
-                  <input type="hidden" id="staff-id">
-                  <div class="form-grid-2">
-                    <div class="form-group">
-                      <label>Nome e cognome</label>
-                      <input type="text" id="staff-nome" required>
-                    </div>
-                    <div class="form-group">
-                      <label>Ruolo</label>
-                      <input type="text" id="staff-ruolo" placeholder="Es. Agente, collaboratore…">
-                    </div>
-                    <div class="form-group">
-                      <label>Colore agenda</label>
-                      <input type="color" id="staff-colore" value="#22c55e">
-                    </div>
-                    <div class="form-group">
-                      <label>Telefono</label>
-                      <input type="tel" id="staff-telefono">
-                    </div>
-                    <div class="form-group">
-                      <label>Email</label>
-                      <input type="email" id="staff-email">
-                    </div>
-                  </div>
-                  <div class="form-group">
-                    <label>Note interne</label>
-                    <textarea id="staff-note"></textarea>
-                  </div>
-                  <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:6px;">
-                    <button type="button" class="btn btn-sm" id="staff-dialog-cancel">Annulla</button>
-                    <button type="submit" class="btn btn-primary btn-sm">Salva membro</button>
-                  </div>
-                </form>
-              </div>
-            </div>
-
-            <!-- MODALE ASSEGNAZIONE -->
-            <div id="staff-assign-overlay" class="modal-overlay">
-              <div class="modal">
-                <div class="modal-header">
-                  <div>
-                    <div class="modal-title">
-                      <span>📌</span>
-                      <span id="staff-assign-title">Assegna schede al membro</span>
-                    </div>
-                    <div class="modal-subtitle">
+</div>
+<button class="btn btn-ghost btn-sm" id="staff-dialog-close">✕</button>
+</div>
+<form id="staff-form">
+<input id="staff-id" type="hidden"/>
+<div class="form-grid-2">
+<div class="form-group">
+<label>Nome e cognome</label>
+<input id="staff-nome" required="" type="text"/>
+</div>
+<div class="form-group">
+<label>Ruolo</label>
+<input id="staff-ruolo" placeholder="Es. Agente, collaboratore…" type="text"/>
+</div>
+<div class="form-group">
+<label>Colore agenda</label>
+<input id="staff-colore" type="color" value="#22c55e"/>
+</div>
+<div class="form-group">
+<label>Telefono</label>
+<input id="staff-telefono" type="tel"/>
+</div>
+<div class="form-group">
+<label>Email</label>
+<input id="staff-email" type="email"/>
+</div>
+</div>
+<div class="form-group">
+<label>Note interne</label>
+<textarea id="staff-note"></textarea>
+</div>
+<div style="display:flex;justify-content:flex-end;gap:6px;margin-top:6px;">
+<button class="btn btn-sm" id="staff-dialog-cancel" type="button">Annulla</button>
+<button class="btn btn-primary btn-sm" type="submit">Salva membro</button>
+</div>
+</form>
+</div>
+</div>
+<!-- MODALE ASSEGNAZIONE -->
+<div class="modal-overlay" id="staff-assign-overlay">
+<div class="modal">
+<div class="modal-header">
+<div>
+<div class="modal-title">
+<span>📌</span>
+<span id="staff-assign-title">Assegna schede al membro</span>
+</div>
+<div class="modal-subtitle">
                       Collega notizie, immobili o attività al membro selezionato.
                     </div>
-                  </div>
-                  <button class="btn btn-ghost btn-sm" id="staff-assign-cancel-top">✕</button>
-                </div>
-                <form id="staff-assign-form">
-                  <input type="hidden" id="staff-assign-staff-id">
-                  <div class="form-group">
-                    <label>Tipo di elemento</label>
-                    <select id="staff-assign-tipo">
-                      <option value="immobili">Immobili</option>
-                      <option value="notizie">Notizie</option>
-                      <option value="attivita">Attività / appuntamenti</option>
-                    </select>
-                  </div>
-                  <div class="form-group">
-                    <label>Elemento</label>
-                    <select id="staff-assign-voce">
-                      <option value="">Seleziona…</option>
-                    </select>
-                  </div>
-                  <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:6px;">
-                    <button type="button" class="btn btn-sm" id="staff-assign-cancel-bottom">Annulla</button>
-                    <button type="submit" class="btn btn-primary btn-sm">Assegna</button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          
+</div>
+<button class="btn btn-ghost btn-sm" id="staff-assign-cancel-top">✕</button>
+</div>
+<form id="staff-assign-form">
+<input id="staff-assign-staff-id" type="hidden"/>
+<div class="form-group">
+<label>Tipo di elemento</label>
+<select id="staff-assign-tipo">
+<option value="immobili">Immobili</option>
+<option value="notizie">Notizie</option>
+<option value="attivita">Attività / appuntamenti</option>
+</select>
+</div>
+<div class="form-group">
+<label>Elemento</label>
+<select id="staff-assign-voce">
+<option value="">Seleziona…</option>
+</select>
+</div>
+<div style="display:flex;justify-content:flex-end;gap:6px;margin-top:6px;">
+<button class="btn btn-sm" id="staff-assign-cancel-bottom" type="button">Annulla</button>
+<button class="btn btn-primary btn-sm" type="submit">Assegna</button>
+</div>
+</form>
+</div>
+</div>
 </section>
-
-          <!-- OMI -->
-          <section class="view" id="view-omi">
-            <div class="card">
-              <div class="card-header">
-                <div>
-                  <div class="card-title">📊 Valori OMI</div>
-                  <div class="card-subtitle">Range €/mq per città e zona.</div>
-                </div>
-                <div class="card-actions">
-                  <button class="btn btn-sm" id="omi-new-btn">Nuovo valore</button>
-                </div>
-              </div>
-              <div class="table-wrap">
-                <table>
-                  <thead>
-                  <tr>
-                    <th>Città</th>
-                    <th>Zona</th>
-                    <th>Tipologia</th>
-                    <th>€/mq min</th>
-                    <th>€/mq max</th>
-                    <th></th>
-                  </tr>
-                  </thead>
-                  <tbody id="omi-body"></tbody>
-                </table>
-              </div>
-            </div>
-          </section>
-        </div>
-      </div>
-    </main>
-  </div>
+<!-- OMI -->
+<section class="view" id="view-omi">
+<div class="card">
+<div class="card-header">
+<div>
+<div class="card-title">📊 Valori OMI</div>
+<div class="card-subtitle">Range €/mq per città e zona.</div>
+</div>
+<div class="card-actions">
+<button class="btn btn-sm" id="omi-new-btn">Nuovo valore</button>
+</div>
+</div>
+<div class="table-wrap">
+<table>
+<thead>
+<tr>
+<th>Città</th>
+<th>Zona</th>
+<th>Tipologia</th>
+<th>€/mq min</th>
+<th>€/mq max</th>
+<th></th>
+</tr>
+</thead>
+<tbody id="omi-body"></tbody>
+</table>
+</div>
+</div>
+</section>
+</div>
+</div>
+</main>
+</div>
 <!-- MODALE APPUNTAMENTO -->
-            <div id="appuntamento-dialog-overlay" class="modal-overlay">
-              <div class="modal">
-                <div class="modal-header">
-                  <div>
-                    <div class="modal-title">
-                      <span>📅</span>
-                      <span>Scheda appuntamento</span>
-                    </div>
-                    <div class="modal-subtitle">
+<div class="modal-overlay" id="appuntamento-dialog-overlay">
+<div class="modal">
+<div class="modal-header">
+<div>
+<div class="modal-title">
+<span>📅</span>
+<span>Scheda appuntamento</span>
+</div>
+<div class="modal-subtitle">
                       Dettagli appuntamento, responsabile e cliente collegato.
                     </div>
-                  </div>
-                  <button class="btn btn-ghost btn-sm" id="appuntamento-dialog-close">✕</button>
-                </div>
-                <form id="appuntamento-form">
-                  <input type="hidden" id="app-id">
-                  <div class="form-grid-2">
-                    <div class="form-group">
-                      <label>Data</label>
-                      <input type="date" id="app-data">
-                    </div>
-                    <div class="form-group">
-                      <label>Ora inizio</label>
-                      <input type="time" id="app-ora">
-                    </div>
-                    <div class="form-group">
-                      <label>Ora fine</label>
-                      <input type="time" id="app-ora-fine">
-                    </div>
-                    <div class="form-group">
-                      <label>Tipo appuntamento</label>
-                      <select id="app-tipo">
-                        <option value="sopralluogo">Sopralluogo immobile</option>
-                        <option value="stima">Stima / valutazione</option>
-                        <option value="acquisizione">Incontro presa incarico</option>
-                        <option value="visita">Visita con cliente</option>
-                        <option value="trattativa">Incontro trattativa</option>
-                        <option value="rogito">Rogito / atto notarile</option>
-                        <option value="altro">Altro</option>
-                      </select>
-                    </div>
-                    <div class="form-group">
-                      <label>Responsabile (staff)</label>
-                      <select id="app-resp">
-                        <option value="">— Nessun responsabile —</option>
-                      </select>
-                    </div>
-                    <div class="form-group">
-                      <label>Cliente (rubrica)</label>
-                      <select id="app-cliente">
-                        <option value="">— Nessun cliente collegato —</option>
-                      </select>
-                    </div>
-                    <div class="form-group">
-                      <label>Collega a immobile</label>
-                      <select id="app-immobile">
-                        <option value="">— Nessun immobile collegato —</option>
-                      </select>
-                    </div>
-                    <div class="form-group">
-                      <label>Collega a notizia</label>
-                      <select id="app-notizia">
-                        <option value="">— Nessuna notizia collegata —</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div class="form-grid-2">
-                    <div class="form-group">
-                      <label>Luogo appuntamento</label>
-                      <input type="text" id="app-luogo" placeholder="Es. indirizzo o ufficio">
-                    </div>
-                    <div class="form-group">
-                      <label>Appuntamento in ufficio</label>
-                      <div style="display:flex;align-items:center;gap:6px;">
-                        <input type="checkbox" id="app-in-ufficio">
-                        <span style="font-size:12px;">Flag se l'incontro avviene in ufficio</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div class="form-group">
-                    <label>Città (ufficio)</label>
-                    <select id="app-citta-ufficio">
-                      <option value="">— Seleziona —</option>
-                      <option value="Alessandria">Alessandria</option>
-                      <option value="Torino">Torino</option>
-                      <option value="Milano">Milano</option>
-                    </select>
-                  </div>
-
-                  <div class="form-group">
-                    <label>Descrizione / note</label>
-                    <textarea id="app-descrizione" rows="3"></textarea>
-                  </div>
-                  <div class="form-group">
-                    <label>Stato</label>
-                    <select id="app-stato">
-                      <option value="aperta">Aperto</option>
-                      <option value="chiusa">Chiuso</option>
-                    </select>
-                  </div>
-                  <div class="form-group">
-                    <label>
-                      <input type="checkbox" id="app-bollente" style="margin-right:6px;">
+</div>
+<button class="btn btn-ghost btn-sm" id="appuntamento-dialog-close">✕</button>
+</div>
+<form id="appuntamento-form">
+<input id="app-id" type="hidden"/>
+<div class="form-grid-2">
+<div class="form-group">
+<label>Data</label>
+<input id="app-data" type="date"/>
+</div>
+<div class="form-group">
+<label>Ora inizio</label>
+<input id="app-ora" type="time"/>
+</div>
+<div class="form-group">
+<label>Ora fine</label>
+<input id="app-ora-fine" type="time"/>
+</div>
+<div class="form-group">
+<label>Tipo appuntamento</label>
+<select id="app-tipo">
+<option value="sopralluogo">Sopralluogo immobile</option>
+<option value="stima">Stima / valutazione</option>
+<option value="acquisizione">Incontro presa incarico</option>
+<option value="visita">Visita con cliente</option>
+<option value="trattativa">Incontro trattativa</option>
+<option value="rogito">Rogito / atto notarile</option>
+<option value="altro">Altro</option>
+</select>
+</div>
+<div class="form-group">
+<label>Responsabile (staff)</label>
+<select id="app-resp">
+<option value="">— Nessun responsabile —</option>
+</select>
+</div>
+<div class="form-group">
+<label>Cliente (rubrica)</label>
+<select id="app-cliente">
+<option value="">— Nessun cliente collegato —</option>
+</select>
+</div>
+<div class="form-group">
+<label>Collega a immobile</label>
+<select id="app-immobile">
+<option value="">— Nessun immobile collegato —</option>
+</select>
+</div>
+<div class="form-group">
+<label>Collega a notizia</label>
+<select id="app-notizia">
+<option value="">— Nessuna notizia collegata —</option>
+</select>
+</div>
+</div>
+<div class="form-grid-2">
+<div class="form-group">
+<label>Luogo appuntamento</label>
+<input id="app-luogo" placeholder="Es. indirizzo o ufficio" type="text"/>
+</div>
+<div class="form-group">
+<label>Appuntamento in ufficio</label>
+<div style="display:flex;align-items:center;gap:6px;">
+<input id="app-in-ufficio" type="checkbox"/>
+<span style="font-size:12px;">Flag se l'incontro avviene in ufficio</span>
+</div>
+</div>
+</div>
+<div class="form-group">
+<label>Città (ufficio)</label>
+<select id="app-citta-ufficio">
+<option value="">— Seleziona —</option>
+<option value="Alessandria">Alessandria</option>
+<option value="Torino">Torino</option>
+<option value="Milano">Milano</option>
+</select>
+</div>
+<div class="form-group">
+<label>Descrizione / note</label>
+<textarea id="app-descrizione" rows="3"></textarea>
+</div>
+<div class="form-group">
+<label>Stato</label>
+<select id="app-stato">
+<option value="aperta">Aperto</option>
+<option value="chiusa">Chiuso</option>
+</select>
+</div>
+<div class="form-group">
+<label>
+<input id="app-bollente" style="margin-right:6px;" type="checkbox"/>
                       Appuntamento bollente 🔥
                     </label>
-                  </div>
-                  <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:8px;">
-                    <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                      <button type="button" class="btn btn-ghost btn-sm" id="app-elimina">Elimina</button>
-                      <button type="button" class="btn btn-ghost btn-sm" id="app-esito-neg">Esito negativo</button>
-                      <button type="button" class="btn btn-ghost btn-sm" id="app-esito-pos">Esito positivo</button>
-                    </div>
-                    <div style="display:flex;gap:8px;">
-                      <button type="button" class="btn btn-ghost btn-sm" id="app-annulla">Annulla</button>
-                      <button type="submit" class="btn btn-sm">Salva</button>
-                    </div>
-                  </div>
-                </form>
-              </div>
-            </div>
-            
-
-
-<script src="crm-app_fixed.js"></script>
-
-
-  <!-- ====== MODALE: NUOVO CONDOMINIO (nome + indirizzo) ====== -->
-  <div id="condominio-modal" class="condominio-modal" aria-hidden="true">
-    <div class="condominio-modal__card" role="dialog" aria-modal="true" aria-labelledby="condominio-modal-title">
-      <div class="condominio-modal__head">
-        <div id="condominio-modal-title" class="condominio-modal__title">Nuovo condominio</div>
-        <button type="button" id="condominio-close" class="condominio-modal__close" aria-label="Chiudi">✕</button>
-      </div>
-      <div class="condominio-modal__body">
-        <div class="form-group">
-          <label>Nome condominio *</label>
-          <input type="text" id="condominio-nome" placeholder="Es. Condominio Aurora">
-        </div>
-        <div class="form-group">
-          <label>Indirizzo</label>
-          <input type="text" id="condominio-indirizzo" placeholder="Es. via micca 5 torino (autocomplete)" autocomplete="off" autocomplete="off">
-        </div>
-        <div class="form-group">
-          <label>Città</label>
-          <input type="text" id="condominio-citta" placeholder="Città">
-        </div>
-        <div class="form-group">
-          <label>Provincia</label>
-          <input type="text" id="condominio-provincia" placeholder="Es. MI">
-        </div>
-        
-        <div class="form-group">
-          <label>CAP</label>
-          <input type="text" id="condominio-cap" placeholder="Es. 10121">
-        </div>
+</div>
+<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:8px;">
+<div style="display:flex;gap:8px;flex-wrap:wrap;">
+<button class="btn btn-ghost btn-sm" id="app-elimina" type="button">Elimina</button>
+<button class="btn btn-ghost btn-sm" id="app-esito-neg" type="button">Esito negativo</button>
+<button class="btn btn-ghost btn-sm" id="app-esito-pos" type="button">Esito positivo</button>
+</div>
+<div style="display:flex;gap:8px;">
+<button class="btn btn-ghost btn-sm" id="app-annulla" type="button">Annulla</button>
+<button class="btn btn-sm" type="submit">Salva</button>
+</div>
+</div>
+</form>
+</div>
+</div>
+<script defer="defer" src="crm-app.js"></script>
+<!-- ====== MODALE: NUOVO CONDOMINIO (nome + indirizzo) ====== -->
+<div aria-hidden="true" class="condominio-modal" id="condominio-modal">
+<div aria-labelledby="condominio-modal-title" aria-modal="true" class="condominio-modal__card" role="dialog">
+<div class="condominio-modal__head">
+<div class="condominio-modal__title" id="condominio-modal-title">Nuovo condominio</div>
+<button aria-label="Chiudi" class="condominio-modal__close" id="condominio-close" type="button">✕</button>
+</div>
+<div class="condominio-modal__body">
+<div class="form-group">
+<label>Nome condominio *</label>
+<input id="condominio-nome" placeholder="Es. Condominio Aurora" type="text"/>
+</div>
+<div class="form-group">
+<label>Indirizzo</label>
+<input autocomplete="off" id="condominio-indirizzo" placeholder="Es. via micca 5 torino (autocomplete)" type="text"/>
+</div>
+<div class="form-group">
+<label>Città</label>
+<input id="condominio-citta" placeholder="Città" type="text"/>
+</div>
+<div class="form-group">
+<label>Provincia</label>
+<input id="condominio-provincia" placeholder="Es. MI" type="text"/>
+</div>
+<div class="form-group">
+<label>CAP</label>
+<input id="condominio-cap" placeholder="Es. 10121" type="text"/>
+</div>
 <div class="muted">Suggerimento: per associare una scheda immobile, compila il campo “Condominio” con lo stesso nome.</div>
-      </div>
-      <div class="condominio-modal__actions">
-        <button type="button" id="condominio-cancel" class="btn">Annulla</button>
-        <button type="button" id="condominio-save" class="btn btn-primary">Salva</button>
-      </div>
-    </div>
-  </div>
-
-  <datalist id="condomini-datalist"></datalist>
+</div>
+<div class="condominio-modal__actions">
+<button class="btn" id="condominio-cancel" type="button">Annulla</button>
+<button class="btn btn-primary" id="condominio-save" type="button">Salva</button>
+</div>
+</div>
+</div>
+<datalist id="condomini-datalist"></datalist>
 </body>
 </html>
