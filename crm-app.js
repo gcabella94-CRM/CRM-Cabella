@@ -1,3 +1,8 @@
+/* CRM-Cabella crm-app.js (FINAL) — generated 2025-12-17 18:20:08
+   If you see this line in Sources, you have the right file.
+*/
+window.__CRM_APP_LOADED__ = true;
+
 /* ====== STORAGE & UTILITY ====== */
 
   const STORAGE_KEYS = {
