@@ -1092,96 +1092,6 @@ function renderAgendaMonth() {
 
   }
 
-/* ====== MODAL NOTIZIE (UI tipo appuntamento) ====== */
-function openNotiziaModal(notizia = null) {
-  const overlay = document.getElementById('notizie-modal-overlay');
-  if (!overlay) return;
-
-  // reset base
-  resetNotizieForm();
-
-  // se modifica, precompila
-  if (notizia) {
-    const idEl = document.getElementById('not-id');
-    if (idEl) idEl.value = notizia.id || '';
-
-    const setVal = (id, v) => {
-      const el = document.getElementById(id);
-      if (!el) return;
-      if (el.type === 'checkbox') el.checked = !!v;
-      else el.value = (v ?? '');
-    };
-
-    setVal('not-nome', notizia.nome);
-    setVal('not-cognome', notizia.cognome);
-    setVal('not-telefono', notizia.telefono);
-    setVal('not-email', notizia.email);
-
-    setVal('not-indirizzo', notizia.indirizzo);
-    setVal('not-citta', notizia.citta);
-    setVal('not-provincia', notizia.provincia);
-    setVal('not-cap', notizia.cap);
-
-    setVal('not-tipologia', notizia.tipologia);
-    setVal('not-piano', notizia.piano);
-    setVal('not-mq', notizia.mq);
-    setVal('not-prezzo', notizia.prezzo);
-
-    setVal('not-caldo', !!notizia.caldo);
-    setVal('not-responsabile', notizia.responsabileId || '');
-    setVal('not-condominio', notizia.condominio || '');
-
-    setVal('not-note', notizia.note);
-
-    const saveBtn = document.getElementById('not-save-btn');
-    if (saveBtn) saveBtn.textContent = 'Salva modifiche';
-
-    const cancelBtn = document.getElementById('not-cancel-edit');
-    if (cancelBtn) cancelBtn.style.display = 'inline-flex';
-  }
-
-  overlay.style.display = 'flex';
-  document.body.classList.add('modal-open');
-
-  // focus sul primo campo
-  const first = overlay.querySelector('input, select, textarea');
-  if (first && first.focus) first.focus();
-}
-
-function closeNotiziaModal() {
-  const overlay = document.getElementById('notizie-modal-overlay');
-  if (!overlay) return;
-  overlay.style.display = 'none';
-  document.body.classList.remove('modal-open');
-}
-
-// chiudi da X / click fuori
-document.getElementById('not-modal-close')?.addEventListener('click', (e) => {
-  e.preventDefault();
-  closeNotiziaModal();
-});
-
-document.getElementById('notizie-modal-overlay')?.addEventListener('click', (e) => {
-  if (e.target && e.target.id === 'notizie-modal-overlay') closeNotiziaModal();
-});
-
-// annulla modifica (torna a nuova notizia senza chiudere)
-document.getElementById('not-cancel-edit')?.addEventListener('click', (e) => {
-  e.preventDefault();
-  openNotiziaModal(null);
-});
-
-// delega: apri modifica notizia da bottoni lista/tabella/card
-document.addEventListener('click', (e) => {
-  const btn = e.target?.closest?.('[data-not-edit]');
-  if (!btn) return;
-  const id = btn.getAttribute('data-not-edit');
-  if (!id) return;
-  const n = (notizie || []).find(x => x && x.id === id);
-  if (n) openNotiziaModal(n);
-});
-
-
   // Apre la scheda di inserimento immobile precompilando i dati a partire da una notizia
   function apriSchedaImmobileDaNotizia(notId) {
     if (!notizie || !notizie.length) return;
@@ -1471,17 +1381,86 @@ document.addEventListener('click', (e) => {
       }
       renderNotizie();
       resetNotizieForm();
-      closeNotiziaModal();
     });
   }
 
-  
-// Nuova notizia: apre il modal Notizie
-document.getElementById('not-new-btn')?.addEventListener('click', (e) => {
-  e.preventDefault();
-  openNotiziaModal(); // nuova
-});
+  // --- NOTIZIE: apertura modale "Nuova notizia" (UI tipo appuntamento) ---
+function openNotiziaModal(prefill) {
+  const overlay = document.getElementById('notizie-modal-overlay');
+  const form = document.getElementById('not-form');
+  if (!overlay || !form) return;
 
+  // reset + prefill
+  form.reset();
+  const idEl = document.getElementById('not-id');
+  if (idEl) idEl.value = (prefill && prefill.id) ? prefill.id : '';
+
+  // compila campi se presenti
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val ?? ''; };
+  if (prefill) {
+    set('not-etichetta', prefill.etichetta || 'generica');
+    set('not-nome', prefill.proprietarioNome || '');
+    set('not-telefono', prefill.proprietarioTelefono || '');
+    set('not-email', prefill.proprietarioEmail || '');
+    set('not-indirizzo', prefill.indirizzo || '');
+    set('not-citta', prefill.citta || '');
+    set('not-provincia', prefill.provincia || '');
+    set('not-cap', prefill.cap || '');
+    set('not-categoria', prefill.categoria || '');
+    set('not-tipologia', prefill.tipologia || 'vendita');
+    set('not-mq', prefill.mq ?? '');
+    set('not-prezzo', prefill.prezzo ?? '');
+    set('not-note', prefill.note || '');
+    set('not-non-risponde', prefill.nonRisponde ? '1' : ''); // se è checkbox lo gestisce il reset
+    const chk = document.getElementById('not-non-risponde');
+    if (chk && typeof chk.checked !== 'undefined') chk.checked = !!prefill.nonRisponde;
+    set('not-ricontatto', prefill.ricontatto || '');
+    set('not-resp', prefill.responsabileId || '');
+  }
+
+  overlay.style.display = 'flex';
+  // focus sul primo campo sensato
+  (document.getElementById('not-etichetta') || document.getElementById('not-indirizzo') || document.getElementById('not-nome'))?.focus?.();
+}
+
+function closeNotiziaModal() {
+  const overlay = document.getElementById('notizie-modal-overlay');
+  if (!overlay) return;
+  overlay.style.display = 'none';
+}
+
+(function bindNotizieModalUI(){
+  const overlay = document.getElementById('notizie-modal-overlay');
+  if (!overlay) return;
+
+  document.getElementById('not-modal-close')?.addEventListener('click', closeNotiziaModal);
+
+  // click fuori dalla modale
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) closeNotiziaModal();
+  });
+
+  // ESC
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      const ov = document.getElementById('notizie-modal-overlay');
+      if (ov && ov.style.display === 'flex') closeNotiziaModal();
+    }
+  });
+
+  // delega click "modifica" (se presente nelle card o altrove)
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest?.('[data-not-edit]');
+    if (!btn) return;
+    const id = btn.getAttribute('data-not-edit');
+    const n = (notizie || []).find(x => x && x.id === id);
+    if (n) openNotiziaModal(n);
+  });
+})();
+
+document.getElementById('not-new-btn')?.addEventListener('click', () => {
+  openNotiziaModal(null);
+});
 }
     const nomeEl = document.getElementById('not-nome');
     if (nomeEl) nomeEl.focus();
