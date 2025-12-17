@@ -12,7 +12,6 @@ window.__CRM_APP_LOADED__ = true;
     staff: 'crm10_staff',
     omi: 'crm10_omi',
     contatti: 'crm10_contatti',      // rubrica contatti proprietari
-    interazioni: 'crm10_interazioni', // timeline unificata (Notizie/Immobili/Contatti)
     intestazioni: 'crm10_intestazioni' // archivio header+footer per documenti IA
   ,    poligoni: 'crm10_mappa_poligoni' // archivio poligoni mappa (aree ricerca + condomini)
   };
@@ -24,7 +23,6 @@ window.__CRM_APP_LOADED__ = true;
   let omi = [];
   let contatti = [];      // rubrica contatti proprietari
   let intestazioni = [];
-  let interazioni = [];
   let lastCreatedAppId = null;
   // modelli di intestazione (header+footer)
 
@@ -45,109 +43,262 @@ window.__CRM_APP_LOADED__ = true;
       if (typeof cloudSync !== 'undefined') {
         cloudSync.save(key, value);
       }
-
-  
-
     } catch (e) {
       console.warn('[SYNC] Errore saveList cloudSync', key, e);
     }
   }
 
+  function genId(prefix = 'id') {
+    return `${prefix}
 
-/* ====== INTERAZIONI (Timeline unificata) ====== */
-  function loadInterazioni() {
-    try { interazioni = loadList(STORAGE_KEYS.interazioni || 'crm10_interazioni'); }
-    catch { interazioni = []; }
-    if (!Array.isArray(interazioni)) interazioni = [];
+/* ====== NOTIZIA DETTAGLIO (drawer) ====== */
+function ensureNotiziaDetailDrawer() {
+  let overlay = document.getElementById('notizia-detail-overlay');
+  if (overlay) return overlay;
+
+  overlay = document.createElement('div');
+  overlay.id = 'notizia-detail-overlay';
+  overlay.className = 'modal-overlay';
+
+  overlay.innerHTML = `
+    <div class="modal-panel notizia-detail-panel" role="dialog" aria-modal="true">
+      <div class="modal-header">
+        <div>
+          <div class="modal-title">Scheda Notizia</div>
+          <div class="modal-subtitle" id="notizia-detail-subtitle">Dettaglio</div>
+        </div>
+        <button class="btn btn-ghost" id="notizia-detail-close" title="Chiudi">✕</button>
+      </div>
+
+      <div class="modal-body" id="notizia-detail-body" style="padding-top:6px;">
+        <div class="notizia-detail-sections">
+          <div class="notizia-detail-section" id="notd-indirizzo">
+            <div class="card-title" style="font-size:13px;">📍 Dati immobile potenziale</div>
+            <div id="notd-indirizzo-content" class="muted" style="margin-top:6px;"></div>
+          </div>
+
+          <div class="notizia-detail-section" id="notd-proprietario" style="margin-top:10px;">
+            <div class="card-title" style="font-size:13px;">👤 Proprietario / Contatto</div>
+            <div id="notd-proprietario-content" class="muted" style="margin-top:6px;"></div>
+          </div>
+
+          <div class="notizia-detail-section" id="notd-timeline" style="margin-top:10px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+              <div class="card-title" style="font-size:13px;">🕒 Timeline</div>
+              <button class="btn btn-sm" id="notd-add-interazione">+ Interazione</button>
+            </div>
+            <div id="notd-timeline-list" style="margin-top:6px;"></div>
+
+            <div id="notd-add-interazione-box" style="display:none;margin-top:8px;border:1px solid #111827;border-radius:12px;padding:8px;background:rgba(2,6,23,0.55);">
+              <div class="form-grid-2">
+                <div class="form-group">
+                  <label>Tipo</label>
+                  <select id="notd-int-tipo">
+                    <option value="chiamata">Chiamata</option>
+                    <option value="whatsapp">WhatsApp</option>
+                    <option value="email">Email</option>
+                    <option value="sopralluogo">Sopralluogo</option>
+                    <option value="nota" selected>Nota</option>
+                    <option value="altro">Altro</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Esito</label>
+                  <select id="notd-int-esito">
+                    <option value="neutro" selected>Neutro</option>
+                    <option value="positivo">Positivo</option>
+                    <option value="negativo">Negativo</option>
+                    <option value="da_richiamare">Da richiamare</option>
+                    <option value="non_risponde">Non risponde</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label>Testo</label>
+                <textarea id="notd-int-testo" placeholder="Cosa ci siamo detti..."></textarea>
+              </div>
+
+              <div class="form-grid-2">
+                <div class="form-group">
+                  <label>Ricontatto (opz.)</label>
+                  <input id="notd-int-when" type="datetime-local">
+                </div>
+                <div class="form-group" style="display:flex;align-items:flex-end;gap:8px;">
+                  <label style="display:flex;align-items:center;gap:8px;">
+                    <input id="notd-int-crea-agenda" type="checkbox" checked>
+                    Crea in agenda (15 min)
+                  </label>
+                </div>
+              </div>
+
+              <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:6px;">
+                <button class="btn btn-ghost" id="notd-int-cancel">Annulla</button>
+                <button class="btn btn-primary" id="notd-int-save">Salva interazione</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="notizia-detail-section" id="notd-azioni" style="margin-top:10px;">
+            <div class="card-title" style="font-size:13px;">⚙️ Azioni</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;">
+              <button class="btn btn-sm" id="notd-btn-modifica">Modifica notizia</button>
+              <button class="btn btn-sm" id="notd-btn-chiudi">Chiudi</button>
+            </div>
+            <div class="muted" style="margin-top:6px;">(Livello 1) Da qui poi collegheremo conversione → Immobile e relazioni avanzate.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+
+  // close handlers
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) closeNotiziaDetail();
+  });
+  document.getElementById('notizia-detail-close')?.addEventListener('click', closeNotiziaDetail);
+  document.getElementById('notd-btn-chiudi')?.addEventListener('click', closeNotiziaDetail);
+
+  return overlay;
+}
+
+let __currentNotiziaDetail = null;
+
+function closeNotiziaDetail() {
+  const overlay = document.getElementById('notizia-detail-overlay');
+  if (overlay) overlay.style.display = 'none';
+  __currentNotiziaDetail = null;
+}
+
+function renderNotiziaDetail(n) {
+  if (!n) return;
+  __currentNotiziaDetail = n;
+
+  const sub = document.getElementById('notizia-detail-subtitle');
+  if (sub) {
+    const nome = [n.nome, n.cognome].filter(Boolean).join(' ').trim() || 'Senza nome';
+    sub.textContent = `${nome}${n.telefono ? ' · ' + n.telefono : ''}`;
   }
 
-  function saveInterazioni() {
-    try { saveList(STORAGE_KEYS.interazioni || 'crm10_interazioni', interazioni || []); } catch {}
+  // dati immobile
+  const indir = document.getElementById('notd-indirizzo-content');
+  if (indir) {
+    const indirizzoCompleto = [n.indirizzo, n.citta, n.provincia, n.cap].filter(Boolean).join(' · ');
+    indir.innerHTML = `
+      <div><strong>Indirizzo:</strong> ${escapeHtml(indirizzoCompleto || '—')}</div>
+      <div style="margin-top:4px;"><strong>Tipologia:</strong> ${escapeHtml(n.tipologia || '—')} &nbsp; <strong>MQ:</strong> ${escapeHtml((n.mq ?? '—').toString())} &nbsp; <strong>Piano:</strong> ${escapeHtml(n.piano || '—')}</div>
+      <div style="margin-top:4px;"><strong>Note:</strong> ${escapeHtml(n.note || '')}</div>
+    `;
   }
 
-  function getInterazioniForNotizia(notiziaId) {
-    if (!notiziaId) return [];
-    const arr = (interazioni || []).filter(x => x && x.links && x.links.notiziaId === notiziaId);
-    arr.sort((a,b) => (b.ts || '').localeCompare(a.ts || ''));
-    return arr;
+  // proprietario
+  const prop = document.getElementById('notd-proprietario-content');
+  if (prop) {
+    const nome = [n.nome, n.cognome].filter(Boolean).join(' ').trim() || '—';
+    prop.innerHTML = `
+      <div><strong>Proprietario:</strong> ${escapeHtml(nome)}</div>
+      <div style="margin-top:4px;"><strong>Telefono:</strong> ${escapeHtml(n.telefono || '—')} &nbsp; <strong>Email:</strong> ${escapeHtml(n.email || '—')}</div>
+    `;
   }
 
-  function getLastInteractionForNotizia(notiziaId) {
-    const arr = getInterazioniForNotizia(notiziaId);
-    return arr.length ? arr[0] : null;
-  }
-
-  function addInterazione(payload) {
-    if (!payload) return null;
-    const nowIso = new Date().toISOString();
-    const rec = {
-      id: payload.id || genId('int'),
-      ts: payload.ts || nowIso,
-      tipo: payload.tipo || 'nota',
-      esito: payload.esito || 'neutro',
-      testo: payload.testo || '',
-      prossimaAzione: payload.prossimaAzione || { enabled:false },
-      links: payload.links || { notiziaId:'', immobileId:'', contattoId:'', attivitaId:'' },
-      meta: payload.meta || {}
-    };
-    if (!Array.isArray(interazioni)) interazioni = [];
-    interazioni.push(rec);
-    saveInterazioni();
-    return rec;
-  }
-
-  function createRicontattoAppuntamentoFromNotizia(n, isoWhen, meta={}) {
-    try {
-      if (!n || !isoWhen) return null;
-      const d = new Date(isoWhen);
-      if (isNaN(d)) return null;
-      const dateIso = d.toISOString().slice(0,10);
-      const hh = String(d.getHours()).padStart(2,'0');
-      const mm = String(d.getMinutes()).padStart(2,'0');
-      const start = `${hh}:${mm}`;
-      const endDate = new Date(d.getTime() + 15*60*1000);
-      const eh = String(endDate.getHours()).padStart(2,'0');
-      const em = String(endDate.getMinutes()).padStart(2,'0');
-      const end = `${eh}:${em}`;
-
-      const app = {
-        id: genId('app'),
-        tipo: 'appuntamento',
-        data: dateIso,
-        ora: start,
-        oraFine: end,
-        tipoDettaglio: meta.tipoDettaglio || 'telefonata',
-        descrizione: meta.descrizione || `Ricontatto: ${(n.nome || '')} ${(n.cognome || '')}`.trim(),
-        responsabileId: n.responsabileId || ((staff && staff[0]) ? staff[0].id : ''),
-        clienteId: meta.clienteId || '',
-        immobileId: meta.immobileId || '',
-        notiziaId: n.id || '',
-        stato: 'aperta',
-        bollente: !!n.caldo,
-        luogo: meta.luogo || '',
-        inUfficio: false,
-        cittaUfficio: ''
-      };
-
-      if (!Array.isArray(attivita)) attivita = [];
-      attivita.push(app);
-      saveList(STORAGE_KEYS.attivita, attivita);
-
-      try { renderAttivita(); } catch {}
-      try { renderAgendaWeek(); } catch {}
-      try { renderAgendaMonth(); } catch {}
-      try { renderDashboard(); } catch {}
-      return app;
-    } catch (e) {
-      console.warn('[INTERAZIONI] createRicontattoAppuntamentoFromNotizia error', e);
-      return null;
+  // timeline
+  const list = document.getElementById('notd-timeline-list');
+  if (list) {
+    const items = getInterazioniForNotizia(n.id);
+    if (!items.length) {
+      list.innerHTML = '<div class="muted">Nessuna interazione registrata.</div>';
+    } else {
+      list.innerHTML = items.map(it => {
+        const when = formatDateIT(it.ts) || '';
+        const tipo = (it.tipo || 'nota');
+        const esito = (it.esito || 'neutro');
+        const txt = (it.testo || '').trim();
+        return `
+          <div class="notizia-timeline-item">
+            <div class="notizia-timeline-top">
+              <span class="tag"><span class="tag-dot"></span>${escapeHtml(tipo)}</span>
+              <span class="muted">${escapeHtml(when)}</span>
+              <span class="pill pill-strong" style="margin-left:auto;">${escapeHtml(esito)}</span>
+            </div>
+            <div class="notizia-timeline-text">${escapeHtml(txt || '—')}</div>
+          </div>
+        `;
+      }).join('');
     }
   }
-  /* ====== end INTERAZIONI ====== */
 
+  // bind azioni
+  document.getElementById('notd-btn-modifica')?.addEventListener('click', () => {
+    // apre SOLO la modale di modifica, non il dettaglio
+    openNotiziaModal(n);
+  });
 
-  function genId(prefix = 'id') {
-    return `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
+  // bind add interazione
+  const btnAdd = document.getElementById('notd-add-interazione');
+  const box = document.getElementById('notd-add-interazione-box');
+  btnAdd && btnAdd.addEventListener('click', () => {
+    if (!box) return;
+    box.style.display = (box.style.display === 'none' || !box.style.display) ? 'block' : 'none';
+  });
+
+  document.getElementById('notd-int-cancel')?.addEventListener('click', () => {
+    if (box) box.style.display = 'none';
+  });
+
+  document.getElementById('notd-int-save')?.addEventListener('click', () => {
+    const tipo = document.getElementById('notd-int-tipo')?.value || 'nota';
+    const esito = document.getElementById('notd-int-esito')?.value || 'neutro';
+    const testo = document.getElementById('notd-int-testo')?.value || '';
+    const whenLocal = document.getElementById('notd-int-when')?.value || '';
+    const creaAgenda = !!document.getElementById('notd-int-crea-agenda')?.checked;
+
+    let isoWhen = '';
+    if (whenLocal) {
+      // datetime-local -> ISO (locale)
+      const d = new Date(whenLocal);
+      if (!isNaN(d)) isoWhen = d.toISOString();
+    }
+
+    addInterazione({
+      tipo, esito, testo,
+      links: { notiziaId: n.id, immobileId:'', contattoId:'', attivitaId:'' },
+      prossimaAzione: isoWhen ? { enabled:true, when: isoWhen, durataMin: 15, creaInAgenda: creaAgenda } : { enabled:false }
+    });
+
+    if (isoWhen && creaAgenda) {
+      createRicontattoAppuntamentoFromNotizia(n, isoWhen, { tipoDettaglio: 'telefonata', descrizione: testo ? ('Ricontatto: ' + testo.slice(0,70)) : undefined });
+    }
+
+    // refresh UI
+    renderNotiziaDetail(n);
+    try { renderNotizie(); } catch {}
+    if (box) box.style.display = 'none';
+    const t = document.getElementById('notd-int-testo');
+    if (t) t.value = '';
+  });
+}
+
+function openNotiziaDetail(n, focusId='') {
+  const overlay = ensureNotiziaDetailDrawer();
+  overlay.style.display = 'flex';
+  renderNotiziaDetail(n);
+
+  // focus se richiesto
+  if (focusId) {
+    const map = {
+      'not-indirizzo': 'notd-indirizzo',
+      'not-proprietario': 'notd-proprietario',
+      'not-ultimo-contatto': 'notd-timeline',
+      'not-commento': 'notd-timeline'
+    };
+    const targetId = map[focusId] || focusId;
+    const el = document.getElementById(targetId);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+_${Math.random().toString(36).slice(2, 9)}`;
   }
 
   function formatEuro(val) {
@@ -1229,7 +1380,7 @@ function renderAgendaMonth() {
           <td>${caldoLabel}</td>
           <td>${escapeHtml(staffObj?.nome || n.responsabileId || '—')}</td>
           <td>
-            <button class="btn btn-xs" data-not-open="${escapeHtml(n.id)}">Apri</button>
+            <button class="btn btn-xs" data-not-edit="${escapeHtml(n.id)}">Apri</button>
             <button class="btn btn-xs btn-danger" data-not-del="${escapeHtml(n.id)}">Elimina</button>
           </td>
         `;
@@ -1254,12 +1405,6 @@ function renderAgendaMonth() {
           const indirizzoCompleto = [n.indirizzo || '', n.citta || '', n.provincia ? `(${n.provincia})` : '', n.cap || ''].filter(Boolean).join(' ');
           const ric = n.ricontatto ? formatDateTimeIT(n.ricontatto) : '';
 
-
-          const lastInt = (typeof getLastInteractionForNotizia==='function') ? getLastInteractionForNotizia(n.id) : null;
-          const lastTs = (lastInt && lastInt.ts) ? lastInt.ts : (n.ultimoContattoAt || '');
-          const lastTxt = (lastInt && lastInt.testo) ? lastInt.testo : (n.commentoUltimaInterazione || '');
-          const lastEsito = (lastInt && lastInt.esito) ? lastInt.esito : '';
-          const lastLabel = lastTs ? formatDateTimeIT(lastTs) : '—';
           const card = document.createElement('div');
           card.className = 'notizia-card';
           card.setAttribute('tabindex','0');
@@ -1271,7 +1416,7 @@ function renderAgendaMonth() {
                 ${n.nonRisponde ? '<span class="badge">⛔ non risponde</span>' : ''}
               </div>
               <div class="notizia-card-actions">
-                <button class="btn btn-xs" data-not-open="${escapeHtml(n.id)}">Apri</button>
+                <button class="btn btn-xs" data-not-edit="${escapeHtml(n.id)}">Apri</button>
                 <button class="btn btn-xs btn-danger" data-not-del="${escapeHtml(n.id)}">Elimina</button>
               </div>
             </div>
@@ -1315,14 +1460,14 @@ function renderAgendaMonth() {
               <div class="notizia-line" style="margin-top:10px;">
                 <div class="notizia-label">Ultimo contatto</div>
                 <div class="notizia-value clickable" data-not-jump="${escapeHtml(n.id)}" data-jump="not-note">
-                  ${escapeHtml(lastLabel)}
+                  ${escapeHtml(n.ultimoContattoAt ? formatDateTimeIT(n.ultimoContattoAt) : '—')}
                 </div>
               </div>
 
-              <details class="notizia-details" ${lastTxt ? '' : 'data-empty="1"'}>
-                <summary>${lastTxt ? 'Commento ultimo contatto' : 'Nessun commento (clicca per aggiungere)'}</summary>
+              <details class="notizia-details" ${n.commentoUltimaInterazione ? '' : 'data-empty="1"'}>
+                <summary>${n.commentoUltimaInterazione ? 'Commento ultimo contatto' : 'Nessun commento (clicca per aggiungere)'}</summary>
                 <div class="notizia-details-body">
-                  <div class="muted" style="margin-bottom:6px;">${escapeHtml(lastTxt || '')}</div>
+                  <div class="muted" style="margin-bottom:6px;">${escapeHtml(n.commentoUltimaInterazione || '')}</div>
 
                   <div class="notizia-lastcomment-box">
                     <textarea class="input-sm" rows="2" placeholder="Scrivi qui il commento dell’ultimo contatto…"
@@ -1362,6 +1507,7 @@ function renderAgendaMonth() {
 
           // apri con click su card (ma non sui bottoni)
           card.addEventListener('click', (ev) => {
+            // click sulla card = apri DETTAGLIO (non la UI di inserimento)
             if (ev.target.closest('button')) return;
             openNotiziaDetail(n);
           });
@@ -1744,185 +1890,6 @@ function closeNotiziaModal() {
   overlay.style.display = 'none';
 }
 
-
-
-/* ====== NOTIZIE — DETTAGLIO (drawer) ====== */
-
-function ensureNotiziaDetailUI() {
-  if (document.getElementById('notizia-detail-overlay')) return;
-
-  const overlay = document.createElement('div');
-  overlay.id = 'notizia-detail-overlay';
-  overlay.className = 'drawer-overlay';
-  overlay.style.display = 'none';
-  overlay.innerHTML = `
-    <div class="drawer-panel" role="dialog" aria-modal="true" aria-label="Dettaglio notizia">
-      <div class="drawer-header">
-        <div>
-          <div class="drawer-title" id="notizia-detail-title">Scheda Notizia</div>
-          <div class="drawer-subtitle" id="notizia-detail-sub">—</div>
-        </div>
-        <button class="btn btn-xs" id="notizia-detail-close" title="Chiudi">✕</button>
-      </div>
-
-      <div class="drawer-body" id="notizia-detail-body"></div>
-
-      <div class="drawer-footer">
-        <button class="btn btn-sm" id="notizia-detail-edit">Modifica</button>
-        <button class="btn btn-sm" id="notizia-detail-to-imm">Crea immobile</button>
-        <button class="btn btn-sm" id="notizia-detail-new-app">Crea appuntamento</button>
-      </div>
-    </div>
-  `;
-
-  document.body.appendChild(overlay);
-
-  // chiusura click esterno
-  overlay.addEventListener('click', (e) => {
-    if (e.target === overlay) closeNotiziaDetail();
-  });
-
-  // ESC
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-      const ov = document.getElementById('notizia-detail-overlay');
-      if (ov && ov.style.display === 'flex') closeNotiziaDetail();
-    }
-  });
-
-  document.getElementById('notizia-detail-close')?.addEventListener('click', closeNotiziaDetail);
-}
-
-function closeNotiziaDetail() {
-  const overlay = document.getElementById('notizia-detail-overlay');
-  if (!overlay) return;
-  overlay.style.display = 'none';
-}
-
-function renderNotiziaDetail(n) {
-  const body = document.getElementById('notizia-detail-body');
-  const title = document.getElementById('notizia-detail-title');
-  const sub = document.getElementById('notizia-detail-sub');
-  if (!body) return;
-
-  const nome = ((n.nome || '') + ' ' + (n.cognome || '')).trim() || '—';
-  const addr = [n.indirizzo || '', n.citta || ''].filter(Boolean).join(' · ') || 'Indirizzo non inserito';
-
-  if (title) title.textContent = `Notizia: ${nome}`;
-  if (sub) sub.textContent = addr;
-
-  // ultimo contatto: preferisci timeline interazioni
-  let last = null;
-  try {
-    const list = Array.isArray(interazioni) ? interazioni : [];
-    const rel = list.filter(x => x && x.links && x.links.notiziaId === n.id);
-    rel.sort((a,b) => (b.ts || '').localeCompare(a.ts || ''));
-    last = rel[0] || null;
-  } catch {}
-
-  const lastLabel = last?.ts ? formatDate(last.ts.slice(0,10)) : (n.ultimoContatto ? formatDate(n.ultimoContatto) : '—');
-  const lastNote = (last?.testo || n.commentoUltimoContatto || '').trim();
-
-  const ric = (n.ricontatto || '').trim();
-
-  body.innerHTML = `
-    <div class="drawer-section">
-      <div class="drawer-kv"><span class="k">Etichetta</span><span class="v">${escapeHtml(n.etichetta || 'generica')}</span></div>
-      <div class="drawer-kv"><span class="k">Telefono</span><span class="v">${escapeHtml(n.telefono || '—')}</span></div>
-      <div class="drawer-kv"><span class="k">Email</span><span class="v">${escapeHtml(n.email || '—')}</span></div>
-      <div class="drawer-kv"><span class="k">Tipologia</span><span class="v">${escapeHtml(n.tipologia || '—')}</span></div>
-      <div class="drawer-kv"><span class="k">MQ</span><span class="v">${escapeHtml(n.mq != null ? String(n.mq) : '—')}</span></div>
-      <div class="drawer-kv"><span class="k">Piano</span><span class="v">${escapeHtml(n.piano || '—')}</span></div>
-      <div class="drawer-kv"><span class="k">Condominio</span><span class="v">${escapeHtml(n.condominio || '—')}</span></div>
-      <div class="drawer-kv"><span class="k">Ultimo contatto</span><span class="v">${escapeHtml(lastLabel)}</span></div>
-      <div class="drawer-kv"><span class="k">Ricontatto</span><span class="v">${escapeHtml(ric || '—')}</span></div>
-    </div>
-
-    <div class="drawer-section" id="notizia-detail-commento">
-      <div class="drawer-section-title">Commento ultimo contatto</div>
-      <div class="drawer-note">${escapeHtml(lastNote || '—')}</div>
-    </div>
-
-    <div class="drawer-section" id="notizia-detail-note">
-      <div class="drawer-section-title">Note</div>
-      <div class="drawer-note">${escapeHtml((n.note || '').trim() || '—')}</div>
-    </div>
-
-    <div class="drawer-section" id="notizia-detail-interazioni">
-      <div class="drawer-section-title">Interazioni</div>
-      <div class="drawer-interazioni">
-        ${(() => {
-          try {
-            const list = Array.isArray(interazioni) ? interazioni : [];
-            const rel = list.filter(x => x && x.links && x.links.notiziaId === n.id);
-            rel.sort((a,b) => (b.ts || '').localeCompare(a.ts || ''));
-            if (!rel.length) return '<div class="muted">Nessuna interazione registrata.</div>';
-            return rel.slice(0, 25).map(ev => {
-              const d = ev.ts ? (ev.ts.slice(0,10) + ' ' + (ev.ts.slice(11,16) || '')) : '';
-              return `
-                <div class="drawer-int">
-                  <div class="drawer-int__meta">${escapeHtml(d)} · ${escapeHtml(ev.tipo || '—')} · ${escapeHtml(ev.esito || '—')}</div>
-                  <div class="drawer-int__txt">${escapeHtml((ev.testo || '').trim() || '—')}</div>
-                </div>
-              `;
-            }).join('');
-          } catch {
-            return '<div class="muted">Interazioni non disponibili.</div>';
-          }
-        })()}
-      </div>
-    </div>
-  `;
-}
-
-function openNotiziaDetail(n, focusSectionId) {
-  if (!n) return;
-  ensureNotiziaDetailUI();
-  const overlay = document.getElementById('notizia-detail-overlay');
-  if (!overlay) return;
-
-  overlay.style.display = 'flex';
-
-  // bind bottoni footer per questa notizia
-  const editBtn = document.getElementById('notizia-detail-edit');
-  const toImmBtn = document.getElementById('notizia-detail-to-imm');
-  const newAppBtn = document.getElementById('notizia-detail-new-app');
-
-  if (editBtn) {
-    editBtn.onclick = () => {
-      closeNotiziaDetail();
-      openNotiziaDetail(n);
-    };
-  }
-  if (toImmBtn) {
-    toImmBtn.onclick = () => {
-      closeNotiziaDetail();
-      if (typeof apriSchedaImmobileDaNotizia === 'function') apriSchedaImmobileDaNotizia(n.id);
-    };
-  }
-  if (newAppBtn) {
-    newAppBtn.onclick = () => {
-      closeNotiziaDetail();
-      if (typeof creaAppuntamentoDaNotiziaId === 'function') creaAppuntamentoDaNotiziaId(n.id);
-    };
-  }
-
-  renderNotiziaDetail(n);
-
-  if (focusSectionId) {
-    // mapping "focusId" vecchi -> sezioni drawer
-    const map = {
-      'not-indirizzo': 'notizia-detail-title',
-      'not-note': 'notizia-detail-note',
-      'not-telefono': 'notizia-detail-title',
-      'not-email': 'notizia-detail-title'
-    };
-    const targetId = map[focusSectionId] || focusSectionId;
-    const el = document.getElementById(targetId);
-    el?.scrollIntoView?.({ block: 'start' });
-  }
-}
-
 function bindNotizieModalUI() {
   const overlay = document.getElementById('notizie-modal-overlay');
   if (!overlay) return;
@@ -1945,15 +1912,7 @@ function bindNotizieModalUI() {
   // delega click "modifica" (se presente nelle card o altrove)
   // deleghe click per azioni card Notizie
   document.addEventListener('click', (e) => {
-        const openBtn = e.target.closest?.('[data-not-open]');
-    if (openBtn) {
-      const id = openBtn.getAttribute('data-not-open');
-      const n = (notizie || []).find(x => x && x.id === id);
-      if (n) openNotiziaDetail(n);
-      return;
-    }
-
-const editBtn = e.target.closest?.('[data-not-edit]');
+    const editBtn = e.target.closest?.('[data-not-edit]');
     if (editBtn) {
       const id = editBtn.getAttribute('data-not-edit');
       const n = (notizie || []).find(x => x && x.id === id);
@@ -2019,37 +1978,6 @@ const editBtn = e.target.closest?.('[data-not-edit]');
       n.ricontatto = iso;
       n.nonRisponde = true;
 
-      // Interazione + appuntamento ricontatto (15')
-      try {
-        addInterazione({
-          tipo: 'chiamata',
-          esito: 'non_risponde',
-          testo: 'Chiamato: non risponde. Ricontatto fissato.',
-          ts: new Date().toISOString(),
-          prossimaAzione: { enabled: true, when: iso, kind: 'ricontatto' },
-          links: { notiziaId: id, immobileId: '', contattoId: '', attivitaId: '' }
-        });
-      } catch {}
-
-      try {
-        const app = createRicontattoAppuntamentoFromNotizia(n, iso, {
-          tipoDettaglio: 'telefonata',
-          descrizione: `Ricontatto (non risponde) – ${(n.nome || '')} ${(n.cognome || '')}`.trim()
-        });
-        if (app && app.id) {
-          try {
-            addInterazione({
-              tipo: 'appuntamento',
-              esito: 'programmato',
-              testo: 'Creato appuntamento in agenda (ricontatto).',
-              ts: new Date().toISOString(),
-              links: { notiziaId: id, immobileId: '', contattoId: '', attivitaId: app.id }
-            });
-          } catch {}
-        }
-      } catch {}
-
-
       try { saveList(STORAGE_KEYS.notizie, notizie); } catch {}
       renderNotizie();
       return;
@@ -2065,26 +1993,15 @@ const editBtn = e.target.closest?.('[data-not-edit]');
       const val = (ta?.value || '').trim();
       if (!val) { alert('Inserisci un commento.'); return; }
 
-      // Salva come ultima interazione + crea evento in timeline
-      const nowIso = new Date().toISOString();
-      n.commentoUltimaInterazione = val; // compat (vecchio campo)
-      n.ultimoContattoAt = nowIso;
+      n.commentoUltimaInterazione = val;
+      n.ultimoContattoAt = new Date().toISOString();
       n._draftLastComment = '';
-      try {
-        addInterazione({
-          tipo: 'nota',
-          esito: 'ok',
-          testo: val,
-          ts: nowIso,
-          links: { notiziaId: id, immobileId: '', contattoId: '', attivitaId: '' }
-        });
-      } catch {}
       try { saveList(STORAGE_KEYS.notizie, notizie); } catch {}
       renderNotizie();
       return;
     }
   });
-}
+}}
 bindNotizieModalUI();
 
 document.getElementById('not-new-btn')?.addEventListener('click', () => {
@@ -5347,7 +5264,6 @@ function initPoligoniModule() {
     omi = loadList(STORAGE_KEYS.omi);
     contatti = loadList(STORAGE_KEYS.contatti);
     intestazioni = loadList(STORAGE_KEYS.intestazioni || 'crm10_intestazioni');
-    interazioni = loadList(STORAGE_KEYS.interazioni || 'crm10_interazioni');
   }
 
   
