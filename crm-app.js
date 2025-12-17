@@ -1142,8 +1142,7 @@ function renderAgendaMonth() {
     if (caldo) pills.push(`<span class="notizia-pill">🔥 Caldo</span>`);
 
     const note = (n.note || '').trim();
-    const noteHtml = note ? escapeHtml(note).replace(/
-/g,'<br>') : '<span class="notizia-muted">Nessuna nota.</span>';
+    const noteHtml = note ? escapeHtml(note).replace(/\n/g,'<br>') : '<span class="notizia-muted">Nessuna nota.</span>';
 
     card.innerHTML = `
       <div class="notizia-card-inner">
