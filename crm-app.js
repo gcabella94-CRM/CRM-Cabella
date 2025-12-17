@@ -1461,10 +1461,6 @@ function closeNotiziaModal() {
 document.getElementById('not-new-btn')?.addEventListener('click', () => {
   openNotiziaModal(null);
 });
-}
-    const nomeEl = document.getElementById('not-nome');
-    if (nomeEl) nomeEl.focus();
-  });
 
 /* ====== RUBRICA / CONTATTI ====== */
 

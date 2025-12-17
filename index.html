@@ -23,15 +23,7 @@
   <!-- Firebase Realtime Database (compat) -->
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-  <script src="firebase-sync.js" defer></script>
-
-  <!-- PERF: preconnect to CDNs -->
-  <link rel="preconnect" href="https://unpkg.com" crossorigin>
-  <link rel="dns-prefetch" href="https://unpkg.com">
-  <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
-  <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
-  <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
-  <link rel="dns-prefetch" href="https://www.gstatic.com">
+  <script src="firebase-sync.js"></script>
 </head>
 <body>
   <div class="app-shell">
@@ -1410,7 +1402,13 @@
                 </form>
               </div>
             </div>
-<!-- ====== MODALE: NUOVO CONDOMINIO (nome + indirizzo) ====== -->
+            
+
+
+<script src="crm-app.js"></script>
+
+
+  <!-- ====== MODALE: NUOVO CONDOMINIO (nome + indirizzo) ====== -->
   <div id="condominio-modal" class="condominio-modal" aria-hidden="true">
     <div class="condominio-modal__card" role="dialog" aria-modal="true" aria-labelledby="condominio-modal-title">
       <div class="condominio-modal__head">
@@ -1449,6 +1447,5 @@
   </div>
 
   <datalist id="condomini-datalist"></datalist>
-  <script src="crm-app.js" defer></script>
 </body>
 </html>
