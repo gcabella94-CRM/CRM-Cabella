@@ -1434,7 +1434,7 @@ function closeNotiziaModal() {
   overlay.style.display = 'none';
 }
 
-(function bindNotizieModalUI(){
+function bindNotizieModalUI() {
   const overlay = document.getElementById('notizie-modal-overlay');
   if (!overlay) return;
 
@@ -1461,7 +1461,8 @@ function closeNotiziaModal() {
     const n = (notizie || []).find(x => x && x.id === id);
     if (n) openNotiziaModal(n);
   });
-})();
+}
+bindNotizieModalUI();
 
 document.getElementById('not-new-btn')?.addEventListener('click', () => {
   openNotiziaModal(null);
