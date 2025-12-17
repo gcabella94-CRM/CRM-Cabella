@@ -1,7 +1,6 @@
 /* CRM-Cabella crm-app.js (FINAL) — generated 2025-12-17 18:20:08
    If you see this line in Sources, you have the right file.
 */
-/* BUILD: 2025-12-17T20:45:21.537287Z */
 window.__CRM_APP_LOADED__ = true;
 
 /* ====== STORAGE & UTILITY ====== */
@@ -1230,7 +1229,7 @@ function renderAgendaMonth() {
           <td>${caldoLabel}</td>
           <td>${escapeHtml(staffObj?.nome || n.responsabileId || '—')}</td>
           <td>
-            <button class="btn btn-xs" data-not-edit="${escapeHtml(n.id)}">Apri</button>
+            <button class="btn btn-xs" data-not-open="${escapeHtml(n.id)}">Apri</button>
             <button class="btn btn-xs btn-danger" data-not-del="${escapeHtml(n.id)}">Elimina</button>
           </td>
         `;
@@ -1272,7 +1271,7 @@ function renderAgendaMonth() {
                 ${n.nonRisponde ? '<span class="badge">⛔ non risponde</span>' : ''}
               </div>
               <div class="notizia-card-actions">
-                <button class="btn btn-xs" data-not-edit="${escapeHtml(n.id)}">Apri</button>
+                <button class="btn btn-xs" data-not-open="${escapeHtml(n.id)}">Apri</button>
                 <button class="btn btn-xs btn-danger" data-not-del="${escapeHtml(n.id)}">Elimina</button>
               </div>
             </div>
@@ -1364,10 +1363,10 @@ function renderAgendaMonth() {
           // apri con click su card (ma non sui bottoni)
           card.addEventListener('click', (ev) => {
             if (ev.target.closest('button')) return;
-            openNotiziaModal(n);
+            openNotiziaDetail(n);
           });
           card.addEventListener('keydown', (ev) => {
-            if (ev.key === 'Enter') openNotiziaModal(n);
+            if (ev.key === 'Enter') openNotiziaDetail(n);
           });
 
           cardsContainer.appendChild(card);
@@ -1745,6 +1744,185 @@ function closeNotiziaModal() {
   overlay.style.display = 'none';
 }
 
+
+
+/* ====== NOTIZIE — DETTAGLIO (drawer) ====== */
+
+function ensureNotiziaDetailUI() {
+  if (document.getElementById('notizia-detail-overlay')) return;
+
+  const overlay = document.createElement('div');
+  overlay.id = 'notizia-detail-overlay';
+  overlay.className = 'drawer-overlay';
+  overlay.style.display = 'none';
+  overlay.innerHTML = `
+    <div class="drawer-panel" role="dialog" aria-modal="true" aria-label="Dettaglio notizia">
+      <div class="drawer-header">
+        <div>
+          <div class="drawer-title" id="notizia-detail-title">Scheda Notizia</div>
+          <div class="drawer-subtitle" id="notizia-detail-sub">—</div>
+        </div>
+        <button class="btn btn-xs" id="notizia-detail-close" title="Chiudi">✕</button>
+      </div>
+
+      <div class="drawer-body" id="notizia-detail-body"></div>
+
+      <div class="drawer-footer">
+        <button class="btn btn-sm" id="notizia-detail-edit">Modifica</button>
+        <button class="btn btn-sm" id="notizia-detail-to-imm">Crea immobile</button>
+        <button class="btn btn-sm" id="notizia-detail-new-app">Crea appuntamento</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+
+  // chiusura click esterno
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) closeNotiziaDetail();
+  });
+
+  // ESC
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      const ov = document.getElementById('notizia-detail-overlay');
+      if (ov && ov.style.display === 'flex') closeNotiziaDetail();
+    }
+  });
+
+  document.getElementById('notizia-detail-close')?.addEventListener('click', closeNotiziaDetail);
+}
+
+function closeNotiziaDetail() {
+  const overlay = document.getElementById('notizia-detail-overlay');
+  if (!overlay) return;
+  overlay.style.display = 'none';
+}
+
+function renderNotiziaDetail(n) {
+  const body = document.getElementById('notizia-detail-body');
+  const title = document.getElementById('notizia-detail-title');
+  const sub = document.getElementById('notizia-detail-sub');
+  if (!body) return;
+
+  const nome = ((n.nome || '') + ' ' + (n.cognome || '')).trim() || '—';
+  const addr = [n.indirizzo || '', n.citta || ''].filter(Boolean).join(' · ') || 'Indirizzo non inserito';
+
+  if (title) title.textContent = `Notizia: ${nome}`;
+  if (sub) sub.textContent = addr;
+
+  // ultimo contatto: preferisci timeline interazioni
+  let last = null;
+  try {
+    const list = Array.isArray(interazioni) ? interazioni : [];
+    const rel = list.filter(x => x && x.links && x.links.notiziaId === n.id);
+    rel.sort((a,b) => (b.ts || '').localeCompare(a.ts || ''));
+    last = rel[0] || null;
+  } catch {}
+
+  const lastLabel = last?.ts ? formatDate(last.ts.slice(0,10)) : (n.ultimoContatto ? formatDate(n.ultimoContatto) : '—');
+  const lastNote = (last?.testo || n.commentoUltimoContatto || '').trim();
+
+  const ric = (n.ricontatto || '').trim();
+
+  body.innerHTML = `
+    <div class="drawer-section">
+      <div class="drawer-kv"><span class="k">Etichetta</span><span class="v">${escapeHtml(n.etichetta || 'generica')}</span></div>
+      <div class="drawer-kv"><span class="k">Telefono</span><span class="v">${escapeHtml(n.telefono || '—')}</span></div>
+      <div class="drawer-kv"><span class="k">Email</span><span class="v">${escapeHtml(n.email || '—')}</span></div>
+      <div class="drawer-kv"><span class="k">Tipologia</span><span class="v">${escapeHtml(n.tipologia || '—')}</span></div>
+      <div class="drawer-kv"><span class="k">MQ</span><span class="v">${escapeHtml(n.mq != null ? String(n.mq) : '—')}</span></div>
+      <div class="drawer-kv"><span class="k">Piano</span><span class="v">${escapeHtml(n.piano || '—')}</span></div>
+      <div class="drawer-kv"><span class="k">Condominio</span><span class="v">${escapeHtml(n.condominio || '—')}</span></div>
+      <div class="drawer-kv"><span class="k">Ultimo contatto</span><span class="v">${escapeHtml(lastLabel)}</span></div>
+      <div class="drawer-kv"><span class="k">Ricontatto</span><span class="v">${escapeHtml(ric || '—')}</span></div>
+    </div>
+
+    <div class="drawer-section" id="notizia-detail-commento">
+      <div class="drawer-section-title">Commento ultimo contatto</div>
+      <div class="drawer-note">${escapeHtml(lastNote || '—')}</div>
+    </div>
+
+    <div class="drawer-section" id="notizia-detail-note">
+      <div class="drawer-section-title">Note</div>
+      <div class="drawer-note">${escapeHtml((n.note || '').trim() || '—')}</div>
+    </div>
+
+    <div class="drawer-section" id="notizia-detail-interazioni">
+      <div class="drawer-section-title">Interazioni</div>
+      <div class="drawer-interazioni">
+        ${(() => {
+          try {
+            const list = Array.isArray(interazioni) ? interazioni : [];
+            const rel = list.filter(x => x && x.links && x.links.notiziaId === n.id);
+            rel.sort((a,b) => (b.ts || '').localeCompare(a.ts || ''));
+            if (!rel.length) return '<div class="muted">Nessuna interazione registrata.</div>';
+            return rel.slice(0, 25).map(ev => {
+              const d = ev.ts ? (ev.ts.slice(0,10) + ' ' + (ev.ts.slice(11,16) || '')) : '';
+              return `
+                <div class="drawer-int">
+                  <div class="drawer-int__meta">${escapeHtml(d)} · ${escapeHtml(ev.tipo || '—')} · ${escapeHtml(ev.esito || '—')}</div>
+                  <div class="drawer-int__txt">${escapeHtml((ev.testo || '').trim() || '—')}</div>
+                </div>
+              `;
+            }).join('');
+          } catch {
+            return '<div class="muted">Interazioni non disponibili.</div>';
+          }
+        })()}
+      </div>
+    </div>
+  `;
+}
+
+function openNotiziaDetail(n, focusSectionId) {
+  if (!n) return;
+  ensureNotiziaDetailUI();
+  const overlay = document.getElementById('notizia-detail-overlay');
+  if (!overlay) return;
+
+  overlay.style.display = 'flex';
+
+  // bind bottoni footer per questa notizia
+  const editBtn = document.getElementById('notizia-detail-edit');
+  const toImmBtn = document.getElementById('notizia-detail-to-imm');
+  const newAppBtn = document.getElementById('notizia-detail-new-app');
+
+  if (editBtn) {
+    editBtn.onclick = () => {
+      closeNotiziaDetail();
+      openNotiziaDetail(n);
+    };
+  }
+  if (toImmBtn) {
+    toImmBtn.onclick = () => {
+      closeNotiziaDetail();
+      if (typeof apriSchedaImmobileDaNotizia === 'function') apriSchedaImmobileDaNotizia(n.id);
+    };
+  }
+  if (newAppBtn) {
+    newAppBtn.onclick = () => {
+      closeNotiziaDetail();
+      if (typeof creaAppuntamentoDaNotiziaId === 'function') creaAppuntamentoDaNotiziaId(n.id);
+    };
+  }
+
+  renderNotiziaDetail(n);
+
+  if (focusSectionId) {
+    // mapping "focusId" vecchi -> sezioni drawer
+    const map = {
+      'not-indirizzo': 'notizia-detail-title',
+      'not-note': 'notizia-detail-note',
+      'not-telefono': 'notizia-detail-title',
+      'not-email': 'notizia-detail-title'
+    };
+    const targetId = map[focusSectionId] || focusSectionId;
+    const el = document.getElementById(targetId);
+    el?.scrollIntoView?.({ block: 'start' });
+  }
+}
+
 function bindNotizieModalUI() {
   const overlay = document.getElementById('notizie-modal-overlay');
   if (!overlay) return;
@@ -1767,7 +1945,15 @@ function bindNotizieModalUI() {
   // delega click "modifica" (se presente nelle card o altrove)
   // deleghe click per azioni card Notizie
   document.addEventListener('click', (e) => {
-    const editBtn = e.target.closest?.('[data-not-edit]');
+        const openBtn = e.target.closest?.('[data-not-open]');
+    if (openBtn) {
+      const id = openBtn.getAttribute('data-not-open');
+      const n = (notizie || []).find(x => x && x.id === id);
+      if (n) openNotiziaDetail(n);
+      return;
+    }
+
+const editBtn = e.target.closest?.('[data-not-edit]');
     if (editBtn) {
       const id = editBtn.getAttribute('data-not-edit');
       const n = (notizie || []).find(x => x && x.id === id);
@@ -1792,7 +1978,7 @@ function bindNotizieModalUI() {
       const id = jumpEl.getAttribute('data-not-jump');
       const focusId = jumpEl.getAttribute('data-jump') || '';
       const n = (notizie || []).find(x => x && x.id === id);
-      if (n) openNotiziaModal(n, focusId);
+      if (n) openNotiziaDetail(n, focusId);
       return;
     }
 
