@@ -1044,43 +1044,182 @@ function renderAgendaMonth() {
 
   /* ====== NOTIZIE ====== */
 
+  
   function renderNotizie() {
     const tbody = document.getElementById('not-table-body');
-    if (!tbody) return;
-    tbody.innerHTML = '';
+    const cardsContainer = document.getElementById('not-cards-container');
 
-    (notizie || []).forEach(n => {
-      const tr = document.createElement('tr');
-      const staffObj = staff.find(s => s.id === n.responsabileId);
-      const nomeCompleto = ((n.nome || '') + ' ' + (n.cognome || '')).trim();
-      const caldoLabel = n.caldo ? '🔥' : '';
-      const indirizzoCompleto = [n.indirizzo || '', n.citta || ''].filter(Boolean).join(' - ');
-      const condoName = (n.condominio || '').trim();
-      if (condoName) tr.classList.add('in-condominio-notizia');
-      const condoBadge = condoName ? ` <span class="badge-condominio badge-condominio--notizia">🏢 ${escapeHtml(condoName)}</span>` : '';
-      tr.dataset.phone = n.telefono || '';
-      tr.dataset.email = n.email || '';
+    // se non esistono target, esci
+    if (!tbody && !cardsContainer) return;
 
-      tr.innerHTML = `
-        <td>${nomeCompleto || '—'}</td>
-        <td>${n.telefono || ''}</td>
-        <td>${escapeHtml(indirizzoCompleto)}${condoBadge}</td>
-        <td>${n.tipologia || ''}</td>
-        <td>${n.piano || ''}</td>
-        <td>${n.mq != null ? n.mq : ''}</td>
-        <td>${caldoLabel}</td>
-        <td>${staffObj ? staffObj.nome : ''}</td>
-        <td>
-          <button class="btn btn-xs" data-not-edit="${n.id || ''}" title="Modifica notizia">✏️ Modifica</button>
-          <button class="btn btn-xs" data-not-att="${n.id || ''}" title="Crea attività collegata">➕ Attività</button>
-          <button class="btn btn-xs" data-not-imm="${n.id || ''}" title="Apri scheda inserimento immobile">🏠 Immobile</button>
-        </td>
-      `;
-      tbody.appendChild(tr);
-    });
+    // --- leggi filtri UI (se presenti) ---
+    const fResp   = document.getElementById('not-filter-resp');
+    const fLabel  = document.getElementById('not-filter-label');
+    const fSort   = document.getElementById('not-filter-sort');
+    const fSearch = document.getElementById('not-filter-search');
+
+    const respVal   = (fResp?.value || '').trim();
+    const labelVal  = (fLabel?.value || '').trim();
+    const sortVal   = (fSort?.value || 'created_desc').trim();
+    const searchVal = (fSearch?.value || '').trim().toLowerCase();
+
+    // --- popola select responsabili / etichette (una volta, ma ricalcolando le opzioni) ---
+    if (fResp) {
+      const prev = fResp.value;
+      const opts = ['<option value="">Tutti i responsabili</option>']
+        .concat((staff || []).map(s => `<option value="${escapeHtml(s.id)}">${escapeHtml(s.nome || s.id)}</option>`));
+      fResp.innerHTML = opts.join('');
+      fResp.value = prev;
+    }
+    if (fLabel) {
+      const prev = fLabel.value;
+      const labels = Array.from(new Set((notizie || []).map(n => (n?.etichetta || '').trim()).filter(Boolean))).sort();
+      const opts = ['<option value="">Tutte le etichette</option>']
+        .concat(labels.map(l => `<option value="${escapeHtml(l)}">${escapeHtml(l)}</option>`));
+      fLabel.innerHTML = opts.join('');
+      fLabel.value = prev;
+    }
+
+    // --- applica filtri ---
+    let list = (notizie || []).slice();
+
+    if (respVal)  list = list.filter(n => String(n?.responsabileId || '') === respVal);
+    if (labelVal) list = list.filter(n => String(n?.etichetta || '') === labelVal);
+
+    if (searchVal) {
+      list = list.filter(n => {
+        const hay = [
+          n?.indirizzo, n?.citta, n?.provincia, n?.cap,
+          n?.tipologia, n?.piano, n?.mq,
+          n?.nome, n?.cognome, n?.telefono, n?.email,
+          n?.note, n?.commentoUltimaInterazione
+        ].filter(Boolean).join(' ').toLowerCase();
+        return hay.includes(searchVal);
+      });
+    }
+
+    // --- sorting ---
+    const safeDate = (x) => {
+      const d = new Date(x || 0);
+      return isNaN(d) ? new Date(0) : d;
+    };
+
+    if (sortVal === 'created_desc') {
+      list.sort((a,b) => safeDate(b?.createdAt) - safeDate(a?.createdAt));
+    } else if (sortVal === 'recall_asc') {
+      list.sort((a,b) => safeDate(a?.ricontatto) - safeDate(b?.ricontatto));
+    } else if (sortVal === 'label_asc') {
+      list.sort((a,b) => String(a?.etichetta||'').localeCompare(String(b?.etichetta||''), 'it', { sensitivity:'base' }));
+    }
+
+    // --- render TABLE (legacy) ---
+    if (tbody) {
+      tbody.innerHTML = '';
+      list.forEach(n => {
+        const tr = document.createElement('tr');
+        const staffObj = (staff || []).find(s => s.id === n.responsabileId);
+        const nomeCompleto = ((n.nome || '') + ' ' + (n.cognome || '')).trim();
+        const caldoLabel = n.caldo ? '🔥' : '';
+        const indirizzoCompleto = [n.indirizzo || '', n.citta || ''].filter(Boolean).join(' - ');
+        tr.innerHTML = `
+          <td>${escapeHtml(nomeCompleto || '—')}</td>
+          <td>${escapeHtml(n.telefono || '—')}</td>
+          <td>${escapeHtml(indirizzoCompleto || '—')}</td>
+          <td>${escapeHtml(n.tipologia || '—')}</td>
+          <td>${escapeHtml(n.piano || '—')}</td>
+          <td>${escapeHtml(n.mq || '—')}</td>
+          <td>${caldoLabel}</td>
+          <td>${escapeHtml(staffObj?.nome || n.responsabileId || '—')}</td>
+          <td>
+            <button class="btn btn-xs" data-not-edit="${escapeHtml(n.id)}">Apri</button>
+            <button class="btn btn-xs btn-danger" data-not-del="${escapeHtml(n.id)}">Elimina</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // --- render CARDS (home notizie) ---
+    if (cardsContainer) {
+      cardsContainer.innerHTML = '';
+
+      if (!list.length) {
+        const empty = document.createElement('div');
+        empty.className = 'muted';
+        empty.style.padding = '12px';
+        empty.textContent = 'Nessuna notizia trovata con i filtri attuali.';
+        cardsContainer.appendChild(empty);
+      } else {
+        list.forEach(n => {
+          const staffObj = (staff || []).find(s => s.id === n.responsabileId);
+          const nomeCompleto = ((n.nome || '') + ' ' + (n.cognome || '')).trim();
+          const indirizzoCompleto = [n.indirizzo || '', n.citta || '', n.provincia ? `(${n.provincia})` : '', n.cap || ''].filter(Boolean).join(' ');
+          const ric = n.ricontatto ? formatDateTimeIT(n.ricontatto) : '';
+
+          const card = document.createElement('div');
+          card.className = 'notizia-card';
+          card.setAttribute('tabindex','0');
+          card.innerHTML = `
+            <div class="notizia-card-top">
+              <div class="notizia-card-title">
+                <span class="badge">${escapeHtml(n.etichetta || 'generica')}</span>
+                ${n.caldo ? '<span class="badge">🔥 caldo</span>' : ''}
+                ${n.nonRisponde ? '<span class="badge">⛔ non risponde</span>' : ''}
+              </div>
+              <div class="notizia-card-actions">
+                <button class="btn btn-xs" data-not-edit="${escapeHtml(n.id)}">Apri</button>
+                <button class="btn btn-xs btn-danger" data-not-del="${escapeHtml(n.id)}">Elimina</button>
+              </div>
+            </div>
+
+            <div class="notizia-card-main">
+              <div><strong>${escapeHtml(indirizzoCompleto || 'Indirizzo non inserito')}</strong></div>
+              <div class="muted">${escapeHtml([n.tipologia || '', n.mq ? `${n.mq} mq` : '', n.piano ? `Piano ${n.piano}` : ''].filter(Boolean).join(' • ') || '—')}</div>
+
+              <div style="margin-top:8px;">
+                <div><strong>${escapeHtml(nomeCompleto || 'Proprietario non inserito')}</strong></div>
+                <div class="muted">${escapeHtml([n.telefono || '', n.email || ''].filter(Boolean).join(' • ') || '—')}</div>
+              </div>
+
+              <div style="margin-top:8px;">
+                <div class="muted"><strong>Responsabile:</strong> ${escapeHtml(staffObj?.nome || n.responsabileId || '—')}</div>
+                ${ric ? `<div class="muted"><strong>Ricontatto:</strong> ${escapeHtml(ric)}</div>` : ''}
+              </div>
+
+              ${n.commentoUltimaInterazione ? `
+                <details style="margin-top:10px;">
+                  <summary>Ultima interazione</summary>
+                  <div style="margin-top:6px;">${escapeHtml(n.commentoUltimaInterazione)}</div>
+                </details>
+              ` : ''}
+            </div>
+          `;
+
+          // apri con click su card (ma non sui bottoni)
+          card.addEventListener('click', (ev) => {
+            if (ev.target.closest('button')) return;
+            openNotiziaModal(n);
+          });
+          card.addEventListener('keydown', (ev) => {
+            if (ev.key === 'Enter') openNotiziaModal(n);
+          });
+
+          cardsContainer.appendChild(card);
+        });
+      }
+    }
+
+    // --- bind filtri (una sola volta) ---
+    if (!window.__NOTIZIE_FILTERS_BOUND__) {
+      window.__NOTIZIE_FILTERS_BOUND__ = true;
+      [fResp, fLabel, fSort, fSearch].forEach(el => {
+        if (!el) return;
+        el.addEventListener('input', () => renderNotizie());
+        el.addEventListener('change', () => renderNotizie());
+      });
+    }
   }
-
-  function resetNotizieForm() {
+function resetNotizieForm() {
     const form = document.getElementById('not-form');
     if (!form) return;
     form.reset();
