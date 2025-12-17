@@ -46,7 +46,15 @@ window.__CRM_APP_LOADED__ = true;
         cloudSync.save(key, value);
       }
 
-  /* ====== INTERAZIONI (Timeline unificata) ====== */
+  
+
+    } catch (e) {
+      console.warn('[SYNC] Errore saveList cloudSync', key, e);
+    }
+  }
+
+
+/* ====== INTERAZIONI (Timeline unificata) ====== */
   function loadInterazioni() {
     try { interazioni = loadList(STORAGE_KEYS.interazioni || 'crm10_interazioni'); }
     catch { interazioni = []; }
@@ -136,10 +144,7 @@ window.__CRM_APP_LOADED__ = true;
     }
   }
   /* ====== end INTERAZIONI ====== */
-    } catch (e) {
-      console.warn('[SYNC] Errore saveList cloudSync', key, e);
-    }
-  }
+
 
   function genId(prefix = 'id') {
     return `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
@@ -1892,7 +1897,7 @@ function bindNotizieModalUI() {
       return;
     }
   });
-}}
+}
 bindNotizieModalUI();
 
 document.getElementById('not-new-btn')?.addEventListener('click', () => {
