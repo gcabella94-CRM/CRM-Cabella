@@ -1045,57 +1045,74 @@ function renderAgendaMonth() {
   /* ====== NOTIZIE ====== */
 
   
-function renderNotizie() {
+  function renderNotizie() {
     const tbody = document.getElementById('not-table-body');
     const cardsContainer = document.getElementById('not-cards-container');
 
-    // Se non esistono target, esci
+    // se non esistono target, esci
     if (!tbody && !cardsContainer) return;
 
-    // ====== prepara lista + filtri (se presenti) ======
-    const listRaw = (notizie || []).slice();
+    // --- leggi filtri UI (se presenti) ---
+    const fResp   = document.getElementById('not-filter-resp');
+    const fLabel  = document.getElementById('not-filter-label');
+    const fSort   = document.getElementById('not-filter-sort');
+    const fSearch = document.getElementById('not-filter-search');
 
-    const elResp = document.getElementById('not-filter-resp');
-    const elLabel = document.getElementById('not-filter-label');
-    const elSort = document.getElementById('not-filter-sort');
-    const elSearch = document.getElementById('not-filter-search');
+    const respVal   = (fResp?.value || '').trim();
+    const labelVal  = (fLabel?.value || '').trim();
+    const sortVal   = (fSort?.value || 'created_desc').trim();
+    const searchVal = (fSearch?.value || '').trim().toLowerCase();
 
-    const fResp = elResp ? (elResp.value || '') : '';
-    const fLabel = elLabel ? (elLabel.value || '') : '';
-    const fSort = elSort ? (elSort.value || 'created_desc') : 'created_desc';
-    const fSearch = elSearch ? (elSearch.value || '').trim().toLowerCase() : '';
+    // --- popola select responsabili / etichette (una volta, ma ricalcolando le opzioni) ---
+    if (fResp) {
+      const prev = fResp.value;
+      const opts = ['<option value="">Tutti i responsabili</option>']
+        .concat((staff || []).map(s => `<option value="${escapeHtml(s.id)}">${escapeHtml(s.nome || s.id)}</option>`));
+      fResp.innerHTML = opts.join('');
+      fResp.value = prev;
+    }
+    if (fLabel) {
+      const prev = fLabel.value;
+      const labels = Array.from(new Set((notizie || []).map(n => (n?.etichetta || '').trim()).filter(Boolean))).sort();
+      const opts = ['<option value="">Tutte le etichette</option>']
+        .concat(labels.map(l => `<option value="${escapeHtml(l)}">${escapeHtml(l)}</option>`));
+      fLabel.innerHTML = opts.join('');
+      fLabel.value = prev;
+    }
 
-    let list = listRaw;
+    // --- applica filtri ---
+    let list = (notizie || []).slice();
 
-    if (fResp) list = list.filter(n => (n.responsabileId || '') === fResp);
-    if (fLabel) list = list.filter(n => (n.etichetta || '') === fLabel);
+    if (respVal)  list = list.filter(n => String(n?.responsabileId || '') === respVal);
+    if (labelVal) list = list.filter(n => String(n?.etichetta || '') === labelVal);
 
-    if (fSearch) {
+    if (searchVal) {
       list = list.filter(n => {
         const hay = [
-          n.indirizzo, n.citta, n.provincia, n.cap,
-          n.tipologia, n.piano, n.mq,
-          n.nome, n.cognome, n.telefono,
-          n.note,
-          n.lastContactComment, n.ultimoContattoComment
+          n?.indirizzo, n?.citta, n?.provincia, n?.cap,
+          n?.tipologia, n?.piano, n?.mq,
+          n?.nome, n?.cognome, n?.telefono, n?.email,
+          n?.note, n?.commentoUltimaInterazione
         ].filter(Boolean).join(' ').toLowerCase();
-        return hay.includes(fSearch);
+        return hay.includes(searchVal);
       });
     }
 
-    const getRecall = (n) => n.ricontatto || n.recallAt || n.recall || '';
-    const getCreated = (n) => n.createdAt || n.dataCreazione || n.id || '';
-    const getLastContact = (n) => n.lastContactAt || n.ultimoContattoAt || n.lastContactDate || '';
+    // --- sorting ---
+    const safeDate = (x) => {
+      const d = new Date(x || 0);
+      return isNaN(d) ? new Date(0) : d;
+    };
 
-    // ordinamenti
-    list.sort((a, b) => {
-      if (fSort === 'recall_asc') return String(getRecall(a)).localeCompare(String(getRecall(b)));
-      if (fSort === 'label_asc') return String(a.etichetta || '').localeCompare(String(b.etichetta || ''));
-      // default: ultimo inserimento
-      return String(getCreated(b)).localeCompare(String(getCreated(a)));
-    });
+    if (sortVal === 'created_desc') {
+      list.sort((a,b) => safeDate(b?.createdAt) - safeDate(a?.createdAt));
+    } else if (sortVal === 'recall_asc') {
+      list.sort((a,b) => safeDate(a?.ricontatto) - safeDate(b?.ricontatto));
+    } else if (sortVal === 'label_asc') {
+      list.sort((a,b) => String(a?.etichetta||'').localeCompare(String(b?.etichetta||''), 'it', { sensitivity:'base' }));
+    }
 
-    // ====== TABLE (legacy) ======
+    // --- render TABLE (legacy) ---
     if (tbody) {
       tbody.innerHTML = '';
       list.forEach(n => {
@@ -1104,37 +1121,26 @@ function renderNotizie() {
         const nomeCompleto = ((n.nome || '') + ' ' + (n.cognome || '')).trim();
         const caldoLabel = n.caldo ? '🔥' : '';
         const indirizzoCompleto = [n.indirizzo || '', n.citta || ''].filter(Boolean).join(' - ');
-        const condoName = (n.condominio || '').trim();
-        if (condoName) tr.classList.add('in-condominio-notizia');
-        const condoBadge = condoName ? ` <span class="badge-condominio badge-condominio--notizia">🏢 ${escapeHtml(condoName)}</span>` : '';
-        tr.dataset.phone = n.telefono || '';
-        tr.dataset.email = n.email || '';
         tr.innerHTML = `
           <td>${escapeHtml(nomeCompleto || '—')}</td>
           <td>${escapeHtml(n.telefono || '—')}</td>
-          <td>${escapeHtml(indirizzoCompleto)}${condoBadge}</td>
+          <td>${escapeHtml(indirizzoCompleto || '—')}</td>
           <td>${escapeHtml(n.tipologia || '—')}</td>
           <td>${escapeHtml(n.piano || '—')}</td>
-          <td>${escapeHtml(n.mq != null ? n.mq : '—')}</td>
+          <td>${escapeHtml(n.mq || '—')}</td>
           <td>${caldoLabel}</td>
-          <td>${escapeHtml(staffObj ? staffObj.nome : '—')}</td>
+          <td>${escapeHtml(staffObj?.nome || n.responsabileId || '—')}</td>
           <td>
-            <button class="btn btn-xs" data-not-edit="${escapeHtml(n.id)}" title="Modifica notizia">✏️ Modifica</button>
-            <button class="btn btn-xs" data-not-att="${escapeHtml(n.id)}" title="Crea attività collegata">➕ Attività</button>
-            <button class="btn btn-xs" data-not-imm="${escapeHtml(n.id)}" title="Apri scheda inserimento immobile">🏠 Immobile</button>
+            <button class="btn btn-xs" data-not-edit="${escapeHtml(n.id)}">Apri</button>
+            <button class="btn btn-xs btn-danger" data-not-del="${escapeHtml(n.id)}">Elimina</button>
           </td>
         `;
         tbody.appendChild(tr);
       });
     }
 
-    // ====== CARDS (ROLodex) ======
+    // --- render CARDS (home notizie) ---
     if (cardsContainer) {
-      // init state
-      if (typeof window.__NOTIZIE_ACTIVE_INDEX !== 'number') window.__NOTIZIE_ACTIVE_INDEX = 0;
-      const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
-      window.__NOTIZIE_ACTIVE_INDEX = clamp(window.__NOTIZIE_ACTIVE_INDEX, 0, Math.max(0, list.length - 1));
-
       cardsContainer.innerHTML = '';
 
       if (!list.length) {
@@ -1144,290 +1150,136 @@ function renderNotizie() {
         empty.textContent = 'Nessuna notizia trovata con i filtri attuali.';
         cardsContainer.appendChild(empty);
       } else {
-        list.forEach((n, i) => {
+        list.forEach(n => {
           const staffObj = (staff || []).find(s => s.id === n.responsabileId);
           const nomeCompleto = ((n.nome || '') + ' ' + (n.cognome || '')).trim();
-          const indirizzoCompleto = [n.indirizzo || '', n.citta || '', (n.provincia ? `(${n.provincia})` : ''), n.cap || ''].filter(Boolean).join(' ');
-          const tipologia = n.tipologia || '—';
-          const mq = (n.mq != null && n.mq !== '') ? `${n.mq} mq` : '— mq';
-          const piano = n.piano || '—';
-          const telefono = n.telefono || '—';
+          const indirizzoCompleto = [n.indirizzo || '', n.citta || '', n.provincia ? `(${n.provincia})` : '', n.cap || ''].filter(Boolean).join(' ');
+          const ric = n.ricontatto ? formatDateTimeIT(n.ricontatto) : '';
 
-          const lastAtISO = getLastContact(n);
-          const lastAt = lastAtISO ? formatDateTimeIT(lastAtISO) : '—';
-          const lastComment = (n.lastContactComment || n.ultimoContattoComment || n.noteUltimoContatto || '').trim();
-          const hasLastComment = !!lastComment;
-
-          const rel = i - window.__NOTIZIE_ACTIVE_INDEX;
-          const abs = Math.abs(rel);
-          const depth = Math.min(abs, 6);
-
-          const card = document.createElement('article');
-          card.className = 'notizie-rolodex-card';
-          card.dataset.notId = n.id || '';
-          card.dataset.index = String(i);
-          card.setAttribute('role', 'button');
-          card.setAttribute('tabindex', '0');
-
-          // transform (schedario rotativo)
-          const translateY = rel * 58;
-          const rotate = rel * -3.5;
-          const scale = 1 - depth * 0.03;
-          const opacity = abs > 7 ? 0 : (1 - depth * 0.10);
-          const z = 1000 - abs;
-
-          card.style.transform = `translateY(${translateY}px) rotate(${rotate}deg) scale(${scale})`;
-          card.style.opacity = String(opacity);
-          card.style.zIndex = String(z);
-          card.classList.toggle('is-active', rel === 0);
-
+          const card = document.createElement('div');
+          card.className = 'notizia-card';
+          card.setAttribute('tabindex','0');
           card.innerHTML = `
-            <div class="notizie-card-grid">
-              <div class="notizie-card-main">
-                <div class="notizie-card-row">
-                  <div class="notizie-chip">${escapeHtml(n.etichetta || 'generica')}</div>
-                  ${n.caldo ? `<div class="notizie-chip">🔥 caldo</div>` : ``}
-                  ${n.nonRisponde ? `<div class="notizie-chip danger">⛔ non risponde</div>` : ``}
-                  ${staffObj?.nome ? `<div class="notizie-chip subtle">👤 ${escapeHtml(staffObj.nome)}</div>` : ``}
-                </div>
+            <div class="notizia-card-top">
+              <div class="notizia-card-title">
+                <span class="badge">${escapeHtml(n.etichetta || 'generica')}</span>
+                ${n.caldo ? '<span class="badge">🔥 caldo</span>' : ''}
+                ${n.nonRisponde ? '<span class="badge">⛔ non risponde</span>' : ''}
+              </div>
+              <div class="notizia-card-actions">
+                <button class="btn btn-xs" data-not-edit="${escapeHtml(n.id)}">Apri</button>
+                <button class="btn btn-xs btn-danger" data-not-del="${escapeHtml(n.id)}">Elimina</button>
+              </div>
+            </div>
 
-                <div class="notizie-card-title">
-                  <span class="notizie-link" data-jump="indirizzo" title="Vai a indirizzo">${escapeHtml(indirizzoCompleto || '—')}</span>
+            <div class="notizia-card-main">
+              <div class="notizia-line">
+                <div class="notizia-label">Indirizzo</div>
+                <div class="notizia-value clickable" data-not-jump="${escapeHtml(n.id)}" data-jump="not-indirizzo">
+                  ${escapeHtml(indirizzoCompleto || 'Indirizzo non inserito')}
                 </div>
+              </div>
 
-                <div class="notizie-card-kpis">
-                  <span class="notizie-kpi notizie-link" data-jump="tipologia">🏷️ ${escapeHtml(tipologia)}</span>
-                  <span class="notizie-kpi notizie-link" data-jump="mq">📐 ${escapeHtml(mq)}</span>
-                  <span class="notizie-kpi notizie-link" data-jump="piano">🧱 Piano: ${escapeHtml(piano)}</span>
+              <div class="notizia-grid">
+                <div class="notizia-mini clickable" data-not-jump="${escapeHtml(n.id)}" data-jump="not-tipologia">
+                  <div class="notizia-mini-k">Tipologia</div>
+                  <div class="notizia-mini-v">${escapeHtml(n.tipologia || '—')}</div>
                 </div>
-
-                <div class="notizie-card-owner">
-                  <span class="notizie-link" data-jump="proprietario">👤 ${escapeHtml(nomeCompleto || '—')}</span>
-                  <span class="sep">·</span>
-                  <span class="notizie-link" data-jump="telefono">📞 ${escapeHtml(telefono)}</span>
+                <div class="notizia-mini clickable" data-not-jump="${escapeHtml(n.id)}" data-jump="not-mq">
+                  <div class="notizia-mini-k">MQ</div>
+                  <div class="notizia-mini-v">${escapeHtml((n.mq ?? '') !== '' ? String(n.mq) : '—')}</div>
                 </div>
+                <div class="notizia-mini clickable" data-not-jump="${escapeHtml(n.id)}" data-jump="not-piano">
+                  <div class="notizia-mini-k">Piano</div>
+                  <div class="notizia-mini-v">${escapeHtml(n.piano || '—')}</div>
+                </div>
+              </div>
 
-                <div class="notizie-card-last">
-                  <div class="notizie-card-last-head">
-                    <span class="muted notizie-link" data-jump="ultimoContatto">🗓 Ultimo contatto: <strong>${escapeHtml(lastAt)}</strong></span>
-                    <button class="btn btn-xs btn-ghost" type="button" data-toggle="lastComment">${hasLastComment ? 'Mostra commento' : 'Aggiungi commento'}</button>
+              <div class="notizia-line" style="margin-top:10px;">
+                <div class="notizia-label">Proprietario</div>
+                <div class="notizia-owner">
+                  <span class="clickable" data-not-jump="${escapeHtml(n.id)}" data-jump="not-nome">
+                    ${escapeHtml(nomeCompleto || '—')}
+                  </span>
+                  <span class="muted">·</span>
+                  <span class="clickable" data-not-jump="${escapeHtml(n.id)}" data-jump="not-telefono">
+                    ${escapeHtml(n.telefono || '—')}
+                  </span>
+                </div>
+              </div>
+
+              <div class="notizia-line" style="margin-top:10px;">
+                <div class="notizia-label">Ultimo contatto</div>
+                <div class="notizia-value clickable" data-not-jump="${escapeHtml(n.id)}" data-jump="not-note">
+                  ${escapeHtml(n.ultimoContattoAt ? formatDateTimeIT(n.ultimoContattoAt) : '—')}
+                </div>
+              </div>
+
+              <details class="notizia-details" ${n.commentoUltimaInterazione ? '' : 'data-empty="1"'}>
+                <summary>${n.commentoUltimaInterazione ? 'Commento ultimo contatto' : 'Nessun commento (clicca per aggiungere)'}</summary>
+                <div class="notizia-details-body">
+                  <div class="muted" style="margin-bottom:6px;">${escapeHtml(n.commentoUltimaInterazione || '')}</div>
+
+                  <div class="notizia-lastcomment-box">
+                    <textarea class="input-sm" rows="2" placeholder="Scrivi qui il commento dell’ultimo contatto…"
+                      data-not-lastcomment="${escapeHtml(n.id)}">${escapeHtml(n._draftLastComment || '')}</textarea>
+                    <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:6px;">
+                      <button class="btn btn-xs" data-not-save-lastcomment="${escapeHtml(n.id)}">Salva commento</button>
+                    </div>
                   </div>
-
-                  <div class="notizie-lastcomment ${hasLastComment ? '' : 'is-collapsed'}" data-lastcomment>
-                    <div class="notizie-lastcomment-text">${escapeHtml(lastComment || '')}</div>
-                  </div>
                 </div>
+              </details>
 
-                <div class="notizie-card-nonrisponde">
-                  <button class="btn btn-xs" type="button" data-nonrisponde>Non risponde</button>
-                  <div class="notizie-recall-form is-hidden" data-recallform>
-                    <input class="input-sm" type="datetime-local" data-recallvalue>
-                    <button class="btn btn-xs btn-primary" type="button" data-recallsave>Salva ricontatto</button>
+              <div class="notizia-actions-row">
+                <button class="btn btn-xs" data-not-noans-toggle="${escapeHtml(n.id)}">Non risponde</button>
+                ${ric ? `<div class="muted"><strong>Ricontatto:</strong> ${escapeHtml(ric)}</div>` : '<div class="muted">Ricontatto: —</div>'}
+              </div>
+
+              <div class="notizia-recall-form" id="not-recall-${escapeHtml(n.id)}" style="display:none;">
+                <div class="notizia-grid" style="margin-top:8px;">
+                  <div class="notizia-mini">
+                    <div class="notizia-mini-k">Data ricontatto</div>
+                    <input class="input-sm" type="date" data-not-recall-date="${escapeHtml(n.id)}">
                   </div>
-                </div>
-
-                <div class="notizie-card-commento">
-                  <label class="muted" style="font-size:11px;">Commento (diventa commento “Ultimo contatto”)</label>
-                  <textarea class="input-sm" rows="2" data-lastcommentinput placeholder="Scrivi cosa ti sei detto nell'ultima interazione..."></textarea>
-                  <div style="display:flex;justify-content:flex-end;margin-top:6px;">
-                    <button class="btn btn-xs btn-primary" type="button" data-lastcommentsave>Salva commento</button>
+                  <div class="notizia-mini">
+                    <div class="notizia-mini-k">Ora</div>
+                    <input class="input-sm" type="time" data-not-recall-time="${escapeHtml(n.id)}">
+                  </div>
+                  <div class="notizia-mini">
+                    <div class="notizia-mini-k">&nbsp;</div>
+                    <button class="btn btn-xs" data-not-save-recall="${escapeHtml(n.id)}">Salva ricontatto</button>
                   </div>
                 </div>
               </div>
+
+              <div class="muted" style="margin-top:10px;"><strong>Responsabile:</strong> ${escapeHtml(staffObj?.nome || n.responsabileId || '—')}</div>
             </div>
           `;
 
-          // click behaviour (focus card / open detail)
-          const focusCard = () => {
-            window.__NOTIZIE_ACTIVE_INDEX = i;
-            renderNotizie();
-          };
-
-          const openDetail = (jump) => {
-            openNotiziaById(n.id, jump);
-          };
-
+          // apri con click su card (ma non sui bottoni)
           card.addEventListener('click', (ev) => {
-            const t = ev.target;
-            if (t && t.closest('[data-nonrisponde],[data-recallsave],[data-lastcommentsave],[data-toggle]')) return;
-            const jumpEl = t && t.closest('[data-jump]');
-            if (jumpEl) return openDetail(jumpEl.getAttribute('data-jump') || '');
-            if (i !== window.__NOTIZIE_ACTIVE_INDEX) return focusCard();
-            openDetail('');
+            if (ev.target.closest('button')) return;
+            openNotiziaModal(n);
           });
-
           card.addEventListener('keydown', (ev) => {
-            if (ev.key === 'Enter' || ev.key === ' ') {
-              ev.preventDefault();
-              if (i !== window.__NOTIZIE_ACTIVE_INDEX) focusCard();
-              else openDetail('');
-            }
+            if (ev.key === 'Enter') openNotiziaModal(n);
           });
-
-          // expand last comment
-          const toggleBtn = card.querySelector('[data-toggle="lastComment"]');
-          const lastEl = card.querySelector('[data-lastcomment]');
-          if (toggleBtn && lastEl) {
-            toggleBtn.addEventListener('click', (ev) => {
-              ev.stopPropagation();
-              lastEl.classList.toggle('is-collapsed');
-            });
-          }
-
-          // Non risponde -> mostra form recall
-          const btnNR = card.querySelector('[data-nonrisponde]');
-          const form = card.querySelector('[data-recallform]');
-          const inpRecall = card.querySelector('[data-recallvalue]');
-          const btnRecallSave = card.querySelector('[data-recallsave]');
-          if (btnNR && form) {
-            btnNR.addEventListener('click', (ev) => {
-              ev.stopPropagation();
-              form.classList.toggle('is-hidden');
-              if (inpRecall) inpRecall.focus();
-            });
-          }
-          if (btnRecallSave && inpRecall) {
-            btnRecallSave.addEventListener('click', (ev) => {
-              ev.stopPropagation();
-              const v = inpRecall.value;
-              const item = (notizie || []).find(x => x.id === n.id);
-              if (!item) return;
-              item.nonRisponde = true;
-              item.ricontatto = v ? new Date(v).toISOString() : '';
-              saveList(STORAGE_KEYS.notizie, notizie);
-              renderNotizie();
-              try { if (typeof addRicontattoToAgendaFromNotizia === 'function') addRicontattoToAgendaFromNotizia(item); } catch {}
-            });
-          }
-
-          // Commento ultimo contatto
-          const inpLast = card.querySelector('[data-lastcommentinput]');
-          const btnLastSave = card.querySelector('[data-lastcommentsave]');
-          if (btnLastSave && inpLast) {
-            btnLastSave.addEventListener('click', (ev) => {
-              ev.stopPropagation();
-              const txt = (inpLast.value || '').trim();
-              const item = (notizie || []).find(x => x.id === n.id);
-              if (!item) return;
-              item.lastContactAt = new Date().toISOString();
-              item.lastContactComment = txt;
-              item.nonRisponde = false; // se hai parlato, non è "non risponde"
-              saveList(STORAGE_KEYS.notizie, notizie);
-              renderNotizie();
-            });
-          }
 
           cardsContainer.appendChild(card);
         });
-
-        // wheel/scroll navigation (bind once per container)
-        if (!cardsContainer.__rolodexBound) {
-          cardsContainer.__rolodexBound = true;
-          let wheelLock = false;
-
-          const move = (delta) => {
-            if (!list.length) return;
-            window.__NOTIZIE_ACTIVE_INDEX = clamp(window.__NOTIZIE_ACTIVE_INDEX + delta, 0, list.length - 1);
-            renderNotizie();
-          };
-
-          cardsContainer.addEventListener('wheel', (ev) => {
-            ev.preventDefault();
-            if (wheelLock) return;
-            wheelLock = true;
-            setTimeout(() => wheelLock = false, 120);
-            move(ev.deltaY > 0 ? 1 : -1);
-          }, { passive: false });
-
-          document.addEventListener('keydown', (ev) => {
-            const inNotizie = document.getElementById('view-notizie')?.classList.contains('active');
-            if (!inNotizie) return;
-            if (ev.key === 'ArrowDown') { ev.preventDefault(); move(1); }
-            if (ev.key === 'ArrowUp') { ev.preventDefault(); move(-1); }
-          });
-        }
       }
     }
 
-    // bind filters once
-    [elResp, elLabel, elSort, elSearch].forEach(el => {
-      if (!el || el.__notizieBound) return;
-      el.__notizieBound = true;
-      el.addEventListener('input', () => renderNotizie());
-      el.addEventListener('change', () => renderNotizie());
-    });
-  }
-
-
-
-  function openNotiziaById(notId, jumpTo = '') {
-    // apre la modale in modifica per quella notizia
-    try {
-      if (typeof startEditNotizia === 'function') startEditNotizia(notId);
-      else if (typeof openSchedaNotizia === 'function') openSchedaNotizia(notId);
-    } catch (e) {
-      console.warn('[NOTIZIE] openNotiziaById error', e);
-    }
-
-    // porta il focus/scroll sulla "sezione" richiesta
-    const focusMap = {
-      indirizzo: 'not-indirizzo',
-      tipologia: 'not-tipologia',
-      mq: 'not-mq',
-      piano: 'not-piano',
-      proprietario: 'not-nome',
-      telefono: 'not-telefono',
-      ultimoContatto: 'not-last-contact-comment'
-    };
-    const targetId = focusMap[jumpTo] || '';
-    if (!targetId) return;
-
-    setTimeout(() => {
-      const el = document.getElementById(targetId);
-      if (!el) return;
-      try { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch {}
-      try { el.focus(); } catch {}
-    }, 60);
-  }
-
-  function ensureNotizieExtraFields() {
-    const form = document.getElementById('not-form');
-    if (!form || form.__extraBound) return;
-    form.__extraBound = true;
-
-    // crea una mini sezione "Ultimo contatto" nel modal (senza toccare l'HTML sorgente)
-    const noteEl = document.getElementById('not-note');
-    if (!noteEl || !noteEl.parentElement) return;
-
-    const wrap = document.createElement('div');
-    wrap.className = 'form-group';
-    wrap.style.gridColumn = '1 / -1';
-    wrap.innerHTML = `
-      <label>Ultimo contatto (commento)</label>
-      <textarea id="not-last-contact-comment" rows="2" placeholder="Commento ultimo contatto (si aggiorna anche dalle card)"></textarea>
-      <div class="muted" style="margin-top:4px;font-size:11px;">
-        Nota: la data “Ultimo contatto” si aggiorna quando salvi questo commento (o dal box rapido nella card).
-      </div>
-    `;
-    noteEl.parentElement.insertAdjacentElement('afterend', wrap);
-
-    const txt = wrap.querySelector('#not-last-contact-comment');
-    if (txt) {
-      txt.addEventListener('change', () => {
-        const idEl = document.getElementById('not-id');
-        const id = idEl ? idEl.value : '';
-        if (!id) return;
-        const item = (notizie || []).find(x => x.id === id);
-        if (!item) return;
-        item.lastContactAt = new Date().toISOString();
-        item.lastContactComment = (txt.value || '').trim();
-        item.nonRisponde = false;
-        saveList(STORAGE_KEYS.notizie, notizie);
-        renderNotizie();
+    // --- bind filtri (una sola volta) ---
+    if (!window.__NOTIZIE_FILTERS_BOUND__) {
+      window.__NOTIZIE_FILTERS_BOUND__ = true;
+      [fResp, fLabel, fSort, fSearch].forEach(el => {
+        if (!el) return;
+        el.addEventListener('input', () => renderNotizie());
+        el.addEventListener('change', () => renderNotizie());
       });
     }
   }
-
 function resetNotizieForm() {
     const form = document.getElementById('not-form');
     if (!form) return;
@@ -1738,7 +1590,7 @@ function resetNotizieForm() {
   }
 
   // --- NOTIZIE: apertura modale "Nuova notizia" (UI tipo appuntamento) ---
-function openNotiziaModal(prefill) {
+function openNotiziaModal(prefill, focusId) {
   const overlay = document.getElementById('notizie-modal-overlay');
   const form = document.getElementById('not-form');
   if (!overlay || !form) return;
@@ -1773,7 +1625,13 @@ function openNotiziaModal(prefill) {
 
   overlay.style.display = 'flex';
   // focus sul primo campo sensato
-  (document.getElementById('not-etichetta') || document.getElementById('not-indirizzo') || document.getElementById('not-nome'))?.focus?.();
+  if (focusId) {
+    const el = document.getElementById(focusId);
+    el?.scrollIntoView?.({ block: 'center' });
+    el?.focus?.();
+  } else {
+    (document.getElementById('not-etichetta') || document.getElementById('not-indirizzo') || document.getElementById('not-nome'))?.focus?.();
+  }
 }
 
 function closeNotiziaModal() {
@@ -1782,11 +1640,9 @@ function closeNotiziaModal() {
   overlay.style.display = 'none';
 }
 
-(function bindNotizieModalUI(){
+function bindNotizieModalUI() {
   const overlay = document.getElementById('notizie-modal-overlay');
   if (!overlay) return;
-
-  ensureNotizieExtraFields();
 
   document.getElementById('not-modal-close')?.addEventListener('click', closeNotiziaModal);
 
@@ -1804,14 +1660,99 @@ function closeNotiziaModal() {
   });
 
   // delega click "modifica" (se presente nelle card o altrove)
+  // deleghe click per azioni card Notizie
   document.addEventListener('click', (e) => {
-    const btn = e.target.closest?.('[data-not-edit]');
-    if (!btn) return;
-    const id = btn.getAttribute('data-not-edit');
-    const n = (notizie || []).find(x => x && x.id === id);
-    if (n) openNotiziaModal(n);
+    const editBtn = e.target.closest?.('[data-not-edit]');
+    if (editBtn) {
+      const id = editBtn.getAttribute('data-not-edit');
+      const n = (notizie || []).find(x => x && x.id === id);
+      if (n) openNotiziaModal(n);
+      return;
+    }
+
+    const delBtn = e.target.closest?.('[data-not-del]');
+    if (delBtn) {
+      const id = delBtn.getAttribute('data-not-del');
+      const n = (notizie || []).find(x => x && x.id === id);
+      if (!n) return;
+      if (!confirm('Eliminare questa notizia?')) return;
+      notizie = (notizie || []).filter(x => x && x.id !== id);
+      try { saveList(STORAGE_KEYS.notizie, notizie); } catch {}
+      renderNotizie();
+      return;
+    }
+
+    const jumpEl = e.target.closest?.('[data-not-jump]');
+    if (jumpEl) {
+      const id = jumpEl.getAttribute('data-not-jump');
+      const focusId = jumpEl.getAttribute('data-jump') || '';
+      const n = (notizie || []).find(x => x && x.id === id);
+      if (n) openNotiziaModal(n, focusId);
+      return;
+    }
+
+    const noans = e.target.closest?.('[data-not-noans-toggle]');
+    if (noans) {
+      const id = noans.getAttribute('data-not-noans-toggle');
+      const box = document.getElementById('not-recall-' + id);
+      if (box) box.style.display = (box.style.display === 'none' || !box.style.display) ? 'block' : 'none';
+
+      // prefill data/ora da ricontatto se presente
+      const n = (notizie || []).find(x => x && x.id === id);
+      if (n && n.ricontatto) {
+        const d = new Date(n.ricontatto);
+        if (!isNaN(d)) {
+          const dateEl = document.querySelector(`[data-not-recall-date="${cssEscape(id)}"]`);
+          const timeEl = document.querySelector(`[data-not-recall-time="${cssEscape(id)}"]`);
+          if (dateEl) dateEl.value = d.toISOString().slice(0,10);
+          if (timeEl) timeEl.value = String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+        }
+      }
+      return;
+    }
+
+    const saveRecall = e.target.closest?.('[data-not-save-recall]');
+    if (saveRecall) {
+      const id = saveRecall.getAttribute('data-not-save-recall');
+      const n = (notizie || []).find(x => x && x.id === id);
+      if (!n) return;
+
+      const dateEl = document.querySelector(`[data-not-recall-date="${cssEscape(id)}"]`);
+      const timeEl = document.querySelector(`[data-not-recall-time="${cssEscape(id)}"]`);
+      const dateVal = (dateEl?.value || '').trim();
+      const timeVal = (timeEl?.value || '').trim();
+
+      if (!dateVal) { alert('Seleziona una data di ricontatto.'); return; }
+
+      const iso = timeVal ? new Date(dateVal + 'T' + timeVal + ':00').toISOString() : new Date(dateVal + 'T09:00:00').toISOString();
+      n.ricontatto = iso;
+      n.nonRisponde = true;
+
+      try { saveList(STORAGE_KEYS.notizie, notizie); } catch {}
+      renderNotizie();
+      return;
+    }
+
+    const saveLast = e.target.closest?.('[data-not-save-lastcomment]');
+    if (saveLast) {
+      const id = saveLast.getAttribute('data-not-save-lastcomment');
+      const n = (notizie || []).find(x => x && x.id === id);
+      if (!n) return;
+
+      const ta = document.querySelector(`[data-not-lastcomment="${cssEscape(id)}"]`);
+      const val = (ta?.value || '').trim();
+      if (!val) { alert('Inserisci un commento.'); return; }
+
+      n.commentoUltimaInterazione = val;
+      n.ultimoContattoAt = new Date().toISOString();
+      n._draftLastComment = '';
+      try { saveList(STORAGE_KEYS.notizie, notizie); } catch {}
+      renderNotizie();
+      return;
+    }
   });
-})();
+}}
+bindNotizieModalUI();
 
 document.getElementById('not-new-btn')?.addEventListener('click', () => {
   openNotiziaModal(null);
