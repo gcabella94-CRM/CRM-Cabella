@@ -12,6 +12,7 @@ window.__CRM_APP_LOADED__ = true;
     staff: 'crm10_staff',
     omi: 'crm10_omi',
     contatti: 'crm10_contatti',      // rubrica contatti proprietari
+    interazioni: 'crm10_interazioni', // timeline unificata (Notizie/Immobili/Contatti)
     intestazioni: 'crm10_intestazioni' // archivio header+footer per documenti IA
   ,    poligoni: 'crm10_mappa_poligoni' // archivio poligoni mappa (aree ricerca + condomini)
   };
@@ -23,6 +24,7 @@ window.__CRM_APP_LOADED__ = true;
   let omi = [];
   let contatti = [];      // rubrica contatti proprietari
   let intestazioni = [];
+  let interazioni = [];
   let lastCreatedAppId = null;
   // modelli di intestazione (header+footer)
 
@@ -43,6 +45,97 @@ window.__CRM_APP_LOADED__ = true;
       if (typeof cloudSync !== 'undefined') {
         cloudSync.save(key, value);
       }
+
+  /* ====== INTERAZIONI (Timeline unificata) ====== */
+  function loadInterazioni() {
+    try { interazioni = loadList(STORAGE_KEYS.interazioni || 'crm10_interazioni'); }
+    catch { interazioni = []; }
+    if (!Array.isArray(interazioni)) interazioni = [];
+  }
+
+  function saveInterazioni() {
+    try { saveList(STORAGE_KEYS.interazioni || 'crm10_interazioni', interazioni || []); } catch {}
+  }
+
+  function getInterazioniForNotizia(notiziaId) {
+    if (!notiziaId) return [];
+    const arr = (interazioni || []).filter(x => x && x.links && x.links.notiziaId === notiziaId);
+    arr.sort((a,b) => (b.ts || '').localeCompare(a.ts || ''));
+    return arr;
+  }
+
+  function getLastInteractionForNotizia(notiziaId) {
+    const arr = getInterazioniForNotizia(notiziaId);
+    return arr.length ? arr[0] : null;
+  }
+
+  function addInterazione(payload) {
+    if (!payload) return null;
+    const nowIso = new Date().toISOString();
+    const rec = {
+      id: payload.id || genId('int'),
+      ts: payload.ts || nowIso,
+      tipo: payload.tipo || 'nota',
+      esito: payload.esito || 'neutro',
+      testo: payload.testo || '',
+      prossimaAzione: payload.prossimaAzione || { enabled:false },
+      links: payload.links || { notiziaId:'', immobileId:'', contattoId:'', attivitaId:'' },
+      meta: payload.meta || {}
+    };
+    if (!Array.isArray(interazioni)) interazioni = [];
+    interazioni.push(rec);
+    saveInterazioni();
+    return rec;
+  }
+
+  function createRicontattoAppuntamentoFromNotizia(n, isoWhen, meta={}) {
+    try {
+      if (!n || !isoWhen) return null;
+      const d = new Date(isoWhen);
+      if (isNaN(d)) return null;
+      const dateIso = d.toISOString().slice(0,10);
+      const hh = String(d.getHours()).padStart(2,'0');
+      const mm = String(d.getMinutes()).padStart(2,'0');
+      const start = `${hh}:${mm}`;
+      const endDate = new Date(d.getTime() + 15*60*1000);
+      const eh = String(endDate.getHours()).padStart(2,'0');
+      const em = String(endDate.getMinutes()).padStart(2,'0');
+      const end = `${eh}:${em}`;
+
+      const app = {
+        id: genId('app'),
+        tipo: 'appuntamento',
+        data: dateIso,
+        ora: start,
+        oraFine: end,
+        tipoDettaglio: meta.tipoDettaglio || 'telefonata',
+        descrizione: meta.descrizione || `Ricontatto: ${(n.nome || '')} ${(n.cognome || '')}`.trim(),
+        responsabileId: n.responsabileId || ((staff && staff[0]) ? staff[0].id : ''),
+        clienteId: meta.clienteId || '',
+        immobileId: meta.immobileId || '',
+        notiziaId: n.id || '',
+        stato: 'aperta',
+        bollente: !!n.caldo,
+        luogo: meta.luogo || '',
+        inUfficio: false,
+        cittaUfficio: ''
+      };
+
+      if (!Array.isArray(attivita)) attivita = [];
+      attivita.push(app);
+      saveList(STORAGE_KEYS.attivita, attivita);
+
+      try { renderAttivita(); } catch {}
+      try { renderAgendaWeek(); } catch {}
+      try { renderAgendaMonth(); } catch {}
+      try { renderDashboard(); } catch {}
+      return app;
+    } catch (e) {
+      console.warn('[INTERAZIONI] createRicontattoAppuntamentoFromNotizia error', e);
+      return null;
+    }
+  }
+  /* ====== end INTERAZIONI ====== */
     } catch (e) {
       console.warn('[SYNC] Errore saveList cloudSync', key, e);
     }
@@ -1156,6 +1249,12 @@ function renderAgendaMonth() {
           const indirizzoCompleto = [n.indirizzo || '', n.citta || '', n.provincia ? `(${n.provincia})` : '', n.cap || ''].filter(Boolean).join(' ');
           const ric = n.ricontatto ? formatDateTimeIT(n.ricontatto) : '';
 
+
+          const lastInt = (typeof getLastInteractionForNotizia==='function') ? getLastInteractionForNotizia(n.id) : null;
+          const lastTs = (lastInt && lastInt.ts) ? lastInt.ts : (n.ultimoContattoAt || '');
+          const lastTxt = (lastInt && lastInt.testo) ? lastInt.testo : (n.commentoUltimaInterazione || '');
+          const lastEsito = (lastInt && lastInt.esito) ? lastInt.esito : '';
+          const lastLabel = lastTs ? formatDateTimeIT(lastTs) : '—';
           const card = document.createElement('div');
           card.className = 'notizia-card';
           card.setAttribute('tabindex','0');
@@ -1211,14 +1310,14 @@ function renderAgendaMonth() {
               <div class="notizia-line" style="margin-top:10px;">
                 <div class="notizia-label">Ultimo contatto</div>
                 <div class="notizia-value clickable" data-not-jump="${escapeHtml(n.id)}" data-jump="not-note">
-                  ${escapeHtml(n.ultimoContattoAt ? formatDateTimeIT(n.ultimoContattoAt) : '—')}
+                  ${escapeHtml(lastLabel)}
                 </div>
               </div>
 
-              <details class="notizia-details" ${n.commentoUltimaInterazione ? '' : 'data-empty="1"'}>
-                <summary>${n.commentoUltimaInterazione ? 'Commento ultimo contatto' : 'Nessun commento (clicca per aggiungere)'}</summary>
+              <details class="notizia-details" ${lastTxt ? '' : 'data-empty="1"'}>
+                <summary>${lastTxt ? 'Commento ultimo contatto' : 'Nessun commento (clicca per aggiungere)'}</summary>
                 <div class="notizia-details-body">
-                  <div class="muted" style="margin-bottom:6px;">${escapeHtml(n.commentoUltimaInterazione || '')}</div>
+                  <div class="muted" style="margin-bottom:6px;">${escapeHtml(lastTxt || '')}</div>
 
                   <div class="notizia-lastcomment-box">
                     <textarea class="input-sm" rows="2" placeholder="Scrivi qui il commento dell’ultimo contatto…"
@@ -1728,6 +1827,37 @@ function bindNotizieModalUI() {
       n.ricontatto = iso;
       n.nonRisponde = true;
 
+      // Interazione + appuntamento ricontatto (15')
+      try {
+        addInterazione({
+          tipo: 'chiamata',
+          esito: 'non_risponde',
+          testo: 'Chiamato: non risponde. Ricontatto fissato.',
+          ts: new Date().toISOString(),
+          prossimaAzione: { enabled: true, when: iso, kind: 'ricontatto' },
+          links: { notiziaId: id, immobileId: '', contattoId: '', attivitaId: '' }
+        });
+      } catch {}
+
+      try {
+        const app = createRicontattoAppuntamentoFromNotizia(n, iso, {
+          tipoDettaglio: 'telefonata',
+          descrizione: `Ricontatto (non risponde) – ${(n.nome || '')} ${(n.cognome || '')}`.trim()
+        });
+        if (app && app.id) {
+          try {
+            addInterazione({
+              tipo: 'appuntamento',
+              esito: 'programmato',
+              testo: 'Creato appuntamento in agenda (ricontatto).',
+              ts: new Date().toISOString(),
+              links: { notiziaId: id, immobileId: '', contattoId: '', attivitaId: app.id }
+            });
+          } catch {}
+        }
+      } catch {}
+
+
       try { saveList(STORAGE_KEYS.notizie, notizie); } catch {}
       renderNotizie();
       return;
@@ -1743,9 +1873,20 @@ function bindNotizieModalUI() {
       const val = (ta?.value || '').trim();
       if (!val) { alert('Inserisci un commento.'); return; }
 
-      n.commentoUltimaInterazione = val;
-      n.ultimoContattoAt = new Date().toISOString();
+      // Salva come ultima interazione + crea evento in timeline
+      const nowIso = new Date().toISOString();
+      n.commentoUltimaInterazione = val; // compat (vecchio campo)
+      n.ultimoContattoAt = nowIso;
       n._draftLastComment = '';
+      try {
+        addInterazione({
+          tipo: 'nota',
+          esito: 'ok',
+          testo: val,
+          ts: nowIso,
+          links: { notiziaId: id, immobileId: '', contattoId: '', attivitaId: '' }
+        });
+      } catch {}
       try { saveList(STORAGE_KEYS.notizie, notizie); } catch {}
       renderNotizie();
       return;
@@ -5014,6 +5155,7 @@ function initPoligoniModule() {
     omi = loadList(STORAGE_KEYS.omi);
     contatti = loadList(STORAGE_KEYS.contatti);
     intestazioni = loadList(STORAGE_KEYS.intestazioni || 'crm10_intestazioni');
+    interazioni = loadList(STORAGE_KEYS.interazioni || 'crm10_interazioni');
   }
 
   
