@@ -7,10 +7,7 @@ export function ensureNotiziaDetailDrawer({ closeNotiziaDetail }) {
   if (overlay) return overlay;
 
   // === BEGIN: markup identico alla versione legacy ===
-let overlay = document.getElementById('notizia-detail-overlay');
-  if (overlay) return overlay;
-
-  overlay = document.createElement('div');
+overlay = document.createElement('div');
   overlay.id = 'notizia-detail-overlay';
   overlay.className = 'modal-overlay';
 
