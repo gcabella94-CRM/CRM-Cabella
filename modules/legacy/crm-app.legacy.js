@@ -6,6 +6,18 @@ window.__CRM_APP_LOADED__ = true;
 
 /* ====== STORAGE & UTILITY ====== */
 
+// --- DOM selector escaping (CSS.escape polyfill) ---
+// Needed because in some contexts (or older browsers) CSS.escape may be undefined,
+// and we use it to build safe attribute selectors (e.g. data-* queries).
+function cssEscape(value) {
+  const s = String(value ?? '');
+  if (typeof CSS !== 'undefined' && CSS && typeof CSS.escape === 'function') return CSS.escape(s);
+  // Minimal, safe fallback: escape quotes and backslashes, and strip line breaks.
+  return s.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n|\r/g, ' ');
+}
+window.cssEscape = window.cssEscape || cssEscape;
+
+
 // --- Compatibility helpers (refactor-safe) ---
 /**
  * Returns the interactions/timeline array for a given notizia id.
@@ -75,23 +87,6 @@ try {
   // ---- Notizie: interazioni/timeline helper (compat) ----
   // Alcune versioni salvano le interazioni dentro la notizia (es. n.interazioni / n.timeline / n.eventi).
   // Questa funzione normalizza e restituisce sempre un array ordinato (più recente prima), evitando crash.
-  function getInterazioniForNotizia(notiziaId) {
-    try {
-      const n = (Array.isArray(notizie) ? notizie.find(x => x && x.id === notiziaId) : null) || (typeof __currentNotiziaDetail !== 'undefined' ? __currentNotiziaDetail : null);
-      if (!n) return [];
-      const arr =
-        (Array.isArray(n.interazioni) && n.interazioni) ||
-        (Array.isArray(n.timeline) && n.timeline) ||
-        (Array.isArray(n.eventi) && n.eventi) ||
-        (Array.isArray(n.log) && n.log) ||
-        [];
-      return arr
-        .filter(Boolean)
-        .slice()
-        .sort((a, b) => (Number(b.ts || b.date || b.when || 0) - Number(a.ts || a.date || a.when || 0)));
-    } catch (e) {
-      return [];
-    }
   }
 
   let attivita = [];
@@ -1473,7 +1468,11 @@ function renderAgendaMonth() {
           // apri con click su card (ma non sui bottoni)
           card.addEventListener('click', (ev) => {
             // click sulla card = apri DETTAGLIO (non la UI di inserimento)
-            if (ev.target.closest('button')) return;
+            // Ma: non deve scattare quando interagisci con controlli interni (commento, input, tendine, form ricontatto, ecc.)
+            const t = ev.target;
+            if (t.closest('button, a, input, textarea, select, option, label')) return;
+            if (t.closest('.notizia-lastnote, .notizia-recall-form')) return;
+            if (t.closest('[data-not-noans-toggle], [data-not-save-recall], [data-not-recall-date], [data-not-recall-time], [data-not-lastcomment], [data-not-save-lastcomment]')) return;
             openNotiziaDetail(n);
           });
           card.addEventListener('keydown', (ev) => {
