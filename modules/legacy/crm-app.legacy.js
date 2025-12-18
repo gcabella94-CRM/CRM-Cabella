@@ -23,7 +23,7 @@ window.cssEscape = window.cssEscape || cssEscape;
  * Returns the interactions/timeline array for a given notizia id.
  * Kept global-safe so legacy calls don't break during modular refactors.
  */
-window.getInterazioniForNotizia = window.getInterazioniForNotizia || function window.getInterazioniForNotizia(notiziaId) {
+window.getInterazioniForNotizia = window.getInterazioniForNotizia || function getInterazioniForNotizia(notiziaId) {
   try {
     const notizie = (typeof loadList === 'function') ? loadList(STORAGE_KEYS.notizie) : [];
     const n = (notizie || []).find(x => String(x.id) === String(notiziaId));
@@ -74,8 +74,8 @@ try {
     staff: 'crm10_staff',
     omi: 'crm10_omi',
     contatti: 'crm10_contatti',      // rubrica contatti proprietari
-    intestazioni: 'crm10_intestazioni', // archivio header+footer per documenti IA
-    poligoni: 'crm10_mappa_poligoni' // archivio poligoni mappa (aree ricerca + condomini)
+    intestazioni: 'crm10_intestazioni' // archivio header+footer per documenti IA
+  ,    poligoni: 'crm10_mappa_poligoni' // archivio poligoni mappa (aree ricerca + condomini)
   };
 
   let immobili = [];
