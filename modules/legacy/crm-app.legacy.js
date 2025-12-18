@@ -23,7 +23,7 @@ window.cssEscape = window.cssEscape || cssEscape;
  * Returns the interactions/timeline array for a given notizia id.
  * Kept global-safe so legacy calls don't break during modular refactors.
  */
-window.getInterazioniForNotizia = window.getInterazioniForNotizia || function(notiziaId) {
+window.getInterazioniForNotizia = window.getInterazioniForNotizia || function window.getInterazioniForNotizia(notiziaId) {
   try {
     const notizie = (typeof loadList === 'function') ? loadList(STORAGE_KEYS.notizie) : [];
     const n = (notizie || []).find(x => String(x.id) === String(notiziaId));
