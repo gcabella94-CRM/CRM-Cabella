@@ -19,6 +19,29 @@ window.__CRM_APP_LOADED__ = true;
 
   let immobili = [];
   let notizie = [];
+
+  // ---- Notizie: interazioni/timeline helper (compat) ----
+  // Alcune versioni salvano le interazioni dentro la notizia (es. n.interazioni / n.timeline / n.eventi).
+  // Questa funzione normalizza e restituisce sempre un array ordinato (più recente prima), evitando crash.
+  function getInterazioniForNotizia(notiziaId) {
+    try {
+      const n = (Array.isArray(notizie) ? notizie.find(x => x && x.id === notiziaId) : null) || (typeof __currentNotiziaDetail !== 'undefined' ? __currentNotiziaDetail : null);
+      if (!n) return [];
+      const arr =
+        (Array.isArray(n.interazioni) && n.interazioni) ||
+        (Array.isArray(n.timeline) && n.timeline) ||
+        (Array.isArray(n.eventi) && n.eventi) ||
+        (Array.isArray(n.log) && n.log) ||
+        [];
+      return arr
+        .filter(Boolean)
+        .slice()
+        .sort((a, b) => (Number(b.ts || b.date || b.when || 0) - Number(a.ts || a.date || a.when || 0)));
+    } catch (e) {
+      return [];
+    }
+  }
+
   let attivita = [];
   let staff = [];
   let omi = [];
@@ -5153,7 +5176,20 @@ function initPoligoniModule() {
     staff = loadList(STORAGE_KEYS.staff);
     omi = loadList(STORAGE_KEYS.omi);
     contatti = loadList(STORAGE_KEYS.contatti);
-    intestazioni = loadList(STORAGE_KEYS.intestazioni || 'crm10_intestazioni');
+    // Migrazione compat: alcune vecchie versioni salvavano la rubrica sotto la chiave 'rubrica'.
+    if ((!Array.isArray(contatti) || contatti.length === 0)) {
+      try {
+        const legacyRubricaRaw = localStorage.getItem('rubrica');
+        if (legacyRubricaRaw) {
+          const legacyRubrica = JSON.parse(legacyRubricaRaw);
+          if (Array.isArray(legacyRubrica) && legacyRubrica.length) {
+            contatti = legacyRubrica;
+            saveList(STORAGE_KEYS.contatti, contatti);
+          }
+        }
+      } catch (e) {}
+    }
+intestazioni = loadList(STORAGE_KEYS.intestazioni || 'crm10_intestazioni');
   }
 
   
