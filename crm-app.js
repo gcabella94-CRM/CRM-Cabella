@@ -12,7 +12,8 @@ window.__CRM_APP_LOADED__ = true;
     staff: 'crm10_staff',
     omi: 'crm10_omi',
     contatti: 'crm10_contatti',      // rubrica contatti proprietari
-    intestazioni: 'crm10_intestazioni' // archivio header+footer per documenti IA
+    intestazioni: 'crm10_intestazioni' // archivio header+footer per documenti IA,
+    interazioni: 'crm10_interazioni'
   ,    poligoni: 'crm10_mappa_poligoni' // archivio poligoni mappa (aree ricerca + condomini)
   };
 
@@ -23,7 +24,9 @@ window.__CRM_APP_LOADED__ = true;
   let omi = [];
   let contatti = [];      // rubrica contatti proprietari
   let intestazioni = [];
-  let lastCreatedAppId = null;
+  
+  let interazioni = [];
+let lastCreatedAppId = null;
   // modelli di intestazione (header+footer)
 
   function loadList(key) {
@@ -48,257 +51,66 @@ window.__CRM_APP_LOADED__ = true;
     }
   }
 
-  function genId(prefix = 'id') {
-    return `${prefix}
-
-/* ====== NOTIZIA DETTAGLIO (drawer) ====== */
-function ensureNotiziaDetailDrawer() {
-  let overlay = document.getElementById('notizia-detail-overlay');
-  if (overlay) return overlay;
-
-  overlay = document.createElement('div');
-  overlay.id = 'notizia-detail-overlay';
-  overlay.className = 'modal-overlay';
-
-  overlay.innerHTML = `
-    <div class="modal-panel notizia-detail-panel" role="dialog" aria-modal="true">
-      <div class="modal-header">
-        <div>
-          <div class="modal-title">Scheda Notizia</div>
-          <div class="modal-subtitle" id="notizia-detail-subtitle">Dettaglio</div>
-        </div>
-        <button class="btn btn-ghost" id="notizia-detail-close" title="Chiudi">✕</button>
-      </div>
-
-      <div class="modal-body" id="notizia-detail-body" style="padding-top:6px;">
-        <div class="notizia-detail-sections">
-          <div class="notizia-detail-section" id="notd-indirizzo">
-            <div class="card-title" style="font-size:13px;">📍 Dati immobile potenziale</div>
-            <div id="notd-indirizzo-content" class="muted" style="margin-top:6px;"></div>
-          </div>
-
-          <div class="notizia-detail-section" id="notd-proprietario" style="margin-top:10px;">
-            <div class="card-title" style="font-size:13px;">👤 Proprietario / Contatto</div>
-            <div id="notd-proprietario-content" class="muted" style="margin-top:6px;"></div>
-          </div>
-
-          <div class="notizia-detail-section" id="notd-timeline" style="margin-top:10px;">
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-              <div class="card-title" style="font-size:13px;">🕒 Timeline</div>
-              <button class="btn btn-sm" id="notd-add-interazione">+ Interazione</button>
-            </div>
-            <div id="notd-timeline-list" style="margin-top:6px;"></div>
-
-            <div id="notd-add-interazione-box" style="display:none;margin-top:8px;border:1px solid #111827;border-radius:12px;padding:8px;background:rgba(2,6,23,0.55);">
-              <div class="form-grid-2">
-                <div class="form-group">
-                  <label>Tipo</label>
-                  <select id="notd-int-tipo">
-                    <option value="chiamata">Chiamata</option>
-                    <option value="whatsapp">WhatsApp</option>
-                    <option value="email">Email</option>
-                    <option value="sopralluogo">Sopralluogo</option>
-                    <option value="nota" selected>Nota</option>
-                    <option value="altro">Altro</option>
-                  </select>
-                </div>
-                <div class="form-group">
-                  <label>Esito</label>
-                  <select id="notd-int-esito">
-                    <option value="neutro" selected>Neutro</option>
-                    <option value="positivo">Positivo</option>
-                    <option value="negativo">Negativo</option>
-                    <option value="da_richiamare">Da richiamare</option>
-                    <option value="non_risponde">Non risponde</option>
-                  </select>
-                </div>
-              </div>
-
-              <div class="form-group">
-                <label>Testo</label>
-                <textarea id="notd-int-testo" placeholder="Cosa ci siamo detti..."></textarea>
-              </div>
-
-              <div class="form-grid-2">
-                <div class="form-group">
-                  <label>Ricontatto (opz.)</label>
-                  <input id="notd-int-when" type="datetime-local">
-                </div>
-                <div class="form-group" style="display:flex;align-items:flex-end;gap:8px;">
-                  <label style="display:flex;align-items:center;gap:8px;">
-                    <input id="notd-int-crea-agenda" type="checkbox" checked>
-                    Crea in agenda (15 min)
-                  </label>
-                </div>
-              </div>
-
-              <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:6px;">
-                <button class="btn btn-ghost" id="notd-int-cancel">Annulla</button>
-                <button class="btn btn-primary" id="notd-int-save">Salva interazione</button>
-              </div>
-            </div>
-          </div>
-
-          <div class="notizia-detail-section" id="notd-azioni" style="margin-top:10px;">
-            <div class="card-title" style="font-size:13px;">⚙️ Azioni</div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;">
-              <button class="btn btn-sm" id="notd-btn-modifica">Modifica notizia</button>
-              <button class="btn btn-sm" id="notd-btn-chiudi">Chiudi</button>
-            </div>
-            <div class="muted" style="margin-top:6px;">(Livello 1) Da qui poi collegheremo conversione → Immobile e relazioni avanzate.</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  `;
-
-  document.body.appendChild(overlay);
-
-  // close handlers
-  overlay.addEventListener('click', (e) => {
-    if (e.target === overlay) closeNotiziaDetail();
-  });
-  document.getElementById('notizia-detail-close')?.addEventListener('click', closeNotiziaDetail);
-  document.getElementById('notd-btn-chiudi')?.addEventListener('click', closeNotiziaDetail);
-
-  return overlay;
+/* ====== INTERAZIONI (Timeline unificata) ====== */
+function saveInterazioni() {
+  try { saveList(STORAGE_KEYS.interazioni || 'crm10_interazioni', interazioni || []); } catch {}
 }
-
-let __currentNotiziaDetail = null;
-
-function closeNotiziaDetail() {
-  const overlay = document.getElementById('notizia-detail-overlay');
-  if (overlay) overlay.style.display = 'none';
-  __currentNotiziaDetail = null;
+function addInterazione(payload) {
+  const rec = {
+    id: payload?.id || genId('int'),
+    ts: payload?.ts || new Date().toISOString(),
+    tipo: payload?.tipo || 'nota',
+    esito: payload?.esito || 'neutro',
+    testo: payload?.testo || '',
+    prossimaAzione: payload?.prossimaAzione || { enabled:false },
+    links: payload?.links || {},
+    meta: payload?.meta || {}
+  };
+  interazioni = interazioni || [];
+  interazioni.push(rec);
+  saveInterazioni();
+  return rec;
 }
-
-function renderNotiziaDetail(n) {
-  if (!n) return;
-  __currentNotiziaDetail = n;
-
-  const sub = document.getElementById('notizia-detail-subtitle');
-  if (sub) {
-    const nome = [n.nome, n.cognome].filter(Boolean).join(' ').trim() || 'Senza nome';
-    sub.textContent = `${nome}${n.telefono ? ' · ' + n.telefono : ''}`;
-  }
-
-  // dati immobile
-  const indir = document.getElementById('notd-indirizzo-content');
-  if (indir) {
-    const indirizzoCompleto = [n.indirizzo, n.citta, n.provincia, n.cap].filter(Boolean).join(' · ');
-    indir.innerHTML = `
-      <div><strong>Indirizzo:</strong> ${escapeHtml(indirizzoCompleto || '—')}</div>
-      <div style="margin-top:4px;"><strong>Tipologia:</strong> ${escapeHtml(n.tipologia || '—')} &nbsp; <strong>MQ:</strong> ${escapeHtml((n.mq ?? '—').toString())} &nbsp; <strong>Piano:</strong> ${escapeHtml(n.piano || '—')}</div>
-      <div style="margin-top:4px;"><strong>Note:</strong> ${escapeHtml(n.note || '')}</div>
-    `;
-  }
-
-  // proprietario
-  const prop = document.getElementById('notd-proprietario-content');
-  if (prop) {
-    const nome = [n.nome, n.cognome].filter(Boolean).join(' ').trim() || '—';
-    prop.innerHTML = `
-      <div><strong>Proprietario:</strong> ${escapeHtml(nome)}</div>
-      <div style="margin-top:4px;"><strong>Telefono:</strong> ${escapeHtml(n.telefono || '—')} &nbsp; <strong>Email:</strong> ${escapeHtml(n.email || '—')}</div>
-    `;
-  }
-
-  // timeline
-  const list = document.getElementById('notd-timeline-list');
-  if (list) {
-    const items = getInterazioniForNotizia(n.id);
-    if (!items.length) {
-      list.innerHTML = '<div class="muted">Nessuna interazione registrata.</div>';
-    } else {
-      list.innerHTML = items.map(it => {
-        const when = formatDateIT(it.ts) || '';
-        const tipo = (it.tipo || 'nota');
-        const esito = (it.esito || 'neutro');
-        const txt = (it.testo || '').trim();
-        return `
-          <div class="notizia-timeline-item">
-            <div class="notizia-timeline-top">
-              <span class="tag"><span class="tag-dot"></span>${escapeHtml(tipo)}</span>
-              <span class="muted">${escapeHtml(when)}</span>
-              <span class="pill pill-strong" style="margin-left:auto;">${escapeHtml(esito)}</span>
-            </div>
-            <div class="notizia-timeline-text">${escapeHtml(txt || '—')}</div>
-          </div>
-        `;
-      }).join('');
-    }
-  }
-
-  // bind azioni
-  document.getElementById('notd-btn-modifica')?.addEventListener('click', () => {
-    // apre SOLO la modale di modifica, non il dettaglio
-    openNotiziaModal(n);
-  });
-
-  // bind add interazione
-  const btnAdd = document.getElementById('notd-add-interazione');
-  const box = document.getElementById('notd-add-interazione-box');
-  btnAdd && btnAdd.addEventListener('click', () => {
-    if (!box) return;
-    box.style.display = (box.style.display === 'none' || !box.style.display) ? 'block' : 'none';
-  });
-
-  document.getElementById('notd-int-cancel')?.addEventListener('click', () => {
-    if (box) box.style.display = 'none';
-  });
-
-  document.getElementById('notd-int-save')?.addEventListener('click', () => {
-    const tipo = document.getElementById('notd-int-tipo')?.value || 'nota';
-    const esito = document.getElementById('notd-int-esito')?.value || 'neutro';
-    const testo = document.getElementById('notd-int-testo')?.value || '';
-    const whenLocal = document.getElementById('notd-int-when')?.value || '';
-    const creaAgenda = !!document.getElementById('notd-int-crea-agenda')?.checked;
-
-    let isoWhen = '';
-    if (whenLocal) {
-      // datetime-local -> ISO (locale)
-      const d = new Date(whenLocal);
-      if (!isNaN(d)) isoWhen = d.toISOString();
-    }
-
-    addInterazione({
-      tipo, esito, testo,
-      links: { notiziaId: n.id, immobileId:'', contattoId:'', attivitaId:'' },
-      prossimaAzione: isoWhen ? { enabled:true, when: isoWhen, durataMin: 15, creaInAgenda: creaAgenda } : { enabled:false }
-    });
-
-    if (isoWhen && creaAgenda) {
-      createRicontattoAppuntamentoFromNotizia(n, isoWhen, { tipoDettaglio: 'telefonata', descrizione: testo ? ('Ricontatto: ' + testo.slice(0,70)) : undefined });
-    }
-
-    // refresh UI
-    renderNotiziaDetail(n);
-    try { renderNotizie(); } catch {}
-    if (box) box.style.display = 'none';
-    const t = document.getElementById('notd-int-testo');
-    if (t) t.value = '';
-  });
+function getInterazioniForNotizia(notiziaId) {
+  return (interazioni || [])
+    .filter(x => x && x.links && x.links.notiziaId === notiziaId)
+    .sort((a,b) => (b.ts||'').localeCompare(a.ts||''));
 }
+function getLastInteractionForNotizia(notiziaId) {
+  const arr = getInterazioniForNotizia(notiziaId);
+  return arr.length ? arr[0] : null;
+}
+/* ====== end INTERAZIONI ====== */
 
-function openNotiziaDetail(n, focusId='') {
-  const overlay = ensureNotiziaDetailDrawer();
-  overlay.style.display = 'flex';
-  renderNotiziaDetail(n);
-
-  // focus se richiesto
-  if (focusId) {
-    const map = {
-      'not-indirizzo': 'notd-indirizzo',
-      'not-proprietario': 'notd-proprietario',
-      'not-ultimo-contatto': 'notd-timeline',
-      'not-commento': 'notd-timeline'
+function createRicontattoAppuntamentoFromNotizia(n, isoWhen, opts={}) {
+  try {
+    const start = new Date(isoWhen);
+    const end = new Date(start.getTime() + 15*60*1000);
+    const app = {
+      id: genId('app'),
+      tipo: 'appuntamento',
+      titolo: 'Ricontatto notizia',
+      tipoDettaglio: opts.tipoDettaglio || 'telefonata',
+      descrizione: opts.descrizione || '',
+      start: start.toISOString(),
+      end: end.toISOString(),
+      responsabileId: n.responsabileId || '',
+      notiziaId: n.id || ''
     };
-    const targetId = map[focusId] || focusId;
-    const el = document.getElementById(targetId);
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    attivita = attivita || [];
+    attivita.push(app);
+    saveList(STORAGE_KEYS.attivita, attivita);
+    return app;
+  } catch (e) {
+    console.warn('Errore creazione appuntamento ricontatto', e);
+    return null;
   }
 }
-_${Math.random().toString(36).slice(2, 9)}`;
+
+
+
+  function genId(prefix = 'id') {
+    return `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
   }
 
   function formatEuro(val) {
@@ -385,6 +197,9 @@ _${Math.random().toString(36).slice(2, 9)}`;
       if (viewId === 'staff') renderStaffTable();
       if (viewId === 'omi') renderOmi();
       if (viewId === 'mappa') initMappa();
+
+    document.getElementById('notizia-drawer-overlay')?.addEventListener('click', closeNotiziaDetailDrawer);
+    document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') closeNotiziaDetailDrawer(); });
     }
 
     document.addEventListener('click', (e) => {
@@ -1380,7 +1195,7 @@ function renderAgendaMonth() {
           <td>${caldoLabel}</td>
           <td>${escapeHtml(staffObj?.nome || n.responsabileId || '—')}</td>
           <td>
-            <button class="btn btn-xs" data-not-edit="${escapeHtml(n.id)}">Apri</button>
+            <button class="btn btn-xs" data-not-open="${escapeHtml(n.id)}">Apri</button>
             <button class="btn btn-xs btn-danger" data-not-del="${escapeHtml(n.id)}">Elimina</button>
           </td>
         `;
@@ -1416,7 +1231,7 @@ function renderAgendaMonth() {
                 ${n.nonRisponde ? '<span class="badge">⛔ non risponde</span>' : ''}
               </div>
               <div class="notizia-card-actions">
-                <button class="btn btn-xs" data-not-edit="${escapeHtml(n.id)}">Apri</button>
+                <button class="btn btn-xs" data-not-open="${escapeHtml(n.id)}">Apri</button>
                 <button class="btn btn-xs btn-danger" data-not-del="${escapeHtml(n.id)}">Elimina</button>
               </div>
             </div>
@@ -1507,12 +1322,11 @@ function renderAgendaMonth() {
 
           // apri con click su card (ma non sui bottoni)
           card.addEventListener('click', (ev) => {
-            // click sulla card = apri DETTAGLIO (non la UI di inserimento)
             if (ev.target.closest('button')) return;
-            openNotiziaDetail(n);
+            openNotiziaDetailDrawer(n.id);
           });
           card.addEventListener('keydown', (ev) => {
-            if (ev.key === 'Enter') openNotiziaDetail(n);
+            if (ev.key === 'Enter') openNotiziaDetailDrawer(n.id);
           });
 
           cardsContainer.appendChild(card);
@@ -1912,11 +1726,11 @@ function bindNotizieModalUI() {
   // delega click "modifica" (se presente nelle card o altrove)
   // deleghe click per azioni card Notizie
   document.addEventListener('click', (e) => {
-    const editBtn = e.target.closest?.('[data-not-edit]');
-    if (editBtn) {
-      const id = editBtn.getAttribute('data-not-edit');
+    const openBtn = e.target.closest?.('[data-not-open]');
+    if (openBtn) {
+      const id = openBtn.getAttribute('data-not-open');
       const n = (notizie || []).find(x => x && x.id === id);
-      if (n) openNotiziaModal(n);
+      if (n) openNotiziaDetailDrawer(n.id);
       return;
     }
 
@@ -1937,7 +1751,7 @@ function bindNotizieModalUI() {
       const id = jumpEl.getAttribute('data-not-jump');
       const focusId = jumpEl.getAttribute('data-jump') || '';
       const n = (notizie || []).find(x => x && x.id === id);
-      if (n) openNotiziaDetail(n, focusId);
+      if (n) openNotiziaDetailDrawer(n.id, focusId);
       return;
     }
 
@@ -5264,7 +5078,10 @@ function initPoligoniModule() {
     omi = loadList(STORAGE_KEYS.omi);
     contatti = loadList(STORAGE_KEYS.contatti);
     intestazioni = loadList(STORAGE_KEYS.intestazioni || 'crm10_intestazioni');
-  }
+  
+    interazioni = loadList(STORAGE_KEYS.interazioni || 'crm10_interazioni');
+    if (!Array.isArray(interazioni)) interazioni = [];
+}
 
   
   function init() {
@@ -5282,6 +5099,9 @@ function initPoligoniModule() {
     renderAgendaWeek();
     renderAgendaMonth();
     initMappa();
+
+    document.getElementById('notizia-drawer-overlay')?.addEventListener('click', closeNotiziaDetailDrawer);
+    document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') closeNotiziaDetailDrawer(); });
 
     // sincronizzazione realtime con Firebase, se attiva
     try {
@@ -6672,4 +6492,13 @@ document.addEventListener('DOMContentLoaded', () => {
     MAP_ADDON_STATE.initialized = true;
   };
 
-})();
+})()
+    const editBtn = e.target.closest?.('[data-not-edit]');
+    if (editBtn) {
+      const id = editBtn.getAttribute('data-not-edit');
+      const n = (notizie || []).find(x => x && x.id === id);
+      if (n) openNotiziaModal(n);
+      return;
+    }
+
+;
