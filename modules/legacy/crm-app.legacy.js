@@ -6,6 +6,58 @@ window.__CRM_APP_LOADED__ = true;
 
 /* ====== STORAGE & UTILITY ====== */
 
+// --- Compatibility helpers (refactor-safe) ---
+/**
+ * Returns the interactions/timeline array for a given notizia id.
+ * Kept global-safe so legacy calls don't break during modular refactors.
+ */
+window.getInterazioniForNotizia = window.getInterazioniForNotizia || function getInterazioniForNotizia(notiziaId) {
+  try {
+    const notizie = (typeof loadList === 'function') ? loadList(STORAGE_KEYS.notizie) : [];
+    const n = (notizie || []).find(x => String(x.id) === String(notiziaId));
+    if (!n) return [];
+    const arr =
+      n.interazioni ||
+      n.timeline ||
+      n.eventi ||
+      n.log ||
+      n.storico ||
+      [];
+    const out = Array.isArray(arr) ? arr.slice() : [];
+    // normalize minimal fields
+    out.forEach((it) => {
+      if (it && typeof it === 'object') {
+        it.data = it.data || it.date || it.datetime || it.ts || it.timestamp || null;
+        it.testo = it.testo || it.text || it.note || it.commento || '';
+        it.esito = it.esito || it.outcome || it.tipo || 'neutro';
+      }
+    });
+    // sort by date desc if possible
+    out.sort((a,b) => {
+      const da = new Date(a?.data || 0).getTime() || 0;
+      const db = new Date(b?.data || 0).getTime() || 0;
+      return db - da;
+    });
+    return out;
+  } catch (e) {
+    return [];
+  }
+};
+// also expose as module-scope identifier for direct calls
+const getInterazioniForNotizia = window.getInterazioniForNotizia;
+
+// migrate old rubrica key if needed (one-time)
+try {
+  const current = (typeof loadList === 'function') ? loadList(STORAGE_KEYS.contatti) : [];
+  if ((!current || current.length === 0) && localStorage.getItem('rubrica')) {
+    const legacyRubrica = JSON.parse(localStorage.getItem('rubrica') || '[]');
+    if (Array.isArray(legacyRubrica) && legacyRubrica.length) {
+      if (typeof saveList === 'function') saveList(STORAGE_KEYS.contatti, legacyRubrica);
+    }
+  }
+} catch {}
+// --- End compatibility helpers ---
+
   const STORAGE_KEYS = {
     immobili: 'crm10_immobili',
     notizie: 'crm10_notizie',
@@ -23,25 +75,6 @@ window.__CRM_APP_LOADED__ = true;
   // ---- Notizie: interazioni/timeline helper (compat) ----
   // Alcune versioni salvano le interazioni dentro la notizia (es. n.interazioni / n.timeline / n.eventi).
   // Questa funzione normalizza e restituisce sempre un array ordinato (più recente prima), evitando crash.
-  function getInterazioniForNotizia(notiziaId) {
-    try {
-      const n = (Array.isArray(notizie) ? notizie.find(x => x && x.id === notiziaId) : null) || (typeof __currentNotiziaDetail !== 'undefined' ? __currentNotiziaDetail : null);
-      if (!n) return [];
-      const arr =
-        (Array.isArray(n.interazioni) && n.interazioni) ||
-        (Array.isArray(n.timeline) && n.timeline) ||
-        (Array.isArray(n.eventi) && n.eventi) ||
-        (Array.isArray(n.log) && n.log) ||
-        [];
-      return arr
-        .filter(Boolean)
-        .slice()
-        .sort((a, b) => (Number(b.ts || b.date || b.when || 0) - Number(a.ts || a.date || a.when || 0)));
-    } catch (e) {
-      return [];
-    }
-  }
-
   let attivita = [];
   let staff = [];
   let omi = [];
