@@ -49,7 +49,8 @@ window.__CRM_APP_LOADED__ = true;
   }
 
   function genId(prefix = 'id') {
-    return `${prefix}
+  return `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
+}
 
 /* ====== NOTIZIA DETTAGLIO (drawer) ====== */
 function ensureNotiziaDetailDrawer() {
@@ -298,8 +299,6 @@ function openNotiziaDetail(n, focusId='') {
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 }
-_${Math.random().toString(36).slice(2, 9)}`;
-  }
 
   function formatEuro(val) {
     if (!val && val !== 0) return '';
@@ -2001,7 +2000,7 @@ function bindNotizieModalUI() {
       return;
     }
   });
-}}
+}
 bindNotizieModalUI();
 
 document.getElementById('not-new-btn')?.addEventListener('click', () => {
