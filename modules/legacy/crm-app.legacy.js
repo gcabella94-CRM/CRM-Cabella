@@ -23,7 +23,7 @@ window.cssEscape = window.cssEscape || cssEscape;
  * Returns the interactions/timeline array for a given notizia id.
  * Kept global-safe so legacy calls don't break during modular refactors.
  */
-window.getInterazioniForNotizia = window.getInterazioniForNotizia || function getInterazioniForNotizia(notiziaId) {
+window.getInterazioniForNotizia = window.getInterazioniForNotizia || function(notiziaId) {
   try {
     const notizie = (typeof loadList === 'function') ? loadList(STORAGE_KEYS.notizie) : [];
     const n = (notizie || []).find(x => String(x.id) === String(notiziaId));
@@ -55,9 +55,6 @@ window.getInterazioniForNotizia = window.getInterazioniForNotizia || function ge
     return [];
   }
 };
-// also expose as module-scope identifier for direct calls
-const getInterazioniForNotizia = window.getInterazioniForNotizia;
-
 // migrate old rubrica key if needed (one-time)
 try {
   const current = (typeof loadList === 'function') ? loadList(STORAGE_KEYS.contatti) : [];
@@ -168,7 +165,7 @@ function renderNotiziaDetail(n) {
   // timeline
   const list = document.getElementById('notd-timeline-list');
   if (list) {
-    const items = getInterazioniForNotizia(n.id);
+    const items = window.getInterazioniForNotizia(n.id);
     if (!items.length) {
       list.innerHTML = '<div class="muted">Nessuna interazione registrata.</div>';
     } else {
