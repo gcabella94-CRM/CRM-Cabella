@@ -84,7 +84,6 @@ try {
   // ---- Notizie: interazioni/timeline helper (compat) ----
   // Alcune versioni salvano le interazioni dentro la notizia (es. n.interazioni / n.timeline / n.eventi).
   // Questa funzione normalizza e restituisce sempre un array ordinato (più recente prima), evitando crash.
-  }
 
   let attivita = [];
   let staff = [];
