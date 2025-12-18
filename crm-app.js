@@ -1,3 +1,3 @@
 // crm-app.js (module entrypoint)
-// Loads the legacy CRM (which mounts UI + listeners) after ensuring modules are available.
+// Boots the legacy app (which mounts UI + listeners) and keeps the rest of the project structure intact.
 import './modules/legacy/crm-app.legacy.js';

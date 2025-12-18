@@ -6,15 +6,9 @@ export function ensureNotiziaDetailDrawer({ closeNotiziaDetail }) {
   let overlay = document.getElementById('notizia-detail-overlay');
   if (overlay) return overlay;
 
-  // fallback close handler if not provided by legacy/controller
-  if (typeof closeNotiziaDetail !== 'function') {
-    closeNotiziaDetail = () => {
-      const ov = document.getElementById('notizia-detail-overlay');
-      if (ov) { ov.classList.remove('show'); ov.style.display = 'none'; }
-    };
-  }
-
   // === BEGIN: markup identico alla versione legacy ===
+let overlay = document.getElementById('notizia-detail-overlay');
+  if (overlay) return overlay;
 
   overlay = document.createElement('div');
   overlay.id = 'notizia-detail-overlay';
