@@ -6,70 +6,6 @@ window.__CRM_APP_LOADED__ = true;
 
 /* ====== STORAGE & UTILITY ====== */
 
-// --- DOM selector escaping (CSS.escape polyfill) ---
-// Needed because in some contexts (or older browsers) CSS.escape may be undefined,
-// and we use it to build safe attribute selectors (e.g. data-* queries).
-function cssEscape(value) {
-  const s = String(value ?? '');
-  if (typeof CSS !== 'undefined' && CSS && typeof CSS.escape === 'function') return CSS.escape(s);
-  // Minimal, safe fallback: escape quotes and backslashes, and strip line breaks.
-  return s.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n|\r/g, ' ');
-}
-window.cssEscape = window.cssEscape || cssEscape;
-
-
-// --- Compatibility helpers (refactor-safe) ---
-/**
- * Returns the interactions/timeline array for a given notizia id.
- * Kept global-safe so legacy calls don't break during modular refactors.
- */
-window.getInterazioniForNotizia = window.getInterazioniForNotizia || function getInterazioniForNotizia(notiziaId) {
-  try {
-    const notizie = (typeof loadList === 'function') ? loadList(STORAGE_KEYS.notizie) : [];
-    const n = (notizie || []).find(x => String(x.id) === String(notiziaId));
-    if (!n) return [];
-    const arr =
-      n.interazioni ||
-      n.timeline ||
-      n.eventi ||
-      n.log ||
-      n.storico ||
-      [];
-    const out = Array.isArray(arr) ? arr.slice() : [];
-    // normalize minimal fields
-    out.forEach((it) => {
-      if (it && typeof it === 'object') {
-        it.data = it.data || it.date || it.datetime || it.ts || it.timestamp || null;
-        it.testo = it.testo || it.text || it.note || it.commento || '';
-        it.esito = it.esito || it.outcome || it.tipo || 'neutro';
-      }
-    });
-    // sort by date desc if possible
-    out.sort((a,b) => {
-      const da = new Date(a?.data || 0).getTime() || 0;
-      const db = new Date(b?.data || 0).getTime() || 0;
-      return db - da;
-    });
-    return out;
-  } catch (e) {
-    return [];
-  }
-};
-// also expose as module-scope identifier for direct calls
-const getInterazioniForNotizia = window.getInterazioniForNotizia;
-
-// migrate old rubrica key if needed (one-time)
-try {
-  const current = (typeof loadList === 'function') ? loadList(STORAGE_KEYS.contatti) : [];
-  if ((!current || current.length === 0) && localStorage.getItem('rubrica')) {
-    const legacyRubrica = JSON.parse(localStorage.getItem('rubrica') || '[]');
-    if (Array.isArray(legacyRubrica) && legacyRubrica.length) {
-      if (typeof saveList === 'function') saveList(STORAGE_KEYS.contatti, legacyRubrica);
-    }
-  }
-} catch {}
-// --- End compatibility helpers ---
-
   const STORAGE_KEYS = {
     immobili: 'crm10_immobili',
     notizie: 'crm10_notizie',
@@ -83,29 +19,6 @@ try {
 
   let immobili = [];
   let notizie = [];
-
-  // ---- Notizie: interazioni/timeline helper (compat) ----
-  // Alcune versioni salvano le interazioni dentro la notizia (es. n.interazioni / n.timeline / n.eventi).
-  // Questa funzione normalizza e restituisce sempre un array ordinato (più recente prima), evitando crash.
-  function getInterazioniForNotizia(notiziaId) {
-    try {
-      const n = (Array.isArray(notizie) ? notizie.find(x => x && x.id === notiziaId) : null) || (typeof __currentNotiziaDetail !== 'undefined' ? __currentNotiziaDetail : null);
-      if (!n) return [];
-      const arr =
-        (Array.isArray(n.interazioni) && n.interazioni) ||
-        (Array.isArray(n.timeline) && n.timeline) ||
-        (Array.isArray(n.eventi) && n.eventi) ||
-        (Array.isArray(n.log) && n.log) ||
-        [];
-      return arr
-        .filter(Boolean)
-        .slice()
-        .sort((a, b) => (Number(b.ts || b.date || b.when || 0) - Number(a.ts || a.date || a.when || 0)));
-    } catch (e) {
-      return [];
-    }
-  }
-
   let attivita = [];
   let staff = [];
   let omi = [];
@@ -1485,11 +1398,7 @@ function renderAgendaMonth() {
           // apri con click su card (ma non sui bottoni)
           card.addEventListener('click', (ev) => {
             // click sulla card = apri DETTAGLIO (non la UI di inserimento)
-            // Ma: non deve scattare quando interagisci con controlli interni (commento, input, tendine, form ricontatto, ecc.)
-            const t = ev.target;
-            if (t.closest('button, a, input, textarea, select, option, label')) return;
-            if (t.closest('.notizia-lastnote, .notizia-recall-form')) return;
-            if (t.closest('[data-not-noans-toggle], [data-not-save-recall], [data-not-recall-date], [data-not-recall-time], [data-not-lastcomment], [data-not-save-lastcomment]')) return;
+            if (ev.target.closest('button')) return;
             openNotiziaDetail(n);
           });
           card.addEventListener('keydown', (ev) => {
@@ -5244,20 +5153,7 @@ function initPoligoniModule() {
     staff = loadList(STORAGE_KEYS.staff);
     omi = loadList(STORAGE_KEYS.omi);
     contatti = loadList(STORAGE_KEYS.contatti);
-    // Migrazione compat: alcune vecchie versioni salvavano la rubrica sotto la chiave 'rubrica'.
-    if ((!Array.isArray(contatti) || contatti.length === 0)) {
-      try {
-        const legacyRubricaRaw = localStorage.getItem('rubrica');
-        if (legacyRubricaRaw) {
-          const legacyRubrica = JSON.parse(legacyRubricaRaw);
-          if (Array.isArray(legacyRubrica) && legacyRubrica.length) {
-            contatti = legacyRubrica;
-            saveList(STORAGE_KEYS.contatti, contatti);
-          }
-        }
-      } catch (e) {}
-    }
-intestazioni = loadList(STORAGE_KEYS.intestazioni || 'crm10_intestazioni');
+    intestazioni = loadList(STORAGE_KEYS.intestazioni || 'crm10_intestazioni');
   }
 
   
