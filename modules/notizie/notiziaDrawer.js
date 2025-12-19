@@ -1,15 +1,13 @@
 // modules/notizie/notiziaDrawer.js
 // Drawer Notizia (UI puro, idempotente)
-// - NON mantiene stato JS globale (niente variabili top-level come `overlay`)
-// - Crea solo il contenitore DOM con gli ID attesi dal legacy
-// - Evita qualsiasi doppia dichiarazione di `overlay`
-//
-// Nota: la logica di rendering (riempire i campi, timeline, salvataggi) resta in crm-app.legacy.js
+// - Nessuna variabile top-level condivisa
+// - Evita collisioni di identificatori (non usa il nome "overlay" come variabile)
+// - Mantiene gli ID/struttura attesi dal legacy (crm-app.legacy.js)
 
 export function ensureNotiziaDetailDrawer({ closeNotiziaDetail } = {}) {
   // Se esiste già, ritorna (idempotente)
-  let overlay = document.getElementById('notizia-detail-overlay');
-  if (overlay) return overlay;
+  let overlayNode = document.getElementById('notizia-detail-overlay');
+  if (overlayNode) return overlayNode;
 
   // fallback close handler
   const safeClose = (typeof closeNotiziaDetail === 'function')
@@ -22,11 +20,11 @@ export function ensureNotiziaDetailDrawer({ closeNotiziaDetail } = {}) {
       };
 
   // ===== Markup (mantiene gli ID/struttura attesi dal legacy) =====
-  overlay = document.createElement('div');
-  overlay.id = 'notizia-detail-overlay';
-  overlay.className = 'modal-overlay';
+  overlayNode = document.createElement('div');
+  overlayNode.id = 'notizia-detail-overlay';
+  overlayNode.className = 'modal-overlay';
 
-  overlay.innerHTML = [
+  overlayNode.innerHTML = [
     '  <div class="modal-panel notizia-detail-panel" role="dialog" aria-modal="true">',
     '    <div class="modal-header">',
     '      <div>',
@@ -118,21 +116,21 @@ export function ensureNotiziaDetailDrawer({ closeNotiziaDetail } = {}) {
     '  </div>'
   ].join('\n');
 
-  document.body.appendChild(overlay);
+  document.body.appendChild(overlayNode);
 
   // ===== Close handlers =====
-  overlay.addEventListener('click', (e) => {
-    if (e.target === overlay) safeClose();
+  overlayNode.addEventListener('click', (e) => {
+    if (e.target === overlayNode) safeClose();
   });
 
-  const btnX = overlay.querySelector('#notizia-detail-close');
+  const btnX = overlayNode.querySelector('#notizia-detail-close');
   if (btnX) btnX.addEventListener('click', safeClose);
 
-  // ESC key close (nice-to-have, safe)
+  // ESC key close (safe)
   const onKey = (e) => {
     if (e.key === 'Escape') safeClose();
   };
   document.addEventListener('keydown', onKey, { passive: true });
 
-  return overlay;
+  return overlayNode;
 }
