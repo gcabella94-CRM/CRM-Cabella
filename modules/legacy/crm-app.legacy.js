@@ -6,6 +6,18 @@ window.__CRM_APP_LOADED__ = true;
 
 /* ====== STORAGE & UTILITY ====== */
 
+// --- DOM selector escaping (CSS.escape polyfill) ---
+// Needed because in some contexts (or older browsers) CSS.escape may be undefined,
+// and we use it to build safe attribute selectors (e.g. data-* queries).
+function cssEscape(value) {
+  const s = String(value ?? '');
+  if (typeof CSS !== 'undefined' && CSS && typeof CSS.escape === 'function') return CSS.escape(s);
+  // Minimal, safe fallback: escape quotes and backslashes, and strip line breaks.
+  return s.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n|\r/g, ' ');
+}
+window.cssEscape = window.cssEscape || cssEscape;
+
+
 // --- Compatibility helpers (refactor-safe) ---
 /**
  * Returns the interactions/timeline array for a given notizia id.
@@ -75,6 +87,25 @@ try {
   // ---- Notizie: interazioni/timeline helper (compat) ----
   // Alcune versioni salvano le interazioni dentro la notizia (es. n.interazioni / n.timeline / n.eventi).
   // Questa funzione normalizza e restituisce sempre un array ordinato (più recente prima), evitando crash.
+  function getInterazioniForNotizia(notiziaId) {
+    try {
+      const n = (Array.isArray(notizie) ? notizie.find(x => x && x.id === notiziaId) : null) || (typeof __currentNotiziaDetail !== 'undefined' ? __currentNotiziaDetail : null);
+      if (!n) return [];
+      const arr =
+        (Array.isArray(n.interazioni) && n.interazioni) ||
+        (Array.isArray(n.timeline) && n.timeline) ||
+        (Array.isArray(n.eventi) && n.eventi) ||
+        (Array.isArray(n.log) && n.log) ||
+        [];
+      return arr
+        .filter(Boolean)
+        .slice()
+        .sort((a, b) => (Number(b.ts || b.date || b.when || 0) - Number(a.ts || a.date || a.when || 0)));
+    } catch (e) {
+      return [];
+    }
+  }
+
   let attivita = [];
   let staff = [];
   let omi = [];
@@ -106,55 +137,7 @@ try {
   }
 
   function genId(prefix = 'id') {
-  return `${prefix}
-
-// --- Interazioni (timeline) ---
-// Salva un'interazione e la collega alla Notizia (storage: dentro n.interazioni).
-function addInterazione(payload) {
-  try {
-    const p = payload || {};
-    const links = p.links || {};
-    const notiziaId = links.notiziaId;
-    if (!notiziaId) return null;
-
-    const n = (notizie || []).find(x => x && String(x.id) === String(notiziaId));
-    if (!n) return null;
-
-    if (!Array.isArray(n.interazioni)) n.interazioni = [];
-
-    const nowIso = new Date().toISOString();
-    const item = {
-      id: genId('int'),
-      ts: Date.now(),
-      when: nowIso,
-      tipo: p.tipo || 'nota',
-      esito: p.esito || 'neutro',
-      testo: (p.testo || '').toString(),
-      links: { ...links },
-      prossimaAzione: p.prossimaAzione || { enabled:false }
-    };
-
-    n.interazioni.push(item);
-
-    // aggiorna "ultimo contatto/commento" (compat UI card + drawer)
-    n.ultimoContatto = nowIso;
-    n.commentoUltimaInterazione = item.testo;
-    if (item.esito) n.esitoUltimaInterazione = item.esito;
-
-    // se impostato ricontatto, allinea campo legacy
-    if (item.prossimaAzione && item.prossimaAzione.enabled && item.prossimaAzione.when) {
-      n.ricontatto = item.prossimaAzione.when;
-    }
-
-    try { saveList(STORAGE_KEYS.notizie, notizie); } catch {}
-    return item;
-  } catch (e) {
-    console.warn('[NOTIZIE] addInterazione error', e);
-    return null;
-  }
-}
-window.addInterazione = window.addInterazione || addInterazione;
-_${Math.random().toString(36).slice(2, 9)}`;
+  return `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
 }
 
 /* ====== NOTIZIA DETTAGLIO (drawer) ====== */
@@ -1461,10 +1444,7 @@ function renderAgendaMonth() {
               <details class="notizia-details" ${n.commentoUltimaInterazione ? '' : 'data-empty="1"'}>
                 <summary>${n.commentoUltimaInterazione ? 'Commento ultimo contatto' : 'Nessun commento (clicca per aggiungere)'}</summary>
                 <div class="notizia-details-body">
-                  <div class="notizia-muted" style="margin-bottom:6px;display:flex;align-items:flex-start;justify-content:space-between;gap:10px;">
-  <div class="notizia-lastnote" id="not-lastnote-${escapeHtml(n.id)}">${escapeHtml(n.commentoUltimaInterazione || '')}</div>
-  ${(String(n.commentoUltimaInterazione || '').length > 120) ? `<button class="btn btn-xs" data-not-toggle-lastnote="${escapeHtml(n.id)}">Espandi</button>` : ''}
-</div>
+                  <div class="muted" style="margin-bottom:6px;">${escapeHtml(n.commentoUltimaInterazione || '')}</div>
 
                   <div class="notizia-lastcomment-box">
                     <textarea class="input-sm" rows="2" placeholder="Scrivi qui il commento dell’ultimo contatto…"
@@ -1505,7 +1485,11 @@ function renderAgendaMonth() {
           // apri con click su card (ma non sui bottoni)
           card.addEventListener('click', (ev) => {
             // click sulla card = apri DETTAGLIO (non la UI di inserimento)
-            if (ev.target.closest('button, input, textarea, select, label, a, .notizia-lastcomment-box')) return;
+            // Ma: non deve scattare quando interagisci con controlli interni (commento, input, tendine, form ricontatto, ecc.)
+            const t = ev.target;
+            if (t.closest('button, a, input, textarea, select, option, label')) return;
+            if (t.closest('.notizia-lastnote, .notizia-recall-form')) return;
+            if (t.closest('[data-not-noans-toggle], [data-not-save-recall], [data-not-recall-date], [data-not-recall-time], [data-not-lastcomment], [data-not-save-lastcomment]')) return;
             openNotiziaDetail(n);
           });
           card.addEventListener('keydown', (ev) => {
@@ -1938,51 +1922,6 @@ function bindNotizieModalUI() {
       return;
     }
 
-// salva commento "ultimo contatto" direttamente dalla card (sempre visibile)
-const saveLast = e.target.closest?.('[data-not-save-lastcomment]');
-if (saveLast) {
-  const id = saveLast.getAttribute('data-not-save-lastcomment');
-  const ta = document.querySelector(`textarea[data-not-lastcomment="${cssEscape(id)}"]`);
-  const testo = (ta?.value || '').trim();
-  const n = (notizie || []).find(x => x && x.id === id);
-  if (!n) return;
-
-  // cleanup draft e textarea
-  n._draftLastComment = '';
-  if (ta) ta.value = '';
-
-  if (testo) {
-    addInterazione({
-      tipo: 'nota',
-      esito: 'neutro',
-      testo,
-      links: { notiziaId: n.id, immobileId:'', contattoId:'', attivitaId:'' },
-      prossimaAzione: { enabled:false }
-    });
-  } else {
-    n.commentoUltimaInterazione = '';
-    try { saveList(STORAGE_KEYS.notizie, notizie); } catch {}
-  }
-
-  try { renderNotizie(); } catch {}
-  e.stopPropagation();
-  return;
-}
-
-// toggle espansione ultimo commento (solo se lungo)
-const tog = e.target.closest?.('[data-not-toggle-lastnote]');
-if (tog) {
-  const id = tog.getAttribute('data-not-toggle-lastnote');
-  const box = document.getElementById('not-lastnote-' + id);
-  if (box) {
-    const expanded = box.classList.toggle('expanded');
-    tog.textContent = expanded ? 'Riduci' : 'Espandi';
-  }
-  e.stopPropagation();
-  return;
-}
-
-
     const noans = e.target.closest?.('[data-not-noans-toggle]');
     if (noans) {
       const id = noans.getAttribute('data-not-noans-toggle');
@@ -2025,9 +1964,9 @@ if (tog) {
       return;
     }
 
-    const saveLast = e.target.closest?.('[data-not-save-lastcomment]');
-    if (saveLast) {
-      const id = saveLast.getAttribute('data-not-save-lastcomment');
+    const saveLastBtn = e.target.closest?.('[data-not-save-lastcomment]');
+    if (saveLastBtn) {
+      const id = saveLastBtn.getAttribute('data-not-save-lastcomment');
       const n = (notizie || []).find(x => x && x.id === id);
       if (!n) return;
 
@@ -2077,15 +2016,6 @@ function escapeHtml(str) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
 }
-
-
-// CSS.escape polyfill (serve per selettori sicuri su data-*)
-function cssEscape(value) {
-  const s = String(value ?? '');
-  if (typeof CSS !== 'undefined' && CSS && typeof CSS.escape === 'function') return CSS.escape(s);
-  return s.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n|\r/g, ' ');
-}
-window.cssEscape = window.cssEscape || cssEscape;
 
 function groupRubrica(data) {
   const map = new Map();
