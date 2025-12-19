@@ -24,6 +24,43 @@ window.__CRM_APP_LOADED__ = true;
   let omi = [];
   let contatti = [];      // rubrica contatti proprietari
   let intestazioni = [];
+
+  // __DEFAULT_getInterazioniForNotizia__
+  // Evita collisioni "Identifier already declared" e garantisce una funzione disponibile al drawer Notizia.
+  // NOTA: non dichiariamo un identificatore top-level chiamato getInterazioniForNotizia; usiamo window.*.
+  if (typeof window.getInterazioniForNotizia !== 'function') {
+    window.getInterazioniForNotizia = function(notiziaId) {
+      if (!notiziaId) return [];
+      const list = Array.isArray(attivita) ? attivita : [];
+      const out = list.filter(a => {
+        if (!a) return false;
+        // supporta sia forma "links.notiziaId" sia "notiziaId" diretto (legacy)
+        const ln = (a.links && a.links.notiziaId) ? a.links.notiziaId : (a.notiziaId || '');
+        if (String(ln) !== String(notiziaId)) return false;
+
+        // include solo elementi che sembrano interazioni/contatti, non appuntamenti "puri"
+        // (ma se è un record legacy con testo/ts lo teniamo comunque)
+        if (a.tipo === 'appuntamento') return false;
+        return true;
+      });
+
+      const toTime = (a) => {
+        const t = a.ts || a.dataOra || a.data || a.createdAt || '';
+        const d = new Date(t);
+        if (!isNaN(d)) return d.getTime();
+        // fallback: data + ora
+        if (a.data) {
+          const d2 = new Date(String(a.data) + 'T' + String(a.ora || '00:00'));
+          if (!isNaN(d2)) return d2.getTime();
+        }
+        return 0;
+      };
+
+      out.sort((a,b) => toTime(b) - toTime(a));
+      return out;
+    };
+  }
+
   let lastCreatedAppId = null;
   // modelli di intestazione (header+footer)
 
@@ -98,7 +135,7 @@ function renderNotiziaDetail(n) {
   // timeline
   const list = document.getElementById('notd-timeline-list');
   if (list) {
-    const items = getInterazioniForNotizia(n.id);
+    const items = window.getInterazioniForNotizia(n.id);
     if (!items.length) {
       list.innerHTML = '<div class="muted">Nessuna interazione registrata.</div>';
     } else {
