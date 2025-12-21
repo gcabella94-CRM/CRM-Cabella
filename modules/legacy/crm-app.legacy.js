@@ -4,14 +4,6 @@ import { ensureNotiziaDetailDrawer } from '../notizie/notiziaDrawer.js';
 */
 window.__CRM_APP_LOADED__ = true;
 
-// ===== CSS ESCAPE SAFE =====
-if (typeof window.cssEscape !== 'function') {
-  window.cssEscape = function (value) {
-    if (window.CSS && typeof window.CSS.escape === 'function') return window.CSS.escape(value);
-    return String(value).replace(/[^a-zA-Z0-9_-]/g, '\\$&');
-  };
-}
-
 /* ====== STORAGE & UTILITY ====== */
 
   const STORAGE_KEYS = {
@@ -21,8 +13,8 @@ if (typeof window.cssEscape !== 'function') {
     staff: 'crm10_staff',
     omi: 'crm10_omi',
     contatti: 'crm10_contatti',      // rubrica contatti proprietari
-    intestazioni: 'crm10_intestazioni', // archivio header+footer per documenti IA
-    poligoni: 'crm10_mappa_poligoni' // archivio poligoni mappa (aree ricerca + condomini)
+    intestazioni: 'crm10_intestazioni' // archivio header+footer per documenti IA
+  ,    poligoni: 'crm10_mappa_poligoni' // archivio poligoni mappa (aree ricerca + condomini)
   };
 
   let immobili = [];
@@ -1399,8 +1391,9 @@ function renderAgendaMonth() {
                 </div>
               </div>
 
-              <details class="notizia-details" ${n.commentoUltimaInterazione ? '' : 'data-empty="1"'}>
-                <summary>${n.commentoUltimaInterazione ? 'Commento ultimo contatto' : 'Nessun commento (clicca per aggiungere)'}</summary>
+              <!-- Commento: sempre visibile (no tendina) -->
+              <details class="notizia-details notizia-details-open" open ${n.commentoUltimaInterazione ? '' : 'data-empty="1"'}>
+                <summary>${n.commentoUltimaInterazione ? 'Commento ultimo contatto' : 'Nessun commento'}</summary>
                 <div class="notizia-details-body">
                   <div class="muted" style="margin-bottom:6px;">${escapeHtml(n.commentoUltimaInterazione || '')}</div>
 
@@ -1440,13 +1433,15 @@ function renderAgendaMonth() {
             </div>
           `;
 
-          // apri con click su card (ma non sui bottoni)
+          // apri con click su card (ma NON quando l'utente interagisce con i campi inline)
           card.addEventListener('click', (ev) => {
             // click sulla card = apri DETTAGLIO (non la UI di inserimento)
-            if (ev.target.closest('button')) return;
+            if (ev.target.closest('button, textarea, input, select, summary, details')) return;
             openNotiziaDetail(n);
           });
           card.addEventListener('keydown', (ev) => {
+            // evita che Enter dentro textarea/input apra il dettaglio
+            if (ev.target && ev.target.closest && ev.target.closest('textarea, input, select, button, summary, details')) return;
             if (ev.key === 'Enter') openNotiziaDetail(n);
           });
 
