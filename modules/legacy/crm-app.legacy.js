@@ -1,20 +1,28 @@
-console.log("### CRM LEGACY MARKER ### 2025-12-21T-OK");
 import { ensureNotiziaDetailDrawer } from '../notizie/notiziaDrawer.js';
 /* CRM-Cabella crm-app.js (FINAL) — generated 2025-12-17 18:20:08
    If you see this line in Sources, you have the right file.
 */
 window.__CRM_APP_LOADED__ = true;
-
-// ===== CSS ESCAPE SAFE (fallback) =====
-if (typeof window.cssEscape !== 'function') {
-  window.cssEscape = function (value) {
-    if (window.CSS && typeof window.CSS.escape === 'function') {
-      return window.CSS.escape(String(value));
-    }
-    // Minimal safe escape for CSS selectors
-    return String(value).replace(/[^a-zA-Z0-9_-]/g, '\\$&');
-  };
-}
+// --- SAFE GLOBAL HELPERS (idempotent) ---
+try {
+  if (typeof window !== 'undefined' && !window.__getInterazioniForNotizia) {
+    window.__getInterazioniForNotizia = function(notiziaId) {
+      try {
+        // Prefer eventuale implementazione esistente
+        if (typeof window.getInterazioniForNotizia === 'function') {
+          return window.window.__getInterazioniForNotizia(notiziaId) || [];
+        }
+        // Fallback: ricava da attivita[] se presente in questo modulo
+        if (typeof attivita !== 'undefined' && Array.isArray(attivita)) {
+          return (attivita || []).filter(it => it && it.links && it.links.notiziaId === notiziaId)
+            .sort((a,b) => new Date(b.ts || b.data || 0) - new Date(a.ts || a.data || 0));
+        }
+      } catch {}
+      return [];
+    };
+  }
+} catch {}
+// --- END SAFE GLOBAL HELPERS ---
 
 
 /* ====== STORAGE & UTILITY ====== */
@@ -37,43 +45,6 @@ if (typeof window.cssEscape !== 'function') {
   let omi = [];
   let contatti = [];      // rubrica contatti proprietari
   let intestazioni = [];
-
-  // __DEFAULT_getInterazioniForNotizia__
-  // Evita collisioni "Identifier already declared" e garantisce una funzione disponibile al drawer Notizia.
-  // NOTA: non dichiariamo un identificatore top-level chiamato getInterazioniForNotizia; usiamo window.*.
-  if (typeof window.getInterazioniForNotizia !== 'function') {
-    window.getInterazioniForNotizia = function(notiziaId) {
-      if (!notiziaId) return [];
-      const list = Array.isArray(attivita) ? attivita : [];
-      const out = list.filter(a => {
-        if (!a) return false;
-        // supporta sia forma "links.notiziaId" sia "notiziaId" diretto (legacy)
-        const ln = (a.links && a.links.notiziaId) ? a.links.notiziaId : (a.notiziaId || '');
-        if (String(ln) !== String(notiziaId)) return false;
-
-        // include solo elementi che sembrano interazioni/contatti, non appuntamenti "puri"
-        // (ma se è un record legacy con testo/ts lo teniamo comunque)
-        if (a.tipo === 'appuntamento') return false;
-        return true;
-      });
-
-      const toTime = (a) => {
-        const t = a.ts || a.dataOra || a.data || a.createdAt || '';
-        const d = new Date(t);
-        if (!isNaN(d)) return d.getTime();
-        // fallback: data + ora
-        if (a.data) {
-          const d2 = new Date(String(a.data) + 'T' + String(a.ora || '00:00'));
-          if (!isNaN(d2)) return d2.getTime();
-        }
-        return 0;
-      };
-
-      out.sort((a,b) => toTime(b) - toTime(a));
-      return out;
-    };
-  }
-
   let lastCreatedAppId = null;
   // modelli di intestazione (header+footer)
 
@@ -148,7 +119,7 @@ function renderNotiziaDetail(n) {
   // timeline
   const list = document.getElementById('notd-timeline-list');
   if (list) {
-    const items = window.getInterazioniForNotizia(n.id);
+    const items = window.__getInterazioniForNotizia(n.id);
     if (!items.length) {
       list.innerHTML = '<div class="muted">Nessuna interazione registrata.</div>';
     } else {
@@ -1933,32 +1904,12 @@ function bindNotizieModalUI() {
       const val = (ta?.value || '').trim();
       if (!val) { alert('Inserisci un commento.'); return; }
 
-      // Salva commento + crea una interazione in timeline (Opzione A)
-      const nowIso = new Date().toISOString();
-
-      // Aggiorna campi notizia "ultimo contatto"
       n.commentoUltimaInterazione = val;
-      n.ultimoContattoAt = nowIso;
+      n.ultimoContattoAt = new Date().toISOString();
       n._draftLastComment = '';
-
-      // Crea record interazione in "attivita" (stesso storage usato dalla timeline)
-      if (!Array.isArray(attivita)) attivita = [];
-      attivita.push({
-        id: (typeof genId === 'function') ? genId('int') : ('int_' + Date.now()),
-        ts: nowIso,                 // data/ora effettiva dell'evento
-        tipo: 'chiamata',           // default: telefonata
-        esito: 'risposta',          // default: risposta
-        testo: val,
-        links: { notiziaId: n.id, immobileId:'', contattoId:'', attivitaId:'' }
-      });
-
-      // Persist
-      try { saveList(STORAGE_KEYS.attivita, attivita); } catch {}
       try { saveList(STORAGE_KEYS.notizie, notizie); } catch {}
-
       renderNotizie();
       return;
-    }return;
     }
   });
 }
