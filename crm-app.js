@@ -1,1 +1,1 @@
-console.log("crm-app.js caricato correttamente");
+import './modules/legacy/crm-app.legacy.js';
