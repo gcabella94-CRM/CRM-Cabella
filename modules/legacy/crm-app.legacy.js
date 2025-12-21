@@ -3,27 +3,6 @@ import { ensureNotiziaDetailDrawer } from '../notizie/notiziaDrawer.js';
    If you see this line in Sources, you have the right file.
 */
 window.__CRM_APP_LOADED__ = true;
-// --- SAFE GLOBAL HELPERS (idempotent) ---
-try {
-  if (typeof window !== 'undefined' && !window.__getInterazioniForNotizia) {
-    window.__getInterazioniForNotizia = function(notiziaId) {
-      try {
-        // Prefer eventuale implementazione esistente
-        if (typeof window.getInterazioniForNotizia === 'function') {
-          return window.window.__getInterazioniForNotizia(notiziaId) || [];
-        }
-        // Fallback: ricava da attivita[] se presente in questo modulo
-        if (typeof attivita !== 'undefined' && Array.isArray(attivita)) {
-          return (attivita || []).filter(it => it && it.links && it.links.notiziaId === notiziaId)
-            .sort((a,b) => new Date(b.ts || b.data || 0) - new Date(a.ts || a.data || 0));
-        }
-      } catch {}
-      return [];
-    };
-  }
-} catch {}
-// --- END SAFE GLOBAL HELPERS ---
-
 
 /* ====== STORAGE & UTILITY ====== */
 
@@ -41,6 +20,21 @@ try {
   let immobili = [];
   let notizie = [];
   let attivita = [];
+
+// ====== SAFE GLOBAL (avoid redeclare collisions) ======
+if (!window.getInterazioniForNotizia) {
+  window.getInterazioniForNotizia = function(notiziaId) {
+    try {
+      const list = Array.isArray(attivita) ? attivita : [];
+      return list
+        .filter(it => it && it.links && it.links.notiziaId === notiziaId)
+        .sort((a,b) => new Date(b.ts || 0) - new Date(a.ts || 0));
+    } catch (e) {
+      return [];
+    }
+  };
+}
+// ===========================================
   let staff = [];
   let omi = [];
   let contatti = [];      // rubrica contatti proprietari
@@ -119,7 +113,7 @@ function renderNotiziaDetail(n) {
   // timeline
   const list = document.getElementById('notd-timeline-list');
   if (list) {
-    const items = window.__getInterazioniForNotizia(n.id);
+    const items = window.getInterazioniForNotizia(n.id);
     if (!items.length) {
       list.innerHTML = '<div class="muted">Nessuna interazione registrata.</div>';
     } else {
