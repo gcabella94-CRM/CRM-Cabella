@@ -1,3 +1,4 @@
+console.log("### CRM LEGACY MARKER ### 2025-12-21T-OK");
 import { ensureNotiziaDetailDrawer } from '../notizie/notiziaDrawer.js';
 /* CRM-Cabella crm-app.js (FINAL) — generated 2025-12-17 18:20:08
    If you see this line in Sources, you have the right file.
