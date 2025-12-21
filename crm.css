@@ -1199,7 +1199,6 @@
 .notizia-mini-v{ font-weight:700; font-size:14px; }
 .notizia-details{ margin-top:10px; }
 .notizia-details summary{ cursor:pointer; }
-.notizia-details.notizia-details-open > summary{ display:none; }
 .notizia-details-body{ margin-top:8px; }
 .notizia-actions-row{ display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:10px; flex-wrap:wrap; }
 .notizia-recall-form .input-sm{ width:100%; }

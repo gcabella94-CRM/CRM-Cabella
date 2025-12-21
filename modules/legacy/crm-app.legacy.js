@@ -92,6 +92,130 @@ window.__CRM_APP_LOADED__ = true;
 
 /* ====== NOTIZIA DETTAGLIO (drawer) ====== */
 
+// ====== NOTIZIE: Interazioni / Timeline helpers ======
+// Salva un'interazione (chiamata / whatsapp / email / nota / ecc.) collegata a notizia/immobile/contatto.
+// Viene salvata in `attivita` ma NON come `tipo: 'appuntamento'` così la timeline la include.
+function addInterazione(payload = {}) {
+  try {
+    if (!Array.isArray(attivita)) attivita = [];
+    if (!payload) payload = {};
+
+    const nowIso = new Date().toISOString();
+    const rec = {
+      id: genId('int'),
+      // NB: qui "tipo" rappresenta il tipo di interazione (chiamata/nota/...)
+      tipo: (payload.tipo || 'nota'),
+      esito: (payload.esito || 'neutro'),
+      testo: (payload.testo || ''),
+      ts: nowIso,
+      links: Object.assign({ notiziaId:'', immobileId:'', contattoId:'', attivitaId:'' }, payload.links || {}),
+      prossimaAzione: payload.prossimaAzione || { enabled:false }
+    };
+
+    // se l'utente ha impostato un "ricontatto" usiamo quella data come ts dell'interazione (più coerente in timeline)
+    if (rec.prossimaAzione && rec.prossimaAzione.when) {
+      const d = new Date(rec.prossimaAzione.when);
+      if (!isNaN(d)) rec.ts = d.toISOString();
+    }
+
+    attivita.push(rec);
+    saveList(STORAGE_KEYS.attivita, attivita);
+
+    // aggiorna campi rapidi notizia (ultimo contatto + commento)
+    const notiziaId = (rec.links && rec.links.notiziaId) ? rec.links.notiziaId : '';
+    if (notiziaId) {
+      const n = (notizie || []).find(x => x && String(x.id) === String(notiziaId));
+      if (n) {
+        n.ultimoContattoAt = rec.ts || nowIso;
+        // se c'è testo, lo consideriamo commento ultimo contatto
+        const t = (rec.testo || '').trim();
+        if (t) n.commentoUltimaInterazione = t;
+        // se è stato selezionato "non risponde" aggiorna flag e ricontatto
+        if ((rec.esito || '') === 'non_risponde') n.nonRisponde = true;
+        saveList(STORAGE_KEYS.notizie, notizie);
+      }
+    }
+
+    return rec;
+  } catch (e) {
+    console.warn('[addInterazione] errore', e);
+    return null;
+  }
+}
+
+// Crea un appuntamento "ricontatto" in agenda (15 minuti) collegato ad una notizia
+function createRicontattoAppuntamentoFromNotizia(n, isoWhen, opts = {}) {
+  try {
+    if (!n || !isoWhen) return null;
+    if (!Array.isArray(attivita)) attivita = [];
+
+    const d = new Date(isoWhen);
+    if (isNaN(d)) return null;
+
+    const pad = (x) => String(x).padStart(2,'0');
+    const dateIso = d.toISOString().slice(0,10);
+    const ora = pad(d.getHours()) + ':' + pad(d.getMinutes());
+
+    const dEnd = new Date(d.getTime() + 15 * 60 * 1000);
+    const oraFine = pad(dEnd.getHours()) + ':' + pad(dEnd.getMinutes());
+
+    const staffId = (staff && staff[0] && staff[0].id) ? staff[0].id : null;
+    const clienteId = (typeof findContattoFromNotizia === 'function') ? (findContattoFromNotizia(n) || '') : '';
+
+    const app = {
+      id: genId('app'),
+      tipo: 'appuntamento',
+      stato: 'aperta',
+      data: dateIso,
+      ora,
+      oraFine,
+      tipoDettaglio: opts.tipoDettaglio || 'telefonata',
+      descrizione: opts.descrizione || '',
+      responsabileId: staffId,
+      clienteId: clienteId || '',
+      contattoId: clienteId || '',
+      notiziaId: n.id,
+      immobileId: n.immobileId || '',
+      inUfficio: false,
+      cittaUfficio: '',
+      luogo: n.indirizzo || ''
+    };
+
+    attivita.push(app);
+    saveList(STORAGE_KEYS.attivita, attivita);
+
+    // aggiorna notizia (ricontatto)
+    try {
+      const nn = (notizie || []).find(x => x && String(x.id) === String(n.id));
+      if (nn) {
+        nn.ricontatto = d.toISOString();
+        saveList(STORAGE_KEYS.notizie, notizie);
+      }
+    } catch:
+      pass
+
+    // refresh agenda se disponibile
+    try:
+      renderAgendaWeek()
+    except:
+      pass
+    try:
+      renderAgendaMonth()
+    except:
+      pass
+    try:
+      renderDashboard()
+    except:
+      pass
+
+    return app;
+  } catch (e) {
+    console.warn('[createRicontattoAppuntamentoFromNotizia] errore', e);
+    return null;
+  }
+}
+
+
 
 let __currentNotiziaDetail = null;
 
@@ -158,25 +282,35 @@ function renderNotiziaDetail(n) {
     }
   }
 
-  // bind azioni
-  document.getElementById('notd-btn-modifica')?.addEventListener('click', () => {
+  
+
+// bind azioni (idempotente: usa .onclick per evitare listener duplicati sui refresh)
+const btnMod = document.getElementById('notd-btn-modifica');
+if (btnMod) {
+  btnMod.onclick = () => {
     // apre SOLO la modale di modifica, non il dettaglio
     openNotiziaModal(n);
-  });
+  };
+}
 
-  // bind add interazione
-  const btnAdd = document.getElementById('notd-add-interazione');
-  const box = document.getElementById('notd-add-interazione-box');
-  btnAdd && btnAdd.addEventListener('click', () => {
+// bind add interazione (toggle box)
+const btnAdd = document.getElementById('notd-add-interazione');
+const box = document.getElementById('notd-add-interazione-box');
+if (btnAdd) {
+  btnAdd.onclick = () => {
     if (!box) return;
     box.style.display = (box.style.display === 'none' || !box.style.display) ? 'block' : 'none';
-  });
+  };
+}
 
-  document.getElementById('notd-int-cancel')?.addEventListener('click', () => {
-    if (box) box.style.display = 'none';
-  });
+const btnCancel = document.getElementById('notd-int-cancel');
+if (btnCancel) {
+  btnCancel.onclick = () => { if (box) box.style.display = 'none'; };
+}
 
-  document.getElementById('notd-int-save')?.addEventListener('click', () => {
+const btnSave = document.getElementById('notd-int-save');
+if (btnSave) {
+  btnSave.onclick = () => {
     const tipo = document.getElementById('notd-int-tipo')?.value || 'nota';
     const esito = document.getElementById('notd-int-esito')?.value || 'neutro';
     const testo = document.getElementById('notd-int-testo')?.value || '';
@@ -206,7 +340,8 @@ function renderNotiziaDetail(n) {
     if (box) box.style.display = 'none';
     const t = document.getElementById('notd-int-testo');
     if (t) t.value = '';
-  });
+  };
+}
 }
 
 function openNotiziaDetail(n, focusId='') {
@@ -1391,9 +1526,8 @@ function renderAgendaMonth() {
                 </div>
               </div>
 
-              <!-- Commento: sempre visibile (no tendina) -->
-              <details class="notizia-details notizia-details-open" open ${n.commentoUltimaInterazione ? '' : 'data-empty="1"'}>
-                <summary>${n.commentoUltimaInterazione ? 'Commento ultimo contatto' : 'Nessun commento'}</summary>
+              <details class="notizia-details" ${n.commentoUltimaInterazione ? '' : 'data-empty="1"'}>
+                <summary>${n.commentoUltimaInterazione ? 'Commento ultimo contatto' : 'Nessun commento (clicca per aggiungere)'}</summary>
                 <div class="notizia-details-body">
                   <div class="muted" style="margin-bottom:6px;">${escapeHtml(n.commentoUltimaInterazione || '')}</div>
 
@@ -1433,15 +1567,13 @@ function renderAgendaMonth() {
             </div>
           `;
 
-          // apri con click su card (ma NON quando l'utente interagisce con i campi inline)
+          // apri con click su card (ma non sui bottoni)
           card.addEventListener('click', (ev) => {
             // click sulla card = apri DETTAGLIO (non la UI di inserimento)
-            if (ev.target.closest('button, textarea, input, select, summary, details')) return;
+            if (ev.target.closest('button')) return;
             openNotiziaDetail(n);
           });
           card.addEventListener('keydown', (ev) => {
-            // evita che Enter dentro textarea/input apra il dettaglio
-            if (ev.target && ev.target.closest && ev.target.closest('textarea, input, select, button, summary, details')) return;
             if (ev.key === 'Enter') openNotiziaDetail(n);
           });
 
