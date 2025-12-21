@@ -1391,9 +1391,8 @@ function renderAgendaMonth() {
                 </div>
               </div>
 
-              <!-- Commento: sempre visibile (no tendina) -->
-              <details class="notizia-details notizia-details-open" open ${n.commentoUltimaInterazione ? '' : 'data-empty="1"'}>
-                <summary>${n.commentoUltimaInterazione ? 'Commento ultimo contatto' : 'Nessun commento'}</summary>
+              <details class="notizia-details" ${n.commentoUltimaInterazione ? '' : 'data-empty="1"'}>
+                <summary>${n.commentoUltimaInterazione ? 'Commento ultimo contatto' : 'Nessun commento (clicca per aggiungere)'}</summary>
                 <div class="notizia-details-body">
                   <div class="muted" style="margin-bottom:6px;">${escapeHtml(n.commentoUltimaInterazione || '')}</div>
 
@@ -1433,15 +1432,13 @@ function renderAgendaMonth() {
             </div>
           `;
 
-          // apri con click su card (ma NON quando l'utente interagisce con i campi inline)
+          // apri con click su card (ma non sui bottoni)
           card.addEventListener('click', (ev) => {
             // click sulla card = apri DETTAGLIO (non la UI di inserimento)
-            if (ev.target.closest('button, textarea, input, select, summary, details')) return;
+            if (ev.target.closest('button')) return;
             openNotiziaDetail(n);
           });
           card.addEventListener('keydown', (ev) => {
-            // evita che Enter dentro textarea/input apra il dettaglio
-            if (ev.target && ev.target.closest && ev.target.closest('textarea, input, select, button, summary, details')) return;
             if (ev.key === 'Enter') openNotiziaDetail(n);
           });
 
@@ -1923,12 +1920,32 @@ function bindNotizieModalUI() {
       const val = (ta?.value || '').trim();
       if (!val) { alert('Inserisci un commento.'); return; }
 
+      // Salva commento + crea una interazione in timeline (Opzione A)
+      const nowIso = new Date().toISOString();
+
+      // Aggiorna campi notizia "ultimo contatto"
       n.commentoUltimaInterazione = val;
-      n.ultimoContattoAt = new Date().toISOString();
+      n.ultimoContattoAt = nowIso;
       n._draftLastComment = '';
+
+      // Crea record interazione in "attivita" (stesso storage usato dalla timeline)
+      if (!Array.isArray(attivita)) attivita = [];
+      attivita.push({
+        id: (typeof genId === 'function') ? genId('int') : ('int_' + Date.now()),
+        ts: nowIso,                 // data/ora effettiva dell'evento
+        tipo: 'chiamata',           // default: telefonata
+        esito: 'risposta',          // default: risposta
+        testo: val,
+        links: { notiziaId: n.id, immobileId:'', contattoId:'', attivitaId:'' }
+      });
+
+      // Persist
+      try { saveList(STORAGE_KEYS.attivita, attivita); } catch {}
       try { saveList(STORAGE_KEYS.notizie, notizie); } catch {}
+
       renderNotizie();
       return;
+    }return;
     }
   });
 }
