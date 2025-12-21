@@ -4,6 +4,18 @@ import { ensureNotiziaDetailDrawer } from '../notizie/notiziaDrawer.js';
 */
 window.__CRM_APP_LOADED__ = true;
 
+// ===== CSS ESCAPE SAFE (fallback) =====
+if (typeof window.cssEscape !== 'function') {
+  window.cssEscape = function (value) {
+    if (window.CSS && typeof window.CSS.escape === 'function') {
+      return window.CSS.escape(String(value));
+    }
+    // Minimal safe escape for CSS selectors
+    return String(value).replace(/[^a-zA-Z0-9_-]/g, '\\$&');
+  };
+}
+
+
 /* ====== STORAGE & UTILITY ====== */
 
   const STORAGE_KEYS = {
