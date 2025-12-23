@@ -1901,6 +1901,22 @@ function bindNotizieModalUI() {
       n.commentoUltimaInterazione = val;
       n.ultimoContattoAt = new Date().toISOString();
       n._draftLastComment = '';
+
+      // ✅ salva anche in timeline come "telefonata" (default) con esito "risposta"
+      try {
+        if (typeof addInterazione === 'function') {
+          addInterazione({
+            tipo: 'chiamata',
+            esito: 'risposta',
+            testo: val,
+            links: { notiziaId: n.id, immobileId:'', contattoId:'', attivitaId:'' },
+            prossimaAzione: { enabled:false }
+          });
+        }
+      } catch (err) {
+        console.warn('[NOTIZIE] addInterazione da "Salva commento" fallita', err);
+      }
+
       try { saveList(STORAGE_KEYS.notizie, notizie); } catch {}
       renderNotizie();
       return;
