@@ -68,6 +68,19 @@ if (!window.getInterazioniForNotizia) {
   return `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
 }
 
+// Escape values for use inside CSS attribute selectors (fallback if CSS.escape unavailable)
+function cssEscape(v) {
+  try {
+    if (window.CSS && typeof window.CSS.escape === 'function') return window.CSS.escape(String(v));
+  } catch {}
+  return String(v)
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, '\\n')
+    .replace(/\r/g, '\\r')
+    .replace(/\f/g, '\\f');
+}
+
 /* ====== NOTIZIA DETTAGLIO (drawer) ====== */
 
 
