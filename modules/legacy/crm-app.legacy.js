@@ -1326,7 +1326,7 @@ function renderAgendaMonth() {
               </div>
             </div>
 
-            <div class="notizia-card-main">
+            <div class="notizia-open-area" data-not-open-detail="${escapeHtml(n.id)}"><div class="notizia-card-main">
               <div class="notizia-line">
                 <div class="notizia-label">Indirizzo</div>
                 <div class="notizia-value clickable" data-not-jump="${escapeHtml(n.id)}" data-jump="not-indirizzo">
@@ -1352,11 +1352,11 @@ function renderAgendaMonth() {
               <div class="notizia-line" style="margin-top:10px;">
                 <div class="notizia-label">Proprietario</div>
                 <div class="notizia-owner">
-                  <span class="clickable" data-not-jump="${escapeHtml(n.id)}" data-jump="not-nome">
+                  <span class="clickable" data-not-open-owner="${escapeHtml(n.id)}" data-owner-field="nome">
                     ${escapeHtml(nomeCompleto || '—')}
                   </span>
                   <span class="muted">·</span>
-                  <span class="clickable" data-not-jump="${escapeHtml(n.id)}" data-jump="not-telefono">
+                  <span class="clickable" data-not-open-owner="${escapeHtml(n.id)}" data-owner-field="telefono">
                     ${escapeHtml(n.telefono || '—')}
                   </span>
                 </div>
@@ -1369,20 +1369,21 @@ function renderAgendaMonth() {
                 </div>
               </div>
 
-              <details class="notizia-details" ${n.commentoUltimaInterazione ? '' : 'data-empty="1"'}>
-                <summary>${n.commentoUltimaInterazione ? 'Commento ultimo contatto' : 'Nessun commento (clicca per aggiungere)'}</summary>
-                <div class="notizia-details-body">
-                  <div class="muted" style="margin-bottom:6px;">${escapeHtml(n.commentoUltimaInterazione || '')}</div>
+              
+</div>
+              <div class="notizia-lastcomment">
+                <div class="notizia-label" style="margin-bottom:6px;">Commento ultimo contatto</div>
+                <div class="muted" style="margin-bottom:6px;">${escapeHtml(n.commentoUltimaInterazione || '')}</div>
 
-                  <div class="notizia-lastcomment-box">
-                    <textarea class="input-sm" rows="2" placeholder="Scrivi qui il commento dell’ultimo contatto…"
-                      data-not-lastcomment="${escapeHtml(n.id)}">${escapeHtml(n._draftLastComment || '')}</textarea>
-                    <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:6px;">
-                      <button class="btn btn-xs" data-not-save-lastcomment="${escapeHtml(n.id)}">Salva commento</button>
-                    </div>
+                <div class="notizia-lastcomment-box">
+                  <textarea class="input-sm" rows="2" placeholder="Scrivi qui il commento dell’ultimo contatto…"
+                    data-not-lastcomment="${escapeHtml(n.id)}">${escapeHtml(n._draftLastComment || '')}</textarea>
+                  <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:6px;">
+                    <button class="btn btn-xs" data-not-save-lastcomment="${escapeHtml(n.id)}">Salva commento</button>
                   </div>
                 </div>
-              </details>
+              </div>
+
 
               <div class="notizia-actions-row">
                 <button class="btn btn-xs" data-not-noans-toggle="${escapeHtml(n.id)}">Non risponde</button>
@@ -1409,15 +1410,6 @@ function renderAgendaMonth() {
               <div class="muted" style="margin-top:10px;"><strong>Responsabile:</strong> ${escapeHtml(staffObj?.nome || n.responsabileId || '—')}</div>
             </div>
           `;
-
-          // apri con click su card (ma non sui bottoni)
-          card.addEventListener('click', (ev) => {
-            // click sulla card = apri DETTAGLIO (non la UI di inserimento)
-            if (ev.target.closest('button')) return;
-            openNotiziaDetail(n);
-          });
-          card.addEventListener('keydown', (ev) => {
-            if (ev.key === 'Enter') openNotiziaDetail(n);
           });
 
           cardsContainer.appendChild(card);
@@ -1837,12 +1829,67 @@ function bindNotizieModalUI() {
       return;
     }
 
+
+    const ownerEl = e.target.closest?.('[data-not-open-owner]');
+    if (ownerEl) {
+      e.preventDefault();
+      e.stopPropagation();
+      const id = ownerEl.getAttribute('data-not-open-owner');
+      const n = (notizie || []).find(x => x && x.id === id);
+      if (!n) return;
+
+      // prova a trovare contatto in rubrica per telefono/email; se non esiste, precompila il form
+      const normPhone = (v) => (v || '').toString().replace(/[^0-9+]/g,'');
+      const targetPhone = normPhone(n.telefono || '');
+      const targetEmail = (n.email || '').trim().toLowerCase();
+
+      let c = null;
+      if (Array.isArray(contatti)) {
+        c = contatti.find(x => x && (
+          (targetEmail && (x.email || '').trim().toLowerCase() === targetEmail) ||
+          (targetPhone && normPhone(x.telefono || '') === targetPhone)
+        )) || null;
+      }
+
+      try { setView('rubrica'); } catch {}
+      try { setRubricaSub('lista'); } catch {}
+
+      // apri editor (anche per creare nuovo)
+      try {
+        openRubricaContactEditor(c || {
+          id: '',
+          nome: [n.nome, n.cognome].filter(Boolean).join(' ').trim() || '',
+          telefono: n.telefono || '',
+          email: n.email || '',
+          indirizzo: n.indirizzo || '',
+          citta: n.citta || '',
+          provincia: n.provincia || '',
+          note: 'Creato da Notizia',
+          isVenditore: true
+        });
+      } catch (err) {
+        console.warn('[RUBRICA] apertura editor contatto fallita', err);
+      }
+      return;
+    }
+
     const jumpEl = e.target.closest?.('[data-not-jump]');
     if (jumpEl) {
       const id = jumpEl.getAttribute('data-not-jump');
       const focusId = jumpEl.getAttribute('data-jump') || '';
       const n = (notizie || []).find(x => x && x.id === id);
       if (n) openNotiziaDetail(n, focusId);
+      return;
+    }
+
+
+    const openZone = e.target.closest?.('[data-not-open-detail]');
+    if (openZone) {
+      // evita apertura se click arriva da controlli interattivi
+      if (e.target.closest('button, input, textarea, select, label, a')) return;
+      const id = openZone.getAttribute('data-not-open-detail');
+      const n = (notizie || []).find(x => x && x.id === id);
+      if (n) openNotiziaDetail(n);
       return;
     }
 
@@ -1883,7 +1930,31 @@ function bindNotizieModalUI() {
       n.ricontatto = iso;
       n.nonRisponde = true;
 
-      try { saveList(STORAGE_KEYS.notizie, notizie); } catch {}
+      
+      // ✅ Registra anche una interazione in timeline + crea appuntamento di ricontatto (15 min)
+      try {
+        if (typeof addInterazione === 'function') {
+          addInterazione({
+            tipo: 'telefonata',
+            esito: 'non_risponde',
+            testo: 'Non risponde · ricontatto fissato',
+            links: { notiziaId: n.id, immobileId:'', contattoId:'', attivitaId:'' },
+            prossimaAzione: { enabled:true, when: iso, durataMin: 15, creaInAgenda: true }
+          });
+        }
+      } catch (err) {
+        console.warn('[NOTIZIE] addInterazione da "Non risponde" fallita', err);
+      }
+
+      try {
+        if (typeof createRicontattoAppuntamentoFromNotizia === 'function') {
+          createRicontattoAppuntamentoFromNotizia(n, iso, { tipoDettaglio: 'telefonata', descrizione: 'Ricontatto (non risponde)' });
+        }
+      } catch (err) {
+        console.warn('[NOTIZIE] createRicontattoAppuntamentoFromNotizia fallita', err);
+      }
+
+try { saveList(STORAGE_KEYS.notizie, notizie); } catch {}
       renderNotizie();
       return;
     }
@@ -1906,7 +1977,7 @@ function bindNotizieModalUI() {
       try {
         if (typeof addInterazione === 'function') {
           addInterazione({
-            tipo: 'chiamata',
+            tipo: 'telefonata',
             esito: 'risposta',
             testo: val,
             links: { notiziaId: n.id, immobileId:'', contattoId:'', attivitaId:'' },
@@ -2163,6 +2234,36 @@ function setRubricaSub(sub) {
 }
 
 
+
+
+/* ====== RUBRICA: editor contatto (apri/crea da Notizie) ====== */
+function openRubricaContactEditor(contact) {
+  const overlay = document.getElementById('rubrica-dialog-overlay');
+  const form = document.getElementById('rubrica-form');
+  if (!overlay || !form) return;
+
+  // prepara form per edit o nuovo
+  const isEdit = !!(contact && contact.id);
+  if (isEdit) form.dataset.editId = contact.id;
+  else { try { delete form.dataset.editId; } catch {} }
+
+  // fill fields
+  document.getElementById('rubrica-nome').value = (contact?.nome || '').toString();
+  document.getElementById('rubrica-telefono').value = (contact?.telefono || '').toString();
+  document.getElementById('rubrica-email').value = (contact?.email || '').toString();
+  document.getElementById('rubrica-indirizzo').value = (contact?.indirizzo || '').toString();
+  document.getElementById('rubrica-citta').value = (contact?.citta || '').toString();
+  document.getElementById('rubrica-provincia').value = (contact?.provincia || '').toString();
+  document.getElementById('rubrica-note').value = (contact?.note || '').toString();
+
+  // flags (default: venditore se arriva da notizia)
+  document.getElementById('rubrica-flag-acq').checked = !!contact?.isAcquirente;
+  document.getElementById('rubrica-flag-vend').checked = (contact?.isVenditore !== undefined) ? !!contact.isVenditore : true;
+  document.getElementById('rubrica-flag-coll').checked = !!contact?.isCollaboratore;
+  document.getElementById('rubrica-flag-altro').checked = !!contact?.isAltro;
+
+  overlay.style.display = 'flex';
+}
 document.addEventListener('click', e => {
   const t = e.target;
 
@@ -2319,33 +2420,81 @@ document.getElementById('rubrica-form')?.addEventListener('submit', e => {
   const isCollaboratore = !!document.getElementById('rubrica-flag-coll')?.checked;
   const isAltro = !!document.getElementById('rubrica-flag-altro')?.checked;
 
-  const c = {
-    id: genId('cont'),
-    nome,
-    telefono,
-    email,
-    indirizzo,
-    citta,
-    provincia,
-    note,
-    provenienza: 'manuale',
-    isAcquirente,
-    isVenditore,
-    isCollaboratore,
-    isAltro,
-    eventi: [],
-    ultimoContatto: new Date().toISOString()
-  };
+  
+  const formEl = document.getElementById('rubrica-form');
+  const editId = (formEl && formEl.dataset) ? (formEl.dataset.editId || '') : '';
 
   if (!Array.isArray(contatti)) contatti = [];
-  contatti.push(c);
+
+  let c = null;
+  if (editId) {
+    const idx = contatti.findIndex(x => x && x.id === editId);
+    if (idx >= 0) {
+      c = contatti[idx];
+      c.nome = nome;
+      c.telefono = telefono;
+      c.email = email;
+      c.indirizzo = indirizzo;
+      c.citta = citta;
+      c.provincia = provincia;
+      c.note = note;
+      c.isAcquirente = isAcquirente;
+      c.isVenditore = isVenditore;
+      c.isCollaboratore = isCollaboratore;
+      c.isAltro = isAltro;
+      c.ultimoContatto = new Date().toISOString();
+    } else {
+      c = {
+        id: editId,
+        nome,
+        telefono,
+        email,
+        indirizzo,
+        citta,
+        provincia,
+        note,
+        provenienza: 'manuale',
+        isAcquirente,
+        isVenditore,
+        isCollaboratore,
+        isAltro,
+        eventi: [],
+        ultimoContatto: new Date().toISOString()
+      };
+      contatti.push(c);
+    }
+  } else {
+    c = {
+      id: genId('cont'),
+      nome,
+      telefono,
+      email,
+      indirizzo,
+      citta,
+      provincia,
+      note,
+      provenienza: 'manuale',
+      isAcquirente,
+      isVenditore,
+      isCollaboratore,
+      isAltro,
+      eventi: [],
+      ultimoContatto: new Date().toISOString()
+    };
+    contatti.push(c);
+  }
+
   saveList(STORAGE_KEYS.contatti, contatti);
+
 
   const overlay = document.getElementById('rubrica-dialog-overlay');
   if (overlay) overlay.style.display = 'none';
 
   const form = document.getElementById('rubrica-form');
-  if (form) form.reset();
+  if (form) {
+    form.reset();
+    try { delete form.dataset.editId; } catch {}
+  }
 
   renderRubrica();
 });
