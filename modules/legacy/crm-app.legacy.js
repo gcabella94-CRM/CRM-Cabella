@@ -4,6 +4,16 @@ import { ensureNotiziaDetailDrawer } from '../notizie/notiziaDrawer.js';
 */
 window.__CRM_APP_LOADED__ = true;
 
+// ===============================
+// CSS.escape shim (REQUIRED)
+// ===============================
+function cssEscape(value) {
+  if (window.CSS && typeof CSS.escape === "function") {
+    return CSS.escape(String(value));
+  }
+  return String(value).replace(/[^a-zA-Z0-9_-]/g, "\\$&");
+}
+
 // --- CSS.escape shim (safe for legacy browsers)
 function cssEscape(value) {
   if (window.CSS && typeof CSS.escape === "function") {
