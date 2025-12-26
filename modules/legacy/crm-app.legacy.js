@@ -75,6 +75,34 @@ if (!window.addInterazione) {
   };
 }
 
+// Inserimento diretto interazione in "attivita" (usato per garantire esito/testo in timeline)
+function pushInterazioneInTimeline(payload) {
+  try {
+    if (!payload) return null;
+    const nowIso = new Date().toISOString();
+    const it = {
+      id: (typeof genId === 'function' ? genId('int') : ('int_' + Date.now())),
+      ts: payload.ts || nowIso,
+      tipo: payload.tipo || 'nota',
+      esito: payload.esito || 'neutro',
+      testo: payload.testo || '',
+      descrizione: payload.descrizione || payload.testo || '',
+      commento: payload.commento || payload.testo || '',
+      note: payload.note || payload.testo || '',
+      titolo: payload.titolo || payload.esito || payload.tipo || 'Interazione',
+      links: payload.links || { notiziaId:'', immobileId:'', contattoId:'', attivitaId:'' },
+      prossimaAzione: payload.prossimaAzione || { enabled:false }
+    };
+    if (!Array.isArray(attivita)) attivita = [];
+    attivita.push(it);
+    try { saveList && saveList(STORAGE_KEYS.attivita, attivita); } catch {}
+    return it;
+  } catch (e) {
+    console.warn('[TIMELINE] pushInterazioneInTimeline error', e);
+    return null;
+  }
+}
+
 // Crea attività + appuntamento 15' per ricontatto da Notizia (robusto, salva subito)
 if (!window.createRicontattoAppuntamentoFromNotizia) {
   window.createRicontattoAppuntamentoFromNotizia = function(n, isoWhen, opts={}) {
@@ -2077,9 +2105,10 @@ function bindNotizieModalUI() {
 
       // ✅ timeline + obbligo ricontatto (attività + appuntamento 15')
       try {
-        window.addInterazione && window.addInterazione({
+        // Inserisco direttamente in timeline per garantire che l'esito sia "risposta" e che il testo sia visibile come anteprima
+        pushInterazioneInTimeline({
           tipo: 'chiamata',
-          esito: 'risponde',
+          esito: 'risposta',
           testo: val,
           descrizione: val,
           commento: val,
@@ -2089,7 +2118,7 @@ function bindNotizieModalUI() {
           prossimaAzione: { enabled:true, when: isoRecall, durataMin: 15, creaInAgenda: true }
         });
       } catch (err) {
-        console.warn('[NOTIZIE] addInterazione da "Salva commento" fallita', err);
+        console.warn('[NOTIZIE] pushInterazioneInTimeline da "Salva commento" fallita', err);
       }
 
       try {
