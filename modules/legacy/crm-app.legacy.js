@@ -255,7 +255,7 @@ function renderNotiziaDetail(n) {
         const tipo = (it.tipo || 'nota');
         const esito = (it.esito || 'neutro');
         // In alcune versioni l'interazione può salvare il testo sotto chiavi diverse
-        const txt = (it.testo || it.descrizione || it.commento || it.note || it.test || '').trim();
+        const txt = (it.testo || it.descrizione || it.commento || it.note || it.test || it.titolo || it.summary || it.body || it.contenuto || it.text || '').trim();
         return `
           <div class="notizia-timeline-item">
             <div class="notizia-timeline-top">
@@ -279,13 +279,13 @@ function renderNotiziaDetail(n) {
   // bind add interazione
   const btnAdd = document.getElementById('notd-add-interazione');
   const box = document.getElementById('notd-add-interazione-box');
-  btnAdd && btnAdd.addEventListener('click', () => {
-    if (!box) return;
-    box.style.display = (box.style.display === 'none' || !box.style.display) ? 'block' : 'none';
-  });
+
+  // Slot inserisci commento SEMPRE visibile (non a tendina)
+  if (box) box.style.display = 'block';
+  if (btnAdd) btnAdd.style.display = 'none';
 
   document.getElementById('notd-int-cancel')?.addEventListener('click', () => {
-    if (box) box.style.display = 'none';
+    if (box) box.style.display = 'block';
   });
 
   document.getElementById('notd-int-save')?.addEventListener('click', () => {
@@ -304,6 +304,10 @@ function renderNotiziaDetail(n) {
 
     addInterazione({
       tipo, esito, testo,
+      descrizione: testo,
+      commento: testo,
+      note: testo,
+      titolo: testo,
       links: { notiziaId: n.id, immobileId:'', contattoId:'', attivitaId:'' },
       prossimaAzione: isoWhen ? { enabled:true, when: isoWhen, durataMin: 15, creaInAgenda: creaAgenda } : { enabled:false }
     });
@@ -315,7 +319,7 @@ function renderNotiziaDetail(n) {
     // refresh UI
     renderNotiziaDetail(n);
     try { renderNotizie(); } catch {}
-    if (box) box.style.display = 'none';
+    if (box) box.style.display = 'block';
     const t = document.getElementById('notd-int-testo');
     if (t) t.value = '';
   });
@@ -1545,7 +1549,7 @@ function renderAgendaMonth() {
           // apri con click su card (ma non sui bottoni)
           card.addEventListener('click', (ev) => {
             // click sulla card = apri DETTAGLIO (non la UI di inserimento)
-            if (ev.target.closest('button, a, input, textarea, select, label, summary, details, [data-not-jump], .clickable, [data-not-lastcomment], [data-not-save-lastcomment], [data-not-noans-toggle], [data-not-recall-date], [data-not-recall-time], [data-not-save-recall], .notizia-details-body, .notizia-lastcomment-box, .notizia-recall-form, .notizia-actions-row')) return;
+            try { if (ev.target.closest('button, a, input, textarea, select, label, summary, details, [data-not-jump], [data-not-save-lastcomment], [data-not-noans-toggle], [data-not-recall-date], [data-not-recall-time], [data-not-set-recall], .notizia-lastcomment-box, .notizia-recall-form, .notizia-actions-row')) return; } catch(e) { /* ignore selector errors */ return; };
             openNotiziaDetail(n);
           });
           card.addEventListener('keydown', (ev) => {
@@ -2021,6 +2025,10 @@ function bindNotizieModalUI() {
           tipo: 'chiamata',
           esito: 'non risponde',
           testo: 'Non risponde',
+          descrizione: 'Non risponde',
+          commento: 'Non risponde',
+          note: 'Non risponde',
+          titolo: 'Non risponde',
           links: { notiziaId: n.id, immobileId:'', contattoId:'', attivitaId:'' },
           prossimaAzione: { enabled:true, when: iso, durataMin: 15, creaInAgenda: true }
         });
@@ -2073,6 +2081,10 @@ function bindNotizieModalUI() {
           tipo: 'chiamata',
           esito: 'risposta',
           testo: val,
+          descrizione: val,
+          commento: val,
+          note: val,
+          titolo: val,
           links: { notiziaId: n.id, immobileId:'', contattoId:'', attivitaId:'' },
           prossimaAzione: { enabled:true, when: isoRecall, durataMin: 15, creaInAgenda: true }
         });
