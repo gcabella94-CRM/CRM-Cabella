@@ -14,6 +14,9 @@ window.cssEscape = window.cssEscape || function (value) {
   return String(value).replace(/[^a-zA-Z0-9_-]/g, "\\$&");
 };
 
+// Alias locale per evitare ReferenceError in scope diversi
+const cssEscape = window.cssEscape;
+
 
 /* ====== STORAGE & UTILITY ====== */
 
@@ -45,6 +48,125 @@ if (!window.getInterazioniForNotizia) {
     }
   };
 }
+
+// addInterazione – se mancante (fallback robusto)
+if (!window.addInterazione) {
+  window.addInterazione = function(payload) {
+    try {
+      if (!payload) return null;
+      const nowIso = new Date().toISOString();
+      const it = {
+        id: (typeof genId === 'function' ? genId('int') : ('int_' + Date.now())),
+        ts: payload.ts || nowIso,
+        tipo: payload.tipo || 'nota',
+        esito: payload.esito || 'neutro',
+        testo: payload.testo || '',
+        links: payload.links || { notiziaId:'', immobileId:'', contattoId:'', attivitaId:'' },
+        prossimaAzione: payload.prossimaAzione || { enabled:false }
+      };
+      if (!Array.isArray(attivita)) attivita = [];
+      attivita.push(it);
+      try { saveList(STORAGE_KEYS.attivita, attivita); } catch {}
+      return it;
+    } catch (e) {
+      console.warn('[addInterazione fallback] errore', e);
+      return null;
+    }
+  };
+}
+
+// Crea attività + appuntamento 15' per ricontatto da Notizia (robusto, salva subito)
+if (!window.createRicontattoAppuntamentoFromNotizia) {
+  window.createRicontattoAppuntamentoFromNotizia = function(n, isoWhen, opts={}) {
+    try {
+      if (!n || !isoWhen) return null;
+      const d = new Date(isoWhen);
+      if (isNaN(d)) return null;
+
+      const dateIso = d.toISOString().slice(0,10);
+      const pad = (x)=>String(x).padStart(2,'0');
+      const ora = pad(d.getHours()) + ':' + pad(d.getMinutes());
+      const end = new Date(d.getTime() + 15*60*1000);
+      const oraFine = pad(end.getHours()) + ':' + pad(end.getMinutes());
+
+      const staffId = (n.responsabileId) || ((staff && staff[0] && staff[0].id) || null);
+
+      // trova/crea contatto collegato
+      let contattoId = null;
+      try {
+        if (typeof findContattoFromNotizia === 'function') contattoId = findContattoFromNotizia(n);
+      } catch {}
+      if (!contattoId && Array.isArray(contatti) && (n.telefono || n.email || n.nome || n.cognome)) {
+        const nomeCompleto = ((n.nome || '') + ' ' + (n.cognome || '')).trim();
+        const contatto = {
+          id: (typeof genId==='function' ? genId('cont') : ('cont_' + Date.now())),
+          nome: nomeCompleto || n.nome || '',
+          telefono: n.telefono || '',
+          email: n.email || '',
+          origine: 'notizia',
+          notiziaId: n.id,
+          indirizzo: n.indirizzo || '',
+          citta: n.citta || '',
+          provincia: n.provincia || '',
+          ultimoContatto: dateIso
+        };
+        contatti.push(contatto);
+        try { saveList(STORAGE_KEYS.contatti, contatti); } catch {}
+        contattoId = contatto.id;
+      }
+
+      if (!Array.isArray(attivita)) attivita = [];
+
+      const descrBase = (opts && opts.descrizione) ? String(opts.descrizione) : 'Ricontatto';
+      const tipoDettaglio = (opts && opts.tipoDettaglio) ? String(opts.tipoDettaglio) : 'telefonata';
+
+      // 1) Attività (task) per follow-up
+      const task = {
+        id: (typeof genId==='function' ? genId('att') : ('att_' + Date.now())),
+        tipo: 'attività',
+        data: dateIso,
+        ora,
+        descrizione: descrBase,
+        responsabileId: staffId,
+        stato: 'aperta',
+        links: { notiziaId: n.id, immobileId:'', contattoId: contattoId || '', attivitaId:'' }
+      };
+      attivita.push(task);
+
+      // 2) Appuntamento 15' in agenda
+      const app = {
+        id: (typeof genId==='function' ? genId('app') : ('app_' + Date.now())),
+        tipo: 'appuntamento',
+        stato: 'aperta',
+        data: dateIso,
+        ora,
+        oraFine,
+        tipoDettaglio,
+        descrizione: descrBase,
+        responsabileId: staffId,
+        clienteId: contattoId || '',
+        contattoId: contattoId || '',
+        notiziaId: n.id,
+        luogo: n.indirizzo || '',
+        inUfficio: false,
+        cittaUfficio: ''
+      };
+      attivita.push(app);
+
+      try { saveList(STORAGE_KEYS.attivita, attivita); } catch {}
+      try { renderAgendaWeek && renderAgendaWeek(); } catch {}
+      try { renderAgendaMonth && renderAgendaMonth(); } catch {}
+      try { renderAttivita && renderAttivita(); } catch {}
+      try { renderDashboard && renderDashboard(); } catch {}
+
+      return { taskId: task.id, appId: app.id };
+    } catch (e) {
+      console.warn('[createRicontattoAppuntamentoFromNotizia] errore', e);
+      return null;
+    }
+  };
+}
+
 // ===========================================
   let staff = [];
   let omi = [];
@@ -1894,6 +2016,24 @@ function bindNotizieModalUI() {
       n.ricontatto = iso;
       n.nonRisponde = true;
 
+      // ✅ timeline + obbligo ricontatto (attività + appuntamento 15')
+      try {
+        window.addInterazione && window.addInterazione({
+          tipo: 'chiamata',
+          esito: 'non risponde',
+          testo: 'Non risponde',
+          links: { notiziaId: n.id, immobileId:'', contattoId:'', attivitaId:'' },
+          prossimaAzione: { enabled:true, when: iso, durataMin: 15, creaInAgenda: true }
+        });
+      } catch (err) { console.warn('[NOTIZIE] addInterazione non risponde err', err); }
+
+      try {
+        window.createRicontattoAppuntamentoFromNotizia && window.createRicontattoAppuntamentoFromNotizia(n, iso, {
+          tipoDettaglio: 'telefonata',
+          descrizione: 'Ricontatto (non risponde)'
+        });
+      } catch (err) { console.warn('[NOTIZIE] create ricontatto non risponde err', err); }
+
       try { saveList(STORAGE_KEYS.notizie, notizie); } catch {}
       renderNotizie();
       return;
@@ -1909,23 +2049,45 @@ function bindNotizieModalUI() {
       const val = (ta?.value || '').trim();
       if (!val) { alert('Inserisci un commento.'); return; }
 
+      // ⚠️ Obbligo fissare ricontatto per salvare commento
+      const dateEl = document.querySelector(`[data-not-recall-date="${window.cssEscape(id)}"]`);
+      const timeEl = document.querySelector(`[data-not-recall-time="${window.cssEscape(id)}"]`);
+      const dateVal = (dateEl?.value || '').trim();
+      const timeVal = (timeEl?.value || '').trim();
+      if (!dateVal) {
+        const box = document.getElementById('not-recall-' + id);
+        if (box) box.style.display = 'block';
+        alert('Prima di salvare il commento devi fissare un ricontatto (data e ora).');
+        return;
+      }
+      const isoRecall = timeVal ? new Date(dateVal + 'T' + timeVal + ':00').toISOString() : new Date(dateVal + 'T09:00:00').toISOString();
+
       n.commentoUltimaInterazione = val;
       n.ultimoContattoAt = new Date().toISOString();
       n._draftLastComment = '';
+      n.ricontatto = isoRecall;
+      n.nonRisponde = false;
 
-      // ✅ salva anche in timeline come "telefonata" (default) con esito "risposta"
+      // ✅ timeline + obbligo ricontatto (attività + appuntamento 15')
       try {
-        if (typeof addInterazione === 'function') {
-          addInterazione({
-            tipo: 'chiamata',
-            esito: 'risposta',
-            testo: val,
-            links: { notiziaId: n.id, immobileId:'', contattoId:'', attivitaId:'' },
-            prossimaAzione: { enabled:false }
-          });
-        }
+        window.addInterazione && window.addInterazione({
+          tipo: 'chiamata',
+          esito: 'risposta',
+          testo: val,
+          links: { notiziaId: n.id, immobileId:'', contattoId:'', attivitaId:'' },
+          prossimaAzione: { enabled:true, when: isoRecall, durataMin: 15, creaInAgenda: true }
+        });
       } catch (err) {
         console.warn('[NOTIZIE] addInterazione da "Salva commento" fallita', err);
+      }
+
+      try {
+        window.createRicontattoAppuntamentoFromNotizia && window.createRicontattoAppuntamentoFromNotizia(n, isoRecall, {
+          tipoDettaglio: 'telefonata',
+          descrizione: val ? ('Ricontatto: ' + val.slice(0,70)) : 'Ricontatto'
+        });
+      } catch (err) {
+        console.warn('[NOTIZIE] create ricontatto da "Salva commento" fallita', err);
       }
 
       try { saveList(STORAGE_KEYS.notizie, notizie); } catch {}
