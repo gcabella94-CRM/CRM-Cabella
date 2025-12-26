@@ -4,6 +4,17 @@ import { ensureNotiziaDetailDrawer } from '../notizie/notiziaDrawer.js';
 */
 window.__CRM_APP_LOADED__ = true;
 
+// ===============================
+// cssEscape – global safe helper
+// ===============================
+window.cssEscape = window.cssEscape || function (value) {
+  if (window.CSS && typeof CSS.escape === "function") {
+    return CSS.escape(String(value));
+  }
+  return String(value).replace(/[^a-zA-Z0-9_-]/g, "\\$&");
+};
+
+
 /* ====== STORAGE & UTILITY ====== */
 
   const STORAGE_KEYS = {
@@ -1368,20 +1379,23 @@ function renderAgendaMonth() {
                   ${escapeHtml(n.ultimoContattoAt ? formatDateTimeIT(n.ultimoContattoAt) : '—')}
                 </div>
               </div>
-              <div class="notizia-lastcomment-wrap">
-                <div class="notizia-muted" style="margin-top:8px;margin-bottom:6px;">
-                  <strong>Ultimo commento:</strong> ${escapeHtml(n.commentoUltimaInterazione || '—')}
-                </div>
 
-                <div class="notizia-lastcomment-box">
-                  <textarea class="input-sm" rows="2" placeholder="Scrivi qui il commento dell’ultimo contatto…"
-                    data-not-lastcomment="${escapeHtml(n.id)}">${escapeHtml(n._draftLastComment || '')}</textarea>
-                  <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:6px;">
-                    <button class="btn btn-xs" data-not-save-lastcomment="${escapeHtml(n.id)}">Salva commento</button>
+              <details class="notizia-details" ${n.commentoUltimaInterazione ? '' : 'data-empty="1"'}>
+                <summary>${n.commentoUltimaInterazione ? 'Commento ultimo contatto' : 'Nessun commento (clicca per aggiungere)'}</summary>
+                <div class="notizia-details-body">
+                  <div class="muted" style="margin-bottom:6px;">${escapeHtml(n.commentoUltimaInterazione || '')}</div>
+
+                  <div class="notizia-lastcomment-box">
+                    <textarea class="input-sm" rows="2" placeholder="Scrivi qui il commento dell’ultimo contatto…"
+                      data-not-lastcomment="${escapeHtml(n.id)}">${escapeHtml(n._draftLastComment || '')}</textarea>
+                    <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:6px;">
+                      <button class="btn btn-xs" data-not-save-lastcomment="${escapeHtml(n.id)}">Salva commento</button>
+                    </div>
                   </div>
                 </div>
-              </div>
-<div class="notizia-actions-row">
+              </details>
+
+              <div class="notizia-actions-row">
                 <button class="btn btn-xs" data-not-noans-toggle="${escapeHtml(n.id)}">Non risponde</button>
                 ${ric ? `<div class="muted"><strong>Ricontatto:</strong> ${escapeHtml(ric)}</div>` : '<div class="muted">Ricontatto: —</div>'}
               </div>
@@ -1410,14 +1424,7 @@ function renderAgendaMonth() {
           // apri con click su card (ma non sui bottoni)
           card.addEventListener('click', (ev) => {
             // click sulla card = apri DETTAGLIO (non la UI di inserimento)
-            // ma NON deve scattare se clicchi su elementi interattivi (input, textarea, pulsanti, link, ecc.)
-            const t = ev.target;
-            if (!t) return;
-
-            // blocca su qualsiasi elemento interattivo o su azioni della card
-            if (t.closest('button, a, input, textarea, select, label, summary, details')) return;
-            if (t.closest('[data-not-jump],[data-not-edit],[data-not-del],[data-not-noans-toggle],[data-not-save-lastcomment],[data-not-lastcomment],[data-not-recall-save],[data-not-recall-cancel],[data-not-recall-when]')) return;
-
+            if (ev.target.closest('button')) return;
             openNotiziaDetail(n);
           });
           card.addEventListener('keydown', (ev) => {
@@ -1861,8 +1868,8 @@ function bindNotizieModalUI() {
       if (n && n.ricontatto) {
         const d = new Date(n.ricontatto);
         if (!isNaN(d)) {
-          const dateEl = document.querySelector(`[data-not-recall-date="${cssEscape(id)}"]`);
-          const timeEl = document.querySelector(`[data-not-recall-time="${cssEscape(id)}"]`);
+          const dateEl = document.querySelector(`[data-not-recall-date="${window.cssEscape(id)}"]`);
+          const timeEl = document.querySelector(`[data-not-recall-time="${window.cssEscape(id)}"]`);
           if (dateEl) dateEl.value = d.toISOString().slice(0,10);
           if (timeEl) timeEl.value = String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
         }
@@ -1876,8 +1883,8 @@ function bindNotizieModalUI() {
       const n = (notizie || []).find(x => x && x.id === id);
       if (!n) return;
 
-      const dateEl = document.querySelector(`[data-not-recall-date="${cssEscape(id)}"]`);
-      const timeEl = document.querySelector(`[data-not-recall-time="${cssEscape(id)}"]`);
+      const dateEl = document.querySelector(`[data-not-recall-date="${window.cssEscape(id)}"]`);
+      const timeEl = document.querySelector(`[data-not-recall-time="${window.cssEscape(id)}"]`);
       const dateVal = (dateEl?.value || '').trim();
       const timeVal = (timeEl?.value || '').trim();
 
@@ -1898,7 +1905,7 @@ function bindNotizieModalUI() {
       const n = (notizie || []).find(x => x && x.id === id);
       if (!n) return;
 
-      const ta = document.querySelector(`[data-not-lastcomment="${cssEscape(id)}"]`);
+      const ta = document.querySelector(`[data-not-lastcomment="${window.cssEscape(id)}"]`);
       const val = (ta?.value || '').trim();
       if (!val) { alert('Inserisci un commento.'); return; }
 
