@@ -254,7 +254,8 @@ function renderNotiziaDetail(n) {
         const when = formatDateIT(it.ts) || '';
         const tipo = (it.tipo || 'nota');
         const esito = (it.esito || 'neutro');
-        const txt = (it.testo || '').trim();
+        // In alcune versioni l'interazione può salvare il testo sotto chiavi diverse
+        const txt = (it.testo || it.descrizione || it.commento || it.note || it.test || '').trim();
         return `
           <div class="notizia-timeline-item">
             <div class="notizia-timeline-top">
@@ -1544,7 +1545,7 @@ function renderAgendaMonth() {
           // apri con click su card (ma non sui bottoni)
           card.addEventListener('click', (ev) => {
             // click sulla card = apri DETTAGLIO (non la UI di inserimento)
-            if (ev.target.closest('button, a, input, textarea, select, label, summary, details, [data-not-jump], .clickable, [data-not-lastcomment], [data-not-save-lastcomment], [data-not-noans-toggle], [data-not-recall-date], [data-not-recall-time], [data-not-save-recall]')) return;
+            if (ev.target.closest('button, a, input, textarea, select, label, summary, details, [data-not-jump], .clickable, [data-not-lastcomment], [data-not-save-lastcomment], [data-not-noans-toggle], [data-not-recall-date], [data-not-recall-time], [data-not-save-recall], .notizia-details-body, .notizia-lastcomment-box, .notizia-recall-form, .notizia-actions-row')) return;
             openNotiziaDetail(n);
           });
           card.addEventListener('keydown', (ev) => {
