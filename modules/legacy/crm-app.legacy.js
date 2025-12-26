@@ -2079,7 +2079,7 @@ function bindNotizieModalUI() {
       try {
         window.addInterazione && window.addInterazione({
           tipo: 'chiamata',
-          esito: 'risposta',
+          esito: 'risponde',
           testo: val,
           descrizione: val,
           commento: val,
