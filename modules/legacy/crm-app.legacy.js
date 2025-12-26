@@ -1502,20 +1502,18 @@ function renderAgendaMonth() {
                 </div>
               </div>
 
-              <details class="notizia-details" ${n.commentoUltimaInterazione ? '' : 'data-empty="1"'}>
-                <summary>${n.commentoUltimaInterazione ? 'Commento ultimo contatto' : 'Nessun commento (clicca per aggiungere)'}</summary>
-                <div class="notizia-details-body">
-                  <div class="muted" style="margin-bottom:6px;">${escapeHtml(n.commentoUltimaInterazione || '')}</div>
+              <div class="notizia-details-body" style="margin-top:6px;">
+                <div class="notizia-label">Commento ultimo contatto</div>
+                <div class="muted" style="margin-bottom:6px;">${escapeHtml(n.commentoUltimaInterazione || '')}</div>
 
-                  <div class="notizia-lastcomment-box">
-                    <textarea class="input-sm" rows="2" placeholder="Scrivi qui il commento dell’ultimo contatto…"
-                      data-not-lastcomment="${escapeHtml(n.id)}">${escapeHtml(n._draftLastComment || '')}</textarea>
-                    <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:6px;">
-                      <button class="btn btn-xs" data-not-save-lastcomment="${escapeHtml(n.id)}">Salva commento</button>
-                    </div>
+                <div class="notizia-lastcomment-box">
+                  <textarea class="input-sm" rows="2" placeholder="Scrivi qui il commento dell’ultimo contatto…"
+                    data-not-lastcomment="${escapeHtml(n.id)}">${escapeHtml(n._draftLastComment || '')}</textarea>
+                  <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:6px;">
+                    <button class="btn btn-xs" data-not-save-lastcomment="${escapeHtml(n.id)}">Salva commento</button>
                   </div>
                 </div>
-              </details>
+              </div>
 
               <div class="notizia-actions-row">
                 <button class="btn btn-xs" data-not-noans-toggle="${escapeHtml(n.id)}">Non risponde</button>
@@ -1546,11 +1544,11 @@ function renderAgendaMonth() {
           // apri con click su card (ma non sui bottoni)
           card.addEventListener('click', (ev) => {
             // click sulla card = apri DETTAGLIO (non la UI di inserimento)
-            if (ev.target.closest('button')) return;
+            if (ev.target.closest('button, a, input, textarea, select, label, summary, details, [data-not-jump], .clickable, [data-not-lastcomment], [data-not-save-lastcomment], [data-not-noans-toggle], [data-not-recall-date], [data-not-recall-time], [data-not-save-recall]')) return;
             openNotiziaDetail(n);
           });
           card.addEventListener('keydown', (ev) => {
-            if (ev.key === 'Enter') openNotiziaDetail(n);
+            if (ev.key === 'Enter' && ev.target === card) openNotiziaDetail(n);
           });
 
           cardsContainer.appendChild(card);
