@@ -111,8 +111,9 @@ if (!window.createRicontattoAppuntamentoFromNotizia) {
       const d = new Date(isoWhen);
       if (isNaN(d)) return null;
 
-      const dateIso = d.toISOString().slice(0,10);
       const pad = (x)=>String(x).padStart(2,'0');
+      // Use LOCAL date (avoid UTC shift)
+      const dateIso = d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate());
       const ora = pad(d.getHours()) + ':' + pad(d.getMinutes());
       const end = new Date(d.getTime() + 15*60*1000);
       const oraFine = pad(end.getHours()) + ':' + pad(end.getMinutes());
@@ -325,12 +326,11 @@ function renderNotiziaDetail(n) {
 
     let isoWhen = '';
     if (whenLocal) {
-      // datetime-local -> ISO (locale)
-      const d = new Date(whenLocal);
-      if (!isNaN(d)) isoWhen = d.toISOString();
+      // datetime-local: keep as LOCAL (avoid UTC shift from toISOString)
+      // Accept formats like 'YYYY-MM-DDTHH:MM' from <input type="datetime-local">
+      isoWhen = String(whenLocal).trim();
     }
-
-    addInterazione({
+addInterazione({
       tipo, esito, testo,
       descrizione: testo,
       commento: testo,
