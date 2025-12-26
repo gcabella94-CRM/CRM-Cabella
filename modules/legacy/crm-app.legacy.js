@@ -64,6 +64,19 @@ if (!window.addInterazione) {
         links: payload.links || { notiziaId:'', immobileId:'', contattoId:'', attivitaId:'' },
         prossimaAzione: payload.prossimaAzione || { enabled:false }
       };
+
+      // aggiorna rubrica: salva prossimo ricontatto sul contatto collegato
+      try {
+        if (Array.isArray(contatti) && contattoId) {
+          const cidx = contatti.findIndex(c => c && c.id === contattoId);
+          if (cidx >= 0) {
+            contatti[cidx].ricontatto = isoWhen;
+            contatti[cidx].prossimoRicontatto = isoWhen;
+            contatti[cidx].ultimoContatto = dateIso;
+            try { saveList(STORAGE_KEYS.contatti, contatti); } catch {}
+          }
+        }
+      } catch {}
       if (!Array.isArray(attivita)) attivita = [];
       attivita.push(it);
       try { saveList(STORAGE_KEYS.attivita, attivita); } catch {}
@@ -125,13 +138,13 @@ if (!window.createRicontattoAppuntamentoFromNotizia) {
       try {
         if (typeof findContattoFromNotizia === 'function') contattoId = findContattoFromNotizia(n);
       } catch {}
-      if (!contattoId && Array.isArray(contatti) && (n.telefono || n.email || n.nome || n.cognome)) {
-        const nomeCompleto = ((n.nome || '') + ' ' + (n.cognome || '')).trim();
+      if (!contattoId && Array.isArray(contatti) && ((n.telefono || n.proprietarioTelefono) || (n.email || n.proprietarioEmail) || (n.nome || n.proprietarioNome) || (n.cognome || ''))) {
+        const nomeCompleto = (((n.nome || n.proprietarioNome || '') + ' ' + (n.cognome || '')).trim());
         const contatto = {
           id: (typeof genId==='function' ? genId('cont') : ('cont_' + Date.now())),
           nome: nomeCompleto || n.nome || '',
-          telefono: n.telefono || '',
-          email: n.email || '',
+          telefono: (n.telefono || n.proprietarioTelefono || ''),
+          email: (n.email || n.proprietarioEmail || ''),
           origine: 'notizia',
           notiziaId: n.id,
           indirizzo: n.indirizzo || '',
@@ -1438,7 +1451,7 @@ function renderAgendaMonth() {
       list.forEach(n => {
         const tr = document.createElement('tr');
         const staffObj = (staff || []).find(s => s.id === n.responsabileId);
-        const nomeCompleto = ((n.nome || '') + ' ' + (n.cognome || '')).trim();
+        const nomeCompleto = (((n.nome || n.proprietarioNome || '') + ' ' + (n.cognome || '')).trim());
         const caldoLabel = n.caldo ? '🔥' : '';
         const indirizzoCompleto = [n.indirizzo || '', n.citta || ''].filter(Boolean).join(' - ');
         tr.innerHTML = `
@@ -1472,7 +1485,7 @@ function renderAgendaMonth() {
       } else {
         list.forEach(n => {
           const staffObj = (staff || []).find(s => s.id === n.responsabileId);
-          const nomeCompleto = ((n.nome || '') + ' ' + (n.cognome || '')).trim();
+          const nomeCompleto = (((n.nome || n.proprietarioNome || '') + ' ' + (n.cognome || '')).trim());
           const indirizzoCompleto = [n.indirizzo || '', n.citta || '', n.provincia ? `(${n.provincia})` : '', n.cap || ''].filter(Boolean).join(' ');
           const ric = n.ricontatto ? formatDateTimeIT(n.ricontatto) : '';
 
@@ -1577,7 +1590,16 @@ function renderAgendaMonth() {
           // apri con click su card (ma non sui bottoni)
           card.addEventListener('click', (ev) => {
             // click sulla card = apri DETTAGLIO (non la UI di inserimento)
-            try { if (ev.target.closest('button, a, input, textarea, select, label, summary, details, [data-not-jump], [data-not-save-lastcomment], [data-not-noans-toggle], [data-not-recall-date], [data-not-recall-time], [data-not-set-recall], .notizia-lastcomment-box, .notizia-recall-form, .notizia-actions-row')) return; } catch(e) { /* ignore selector errors */ return; };
+            try {
+              const stopSel = 'button, a, input, textarea, select, label, summary, details, ' +
+                '[data-not-jump], [data-not-edit], [data-not-del], [data-not-save-lastcomment], ' +
+                '[data-not-noans-toggle], [data-not-recall-date], [data-not-recall-time], [data-not-save-recall], ' +
+                '.notizia-lastcomment-box, .notizia-actions-row, .notizia-mini';
+              if (ev.target.closest(stopSel)) return;
+            } catch(e) {
+              return;
+            }
+
             openNotiziaDetail(n);
           });
           card.addEventListener('keydown', (ev) => {
@@ -1644,7 +1666,7 @@ function resetNotizieForm() {
     const caldoImmEl   = document.getElementById('imm-caldo');
     const noteEl       = document.getElementById('imm-note');
 
-    const nomeCompleto = ((n.nome || '') + ' ' + (n.cognome || '')).trim();
+    const nomeCompleto = (((n.nome || n.proprietarioNome || '') + ' ' + (n.cognome || '')).trim());
 
     // Precompila campi base
     if (rifEl) {
@@ -1776,12 +1798,12 @@ function resetNotizieForm() {
 
     // Se non esiste ancora un contatto collegato alla notizia, crealo ora
     if (!clienteId && (n.nome || n.cognome || n.telefono || n.email)) {
-      const nomeCompleto = ((n.nome || '') + ' ' + (n.cognome || '')).trim();
+      const nomeCompleto = (((n.nome || n.proprietarioNome || '') + ' ' + (n.cognome || '')).trim());
       const contatto = {
         id: genId('cont'),
         nome: nomeCompleto || n.nome || '',
-        telefono: n.telefono || '',
-        email: n.email || '',
+        telefono: (n.telefono || n.proprietarioTelefono || ''),
+        email: (n.email || n.proprietarioEmail || ''),
         origine: 'notizia',
         notiziaId: n.id,
         indirizzo: n.indirizzo || '',
@@ -2173,13 +2195,6 @@ function formatDateTimeIT(str) {
   return `${date} ${time}`;
 }
 
-
-function toLocalISODate(d) {
-  // Returns YYYY-MM-DD using LOCAL timezone (avoids UTC day shifts)
-  if (!(d instanceof Date) || isNaN(d)) return '';
-  const pad = (x)=>String(x).padStart(2,'0');
-  return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate());
-}
 function escapeHtml(str) {
   if (!str) return '';
   return String(str)
@@ -2187,6 +2202,16 @@ function escapeHtml(str) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
 }
+
+// Local date key helper (avoid UTC day shift in Agenda)
+function toLocalISODate(d) {
+  if (!d) return '';
+  const dd = (d instanceof Date) ? d : new Date(d);
+  if (isNaN(dd)) return '';
+  const pad = (x)=>String(x).padStart(2,'0');
+  return dd.getFullYear() + '-' + pad(dd.getMonth()+1) + '-' + pad(dd.getDate());
+}
+
 
 function groupRubrica(data) {
   const map = new Map();
@@ -6834,43 +6859,3 @@ try {
 } catch (e) {
   console.warn('[BOOT] esposizione funzioni globali fallita', e);
 }
-
-
-/* PATCH: override createRicontattoAppuntamentoFromNotizia to avoid UTC date shifts.
-   We build dateIso/ora from the user-selected local datetime when possible. */
-(function(){
-  const _orig = window.createRicontattoAppuntamentoFromNotizia;
-  window.createRicontattoAppuntamentoFromNotizia = function(n, when, opts={}) {
-    try {
-      if (!n || !when) return _orig ? _orig(n, when, opts) : null;
-
-      // If it's a datetime-local string (YYYY-MM-DDTHH:MM...), keep it LOCAL without Date().
-      if (typeof when === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(when) && !/Z$/.test(when)) {
-        const parts = when.split('T');
-        const dateIso = parts[0];
-        const ora = (parts[1] || '').slice(0,5);
-        const [hh, mm] = ora.split(':').map(x=>parseInt(x,10));
-        const pad = (x)=>String(x).padStart(2,'0');
-        const d0 = new Date(dateIso + 'T' + ora);
-        const end = new Date(d0.getTime() + 15*60*1000);
-        const oraFine = pad(end.getHours()) + ':' + pad(end.getMinutes());
-
-        // Prefer using existing app/task creators if present (to preserve structure)
-        if (typeof window.__createRicontattoFromPieces === 'function') {
-          return window.__createRicontattoFromPieces(n, {dateIso, ora, oraFine}, opts);
-        }
-
-        // Fallback: temporarily call original with a Date built from local datetime but also pass pieces via opts
-        const whenDate = d0;
-        return _orig ? _orig(n, whenDate, Object.assign({}, opts, { __dateIso: dateIso, __ora: ora, __oraFine: oraFine })) : null;
-      }
-
-      // Otherwise (ISO with Z or Date), delegate to original
-      return _orig ? _orig(n, when, opts) : null;
-    } catch(e) {
-      try { return _orig ? _orig(n, when, opts) : null; } catch {}
-      return null;
-    }
-  };
-})();
-
