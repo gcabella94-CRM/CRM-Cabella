@@ -14,9 +14,6 @@ window.cssEscape = window.cssEscape || function (value) {
   return String(value).replace(/[^a-zA-Z0-9_-]/g, "\\$&");
 };
 
-// Alias locale per evitare ReferenceError in scope diversi
-const cssEscape = window.cssEscape;
-
 
 /* ====== STORAGE & UTILITY ====== */
 
@@ -48,154 +45,6 @@ if (!window.getInterazioniForNotizia) {
     }
   };
 }
-
-// addInterazione – se mancante (fallback robusto)
-if (!window.addInterazione) {
-  window.addInterazione = function(payload) {
-    try {
-      if (!payload) return null;
-      const nowIso = new Date().toISOString();
-      const it = {
-        id: (typeof genId === 'function' ? genId('int') : ('int_' + Date.now())),
-        ts: payload.ts || nowIso,
-        tipo: payload.tipo || 'nota',
-        esito: payload.esito || 'neutro',
-        testo: payload.testo || '',
-        links: payload.links || { notiziaId:'', immobileId:'', contattoId:'', attivitaId:'' },
-        prossimaAzione: payload.prossimaAzione || { enabled:false }
-      };
-      if (!Array.isArray(attivita)) attivita = [];
-      attivita.push(it);
-      try { saveList(STORAGE_KEYS.attivita, attivita); } catch {}
-      return it;
-    } catch (e) {
-      console.warn('[addInterazione fallback] errore', e);
-      return null;
-    }
-  };
-}
-
-// Inserimento diretto interazione in "attivita" (usato per garantire esito/testo in timeline)
-function pushInterazioneInTimeline(payload) {
-  try {
-    if (!payload) return null;
-    const nowIso = new Date().toISOString();
-    const it = {
-      id: (typeof genId === 'function' ? genId('int') : ('int_' + Date.now())),
-      ts: payload.ts || nowIso,
-      tipo: payload.tipo || 'nota',
-      esito: payload.esito || 'neutro',
-      testo: payload.testo || '',
-      descrizione: payload.descrizione || payload.testo || '',
-      commento: payload.commento || payload.testo || '',
-      note: payload.note || payload.testo || '',
-      titolo: payload.titolo || payload.esito || payload.tipo || 'Interazione',
-      links: payload.links || { notiziaId:'', immobileId:'', contattoId:'', attivitaId:'' },
-      prossimaAzione: payload.prossimaAzione || { enabled:false }
-    };
-    if (!Array.isArray(attivita)) attivita = [];
-    attivita.push(it);
-    try { saveList && saveList(STORAGE_KEYS.attivita, attivita); } catch {}
-    return it;
-  } catch (e) {
-    console.warn('[TIMELINE] pushInterazioneInTimeline error', e);
-    return null;
-  }
-}
-
-// Crea attività + appuntamento 15' per ricontatto da Notizia (robusto, salva subito)
-if (!window.createRicontattoAppuntamentoFromNotizia) {
-  window.createRicontattoAppuntamentoFromNotizia = function(n, isoWhen, opts={}) {
-    try {
-      if (!n || !isoWhen) return null;
-      const d = new Date(isoWhen);
-      if (isNaN(d)) return null;
-
-      const pad = (x)=>String(x).padStart(2,'0');
-      // Use LOCAL date (avoid UTC shift)
-      const dateIso = d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate());
-      const ora = pad(d.getHours()) + ':' + pad(d.getMinutes());
-      const end = new Date(d.getTime() + 15*60*1000);
-      const oraFine = pad(end.getHours()) + ':' + pad(end.getMinutes());
-
-      const staffId = (n.responsabileId) || ((staff && staff[0] && staff[0].id) || null);
-
-      // trova/crea contatto collegato
-      let contattoId = null;
-      try {
-        if (typeof findContattoFromNotizia === 'function') contattoId = findContattoFromNotizia(n);
-      } catch {}
-      if (!contattoId && Array.isArray(contatti) && (n.telefono || n.email || n.nome || n.cognome)) {
-        const nomeCompleto = ((n.nome || '') + ' ' + (n.cognome || '')).trim();
-        const contatto = {
-          id: (typeof genId==='function' ? genId('cont') : ('cont_' + Date.now())),
-          nome: nomeCompleto || n.nome || '',
-          telefono: n.telefono || '',
-          email: n.email || '',
-          origine: 'notizia',
-          notiziaId: n.id,
-          indirizzo: n.indirizzo || '',
-          citta: n.citta || '',
-          provincia: n.provincia || '',
-          ultimoContatto: dateIso
-        };
-        contatti.push(contatto);
-        try { saveList(STORAGE_KEYS.contatti, contatti); } catch {}
-        contattoId = contatto.id;
-      }
-
-      if (!Array.isArray(attivita)) attivita = [];
-
-      const descrBase = (opts && opts.descrizione) ? String(opts.descrizione) : 'Ricontatto';
-      const tipoDettaglio = (opts && opts.tipoDettaglio) ? String(opts.tipoDettaglio) : 'telefonata';
-
-      // 1) Attività (task) per follow-up
-      const task = {
-        id: (typeof genId==='function' ? genId('att') : ('att_' + Date.now())),
-        tipo: 'attività',
-        data: dateIso,
-        ora,
-        descrizione: descrBase,
-        responsabileId: staffId,
-        stato: 'aperta',
-        links: { notiziaId: n.id, immobileId:'', contattoId: contattoId || '', attivitaId:'' }
-      };
-      attivita.push(task);
-
-      // 2) Appuntamento 15' in agenda
-      const app = {
-        id: (typeof genId==='function' ? genId('app') : ('app_' + Date.now())),
-        tipo: 'appuntamento',
-        stato: 'aperta',
-        data: dateIso,
-        ora,
-        oraFine,
-        tipoDettaglio,
-        descrizione: descrBase,
-        responsabileId: staffId,
-        clienteId: contattoId || '',
-        contattoId: contattoId || '',
-        notiziaId: n.id,
-        luogo: n.indirizzo || '',
-        inUfficio: false,
-        cittaUfficio: ''
-      };
-      attivita.push(app);
-
-      try { saveList(STORAGE_KEYS.attivita, attivita); } catch {}
-      try { renderAgendaWeek && renderAgendaWeek(); } catch {}
-      try { renderAgendaMonth && renderAgendaMonth(); } catch {}
-      try { renderAttivita && renderAttivita(); } catch {}
-      try { renderDashboard && renderDashboard(); } catch {}
-
-      return { taskId: task.id, appId: app.id };
-    } catch (e) {
-      console.warn('[createRicontattoAppuntamentoFromNotizia] errore', e);
-      return null;
-    }
-  };
-}
-
 // ===========================================
   let staff = [];
   let omi = [];
@@ -229,6 +78,110 @@ if (!window.createRicontattoAppuntamentoFromNotizia) {
   function genId(prefix = 'id') {
   return `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
 }
+
+// --- FIX TIMEZONE RICONTATTI ---
+// Con input datetime-local (senza timezone) NON usare toISOString()/UTC per derivare il giorno.
+// Questo helper produce sempre data/ora in locale, evitando lo slittamento al giorno successivo.
+function parseWhenToLocalParts(whenAny) {
+  if (!whenAny) return null;
+
+  // Caso 1: datetime-local o stringa ISO senza timezone ("YYYY-MM-DDTHH:MM" o "YYYY-MM-DDTHH:MM:SS")
+  const mLocal = String(whenAny).match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/);
+  const hasTZ = /Z$|[\+\-]\d{2}:?\d{2}$/.test(String(whenAny));
+  if (mLocal && !hasTZ) {
+    return { date: mLocal[1], time: mLocal[2] };
+  }
+
+  // Caso 2: ISO con timezone / Date-parsable -> estrai componenti LOCALI
+  const d = new Date(whenAny);
+  if (isNaN(d)) return null;
+
+  const pad2 = (n) => String(n).padStart(2, '0');
+  const date = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+  const time = `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+  return { date, time };
+}
+
+function addMinutesToHHMM(hhmm, minutesToAdd) {
+  const m = String(hhmm || '').match(/^(\d{2}):(\d{2})$/);
+  if (!m) return '';
+  const h = parseInt(m[1], 10);
+  const mi = parseInt(m[2], 10);
+  let total = h * 60 + mi + (minutesToAdd || 0);
+  if (total < 0) total = 0;
+  total = total % (24 * 60);
+  const pad2 = (n) => String(n).padStart(2, '0');
+  return `${pad2(Math.floor(total / 60))}:${pad2(total % 60)}`;
+}
+
+// Override intenzionale: usiamo sempre data/ora locali per creare attività + appuntamento (15 min) da ricontatto,
+// evitando shift di giorno dovuti a UTC/toISOString.
+function createRicontattoAppuntamentoFromNotizia(notizia, whenAny, opts = {}) {
+  const parts = parseWhenToLocalParts(whenAny);
+  if (!parts) return null;
+
+  const data = parts.date;
+  const ora = parts.time;
+  const durataMin = Number(opts.durataMin || 15);
+
+  // Responsabile: default primo staff
+  let responsabileId = opts.responsabileId || null;
+  try {
+    if (!responsabileId && Array.isArray(staff) && staff[0] && staff[0].id) responsabileId = staff[0].id;
+  } catch {}
+
+  const notiziaId = (notizia && notizia.id) ? notizia.id : (opts.notiziaId || '');
+
+  const descr = opts.descrizione
+    || opts.titolo
+    || (opts.testo ? String(opts.testo) : '')
+    || (notizia && notizia.indirizzo ? ('Ricontatto: ' + notizia.indirizzo) : 'Ricontatto');
+
+  // 1) ATTIVITÀ (task)
+  const act = {
+    id: genId('att'),
+    data,
+    ora,
+    tipo: 'ricontatto',
+    descrizione: descr,
+    responsabileId,
+    stato: 'aperta',
+    links: { notiziaId }
+  };
+
+  // 2) APPUNTAMENTO AGENDA (15 min)
+  const app = {
+    id: genId('att'),
+    data,
+    ora,
+    oraFine: addMinutesToHHMM(ora, durataMin),
+    tipo: 'appuntamento',
+    tipoDettaglio: opts.tipoDettaglio || 'telefonata',
+    descrizione: descr,
+    responsabileId,
+    clienteId: '',
+    stato: 'aperta',
+    links: { notiziaId }
+  };
+
+  try {
+    if (!Array.isArray(attivita)) attivita = [];
+    attivita.push(act);
+    attivita.push(app);
+
+    // persistenza + refresh UI
+    try { saveList(STORAGE_KEYS.attivita, attivita); } catch {}
+    try { renderAttivita(); } catch {}
+    try { renderAgenda(); } catch {}
+    try { renderDashboardTodayActivities(); } catch {}
+    try { renderDashboardDaySummary(); } catch {}
+  } catch {}
+
+  return { actId: act.id, appId: app.id };
+}
+// --- /FIX TIMEZONE RICONTATTI ---
+
+
 
 /* ====== NOTIZIA DETTAGLIO (drawer) ====== */
 
@@ -283,8 +236,7 @@ function renderNotiziaDetail(n) {
         const when = formatDateIT(it.ts) || '';
         const tipo = (it.tipo || 'nota');
         const esito = (it.esito || 'neutro');
-        // In alcune versioni l'interazione può salvare il testo sotto chiavi diverse
-        const txt = (it.testo || it.descrizione || it.commento || it.note || it.test || it.titolo || it.summary || it.body || it.contenuto || it.text || '').trim();
+        const txt = (it.testo || '').trim();
         return `
           <div class="notizia-timeline-item">
             <div class="notizia-timeline-top">
@@ -308,13 +260,13 @@ function renderNotiziaDetail(n) {
   // bind add interazione
   const btnAdd = document.getElementById('notd-add-interazione');
   const box = document.getElementById('notd-add-interazione-box');
-
-  // Slot inserisci commento SEMPRE visibile (non a tendina)
-  if (box) box.style.display = 'block';
-  if (btnAdd) btnAdd.style.display = 'none';
+  btnAdd && btnAdd.addEventListener('click', () => {
+    if (!box) return;
+    box.style.display = (box.style.display === 'none' || !box.style.display) ? 'block' : 'none';
+  });
 
   document.getElementById('notd-int-cancel')?.addEventListener('click', () => {
-    if (box) box.style.display = 'block';
+    if (box) box.style.display = 'none';
   });
 
   document.getElementById('notd-int-save')?.addEventListener('click', () => {
@@ -326,16 +278,13 @@ function renderNotiziaDetail(n) {
 
     let isoWhen = '';
     if (whenLocal) {
-      // datetime-local: keep as LOCAL (avoid UTC shift from toISOString)
-      // Accept formats like 'YYYY-MM-DDTHH:MM' from <input type="datetime-local">
-      isoWhen = String(whenLocal).trim();
+      // datetime-local -> ISO (locale)
+      const d = new Date(whenLocal);
+      if (!isNaN(d)) isoWhen = d.toISOString();
     }
-addInterazione({
+
+    addInterazione({
       tipo, esito, testo,
-      descrizione: testo,
-      commento: testo,
-      note: testo,
-      titolo: testo,
       links: { notiziaId: n.id, immobileId:'', contattoId:'', attivitaId:'' },
       prossimaAzione: isoWhen ? { enabled:true, when: isoWhen, durataMin: 15, creaInAgenda: creaAgenda } : { enabled:false }
     });
@@ -347,7 +296,7 @@ addInterazione({
     // refresh UI
     renderNotiziaDetail(n);
     try { renderNotizie(); } catch {}
-    if (box) box.style.display = 'block';
+    if (box) box.style.display = 'none';
     const t = document.getElementById('notd-int-testo');
     if (t) t.value = '';
   });
@@ -1535,18 +1484,20 @@ function renderAgendaMonth() {
                 </div>
               </div>
 
-              <div class="notizia-details-body" style="margin-top:6px;">
-                <div class="notizia-label">Commento ultimo contatto</div>
-                <div class="muted" style="margin-bottom:6px;">${escapeHtml(n.commentoUltimaInterazione || '')}</div>
+              <details class="notizia-details" ${n.commentoUltimaInterazione ? '' : 'data-empty="1"'}>
+                <summary>${n.commentoUltimaInterazione ? 'Commento ultimo contatto' : 'Nessun commento (clicca per aggiungere)'}</summary>
+                <div class="notizia-details-body">
+                  <div class="muted" style="margin-bottom:6px;">${escapeHtml(n.commentoUltimaInterazione || '')}</div>
 
-                <div class="notizia-lastcomment-box">
-                  <textarea class="input-sm" rows="2" placeholder="Scrivi qui il commento dell’ultimo contatto…"
-                    data-not-lastcomment="${escapeHtml(n.id)}">${escapeHtml(n._draftLastComment || '')}</textarea>
-                  <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:6px;">
-                    <button class="btn btn-xs" data-not-save-lastcomment="${escapeHtml(n.id)}">Salva commento</button>
+                  <div class="notizia-lastcomment-box">
+                    <textarea class="input-sm" rows="2" placeholder="Scrivi qui il commento dell’ultimo contatto…"
+                      data-not-lastcomment="${escapeHtml(n.id)}">${escapeHtml(n._draftLastComment || '')}</textarea>
+                    <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:6px;">
+                      <button class="btn btn-xs" data-not-save-lastcomment="${escapeHtml(n.id)}">Salva commento</button>
+                    </div>
                   </div>
                 </div>
-              </div>
+              </details>
 
               <div class="notizia-actions-row">
                 <button class="btn btn-xs" data-not-noans-toggle="${escapeHtml(n.id)}">Non risponde</button>
@@ -1577,11 +1528,11 @@ function renderAgendaMonth() {
           // apri con click su card (ma non sui bottoni)
           card.addEventListener('click', (ev) => {
             // click sulla card = apri DETTAGLIO (non la UI di inserimento)
-            try { if (ev.target.closest('button, a, input, textarea, select, label, summary, details, [data-not-jump], [data-not-save-lastcomment], [data-not-noans-toggle], [data-not-recall-date], [data-not-recall-time], [data-not-set-recall], .notizia-lastcomment-box, .notizia-recall-form, .notizia-actions-row')) return; } catch(e) { /* ignore selector errors */ return; };
+            if (ev.target.closest('button')) return;
             openNotiziaDetail(n);
           });
           card.addEventListener('keydown', (ev) => {
-            if (ev.key === 'Enter' && ev.target === card) openNotiziaDetail(n);
+            if (ev.key === 'Enter') openNotiziaDetail(n);
           });
 
           cardsContainer.appendChild(card);
@@ -2014,16 +1965,10 @@ function bindNotizieModalUI() {
     if (noans) {
       const id = noans.getAttribute('data-not-noans-toggle');
       const box = document.getElementById('not-recall-' + id);
-      let willShow = false;
-      if (box) {
-        willShow = (box.style.display === 'none' || !box.style.display);
-        box.style.display = willShow ? 'block' : 'none';
-      }
-
+      if (box) box.style.display = (box.style.display === 'none' || !box.style.display) ? 'block' : 'none';
 
       // prefill data/ora da ricontatto se presente
       const n = (notizie || []).find(x => x && x.id === id);
-      if (n && willShow) n._pendingNoAnswer = true;
       if (n && n.ricontatto) {
         const d = new Date(n.ricontatto);
         if (!isNaN(d)) {
@@ -2051,34 +1996,7 @@ function bindNotizieModalUI() {
 
       const iso = timeVal ? new Date(dateVal + 'T' + timeVal + ':00').toISOString() : new Date(dateVal + 'T09:00:00').toISOString();
       n.ricontatto = iso;
-      const isNoAnswer = !!n._pendingNoAnswer;
-      n.nonRisponde = isNoAnswer;
-      n._pendingNoAnswer = false;
-
-      if (isNoAnswer) {
-        // ✅ timeline: "non risponde" + obbligo ricontatto (attività + appuntamento 15')
-        try {
-          window.addInterazione && window.addInterazione({
-            tipo: 'chiamata',
-            esito: 'non risponde',
-            testo: 'Non risponde',
-            descrizione: 'Non risponde',
-            commento: 'Non risponde',
-            note: 'Non risponde',
-            titolo: 'Non risponde',
-            links: { notiziaId: n.id, immobileId:'', contattoId:'', attivitaId:'' },
-            prossimaAzione: { enabled:true, when: iso, durataMin: 15, creaInAgenda: true }
-          });
-        } catch (err) { console.warn('[NOTIZIE] addInterazione non risponde err', err); }
-      }
-
-      // ✅ ricontatto: attività + appuntamento 15' (sia per "non risponde" che per "salva commento")
-      try {
-        window.createRicontattoAppuntamentoFromNotizia && window.createRicontattoAppuntamentoFromNotizia(n, iso, {
-          tipoDettaglio: 'telefonata',
-          descrizione: isNoAnswer ? 'Ricontatto (non risponde)' : 'Ricontatto'
-        });
-      } catch (err) { console.warn('[NOTIZIE] create ricontatto non risponde err', err); }
+      n.nonRisponde = true;
 
       try { saveList(STORAGE_KEYS.notizie, notizie); } catch {}
       renderNotizie();
@@ -2095,50 +2013,23 @@ function bindNotizieModalUI() {
       const val = (ta?.value || '').trim();
       if (!val) { alert('Inserisci un commento.'); return; }
 
-      // Ricontatto: NON più obbligatorio quando salvo un commento.
-      // Se data/ora sono compilate, lo salvo e creo anche attività+appuntamento 15'.
-      const dateEl = document.querySelector(`[data-not-recall-date="${window.cssEscape(id)}"]`);
-      const timeEl = document.querySelector(`[data-not-recall-time="${window.cssEscape(id)}"]`);
-      const dateVal = (dateEl?.value || '').trim();
-      const timeVal = (timeEl?.value || '').trim();
-      const isoRecall = dateVal
-        ? (timeVal ? new Date(dateVal + 'T' + timeVal + ':00').toISOString() : new Date(dateVal + 'T09:00:00').toISOString())
-        : '';
-
       n.commentoUltimaInterazione = val;
       n.ultimoContattoAt = new Date().toISOString();
       n._draftLastComment = '';
-      try { if (ta) ta.value = ''; } catch {}
-      if (isoRecall) n.ricontatto = isoRecall;
-      n.nonRisponde = false;
-      n._pendingNoAnswer = false;
 
-      // ✅ timeline: deve risultare "risposta" + anteprima testo
+      // ✅ salva anche in timeline come "telefonata" (default) con esito "risposta"
       try {
-        window.addInterazione && window.addInterazione({
-          tipo: 'chiamata',
-          esito: 'risposta',
-          testo: val,
-          descrizione: val,
-          commento: val,
-          note: val,
-          titolo: 'Risposta',
-          links: { notiziaId: n.id, immobileId:'', contattoId:'', attivitaId:'' },
-          prossimaAzione: isoRecall ? { enabled:true, when: isoRecall, durataMin: 15, creaInAgenda: true } : { enabled:false }
-        });
+        if (typeof addInterazione === 'function') {
+          addInterazione({
+            tipo: 'chiamata',
+            esito: 'risposta',
+            testo: val,
+            links: { notiziaId: n.id, immobileId:'', contattoId:'', attivitaId:'' },
+            prossimaAzione: { enabled:false }
+          });
+        }
       } catch (err) {
         console.warn('[NOTIZIE] addInterazione da "Salva commento" fallita', err);
-      }
-
-      if (isoRecall) {
-        try {
-          window.createRicontattoAppuntamentoFromNotizia && window.createRicontattoAppuntamentoFromNotizia(n, isoRecall, {
-            tipoDettaglio: 'telefonata',
-            descrizione: val ? ('Ricontatto: ' + val.slice(0,70)) : 'Ricontatto'
-          });
-        } catch (err) {
-          console.warn('[NOTIZIE] create ricontatto da "Salva commento" fallita', err);
-        }
       }
 
       try { saveList(STORAGE_KEYS.notizie, notizie); } catch {}
