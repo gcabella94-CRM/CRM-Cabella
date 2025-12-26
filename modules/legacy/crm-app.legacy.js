@@ -2014,10 +2014,16 @@ function bindNotizieModalUI() {
     if (noans) {
       const id = noans.getAttribute('data-not-noans-toggle');
       const box = document.getElementById('not-recall-' + id);
-      if (box) box.style.display = (box.style.display === 'none' || !box.style.display) ? 'block' : 'none';
+      let willShow = false;
+      if (box) {
+        willShow = (box.style.display === 'none' || !box.style.display);
+        box.style.display = willShow ? 'block' : 'none';
+      }
+
 
       // prefill data/ora da ricontatto se presente
       const n = (notizie || []).find(x => x && x.id === id);
+      if (n && willShow) n._pendingNoAnswer = true;
       if (n && n.ricontatto) {
         const d = new Date(n.ricontatto);
         if (!isNaN(d)) {
@@ -2045,27 +2051,32 @@ function bindNotizieModalUI() {
 
       const iso = timeVal ? new Date(dateVal + 'T' + timeVal + ':00').toISOString() : new Date(dateVal + 'T09:00:00').toISOString();
       n.ricontatto = iso;
-      n.nonRisponde = true;
+      const isNoAnswer = !!n._pendingNoAnswer;
+      n.nonRisponde = isNoAnswer;
+      n._pendingNoAnswer = false;
 
-      // ✅ timeline + obbligo ricontatto (attività + appuntamento 15')
-      try {
-        window.addInterazione && window.addInterazione({
-          tipo: 'chiamata',
-          esito: 'non risponde',
-          testo: 'Non risponde',
-          descrizione: 'Non risponde',
-          commento: 'Non risponde',
-          note: 'Non risponde',
-          titolo: 'Non risponde',
-          links: { notiziaId: n.id, immobileId:'', contattoId:'', attivitaId:'' },
-          prossimaAzione: { enabled:true, when: iso, durataMin: 15, creaInAgenda: true }
-        });
-      } catch (err) { console.warn('[NOTIZIE] addInterazione non risponde err', err); }
+      if (isNoAnswer) {
+        // ✅ timeline: "non risponde" + obbligo ricontatto (attività + appuntamento 15')
+        try {
+          window.addInterazione && window.addInterazione({
+            tipo: 'chiamata',
+            esito: 'non risponde',
+            testo: 'Non risponde',
+            descrizione: 'Non risponde',
+            commento: 'Non risponde',
+            note: 'Non risponde',
+            titolo: 'Non risponde',
+            links: { notiziaId: n.id, immobileId:'', contattoId:'', attivitaId:'' },
+            prossimaAzione: { enabled:true, when: iso, durataMin: 15, creaInAgenda: true }
+          });
+        } catch (err) { console.warn('[NOTIZIE] addInterazione non risponde err', err); }
+      }
 
+      // ✅ ricontatto: attività + appuntamento 15' (sia per "non risponde" che per "salva commento")
       try {
         window.createRicontattoAppuntamentoFromNotizia && window.createRicontattoAppuntamentoFromNotizia(n, iso, {
           tipoDettaglio: 'telefonata',
-          descrizione: 'Ricontatto (non risponde)'
+          descrizione: isNoAnswer ? 'Ricontatto (non risponde)' : 'Ricontatto'
         });
       } catch (err) { console.warn('[NOTIZIE] create ricontatto non risponde err', err); }
 
@@ -2100,23 +2111,23 @@ function bindNotizieModalUI() {
       try { if (ta) ta.value = ''; } catch {}
       if (isoRecall) n.ricontatto = isoRecall;
       n.nonRisponde = false;
+      n._pendingNoAnswer = false;
 
       // ✅ timeline: deve risultare "risposta" + anteprima testo
       try {
-        // Inserisco direttamente in timeline per garantire che l'esito sia "risposta" e che il testo sia visibile come anteprima
-        pushInterazioneInTimeline({
+        window.addInterazione && window.addInterazione({
           tipo: 'chiamata',
           esito: 'risposta',
           testo: val,
           descrizione: val,
           commento: val,
           note: val,
-          titolo: val,
+          titolo: 'Risposta',
           links: { notiziaId: n.id, immobileId:'', contattoId:'', attivitaId:'' },
           prossimaAzione: isoRecall ? { enabled:true, when: isoRecall, durataMin: 15, creaInAgenda: true } : { enabled:false }
         });
       } catch (err) {
-        console.warn('[NOTIZIE] pushInterazioneInTimeline da "Salva commento" fallita', err);
+        console.warn('[NOTIZIE] addInterazione da "Salva commento" fallita', err);
       }
 
       if (isoRecall) {
