@@ -2084,26 +2084,24 @@ function bindNotizieModalUI() {
       const val = (ta?.value || '').trim();
       if (!val) { alert('Inserisci un commento.'); return; }
 
-      // ⚠️ Obbligo fissare ricontatto per salvare commento
+      // Ricontatto: NON più obbligatorio quando salvo un commento.
+      // Se data/ora sono compilate, lo salvo e creo anche attività+appuntamento 15'.
       const dateEl = document.querySelector(`[data-not-recall-date="${window.cssEscape(id)}"]`);
       const timeEl = document.querySelector(`[data-not-recall-time="${window.cssEscape(id)}"]`);
       const dateVal = (dateEl?.value || '').trim();
       const timeVal = (timeEl?.value || '').trim();
-      if (!dateVal) {
-        const box = document.getElementById('not-recall-' + id);
-        if (box) box.style.display = 'block';
-        alert('Prima di salvare il commento devi fissare un ricontatto (data e ora).');
-        return;
-      }
-      const isoRecall = timeVal ? new Date(dateVal + 'T' + timeVal + ':00').toISOString() : new Date(dateVal + 'T09:00:00').toISOString();
+      const isoRecall = dateVal
+        ? (timeVal ? new Date(dateVal + 'T' + timeVal + ':00').toISOString() : new Date(dateVal + 'T09:00:00').toISOString())
+        : '';
 
       n.commentoUltimaInterazione = val;
       n.ultimoContattoAt = new Date().toISOString();
       n._draftLastComment = '';
-      n.ricontatto = isoRecall;
+      try { if (ta) ta.value = ''; } catch {}
+      if (isoRecall) n.ricontatto = isoRecall;
       n.nonRisponde = false;
 
-      // ✅ timeline + obbligo ricontatto (attività + appuntamento 15')
+      // ✅ timeline: deve risultare "risposta" + anteprima testo
       try {
         // Inserisco direttamente in timeline per garantire che l'esito sia "risposta" e che il testo sia visibile come anteprima
         pushInterazioneInTimeline({
@@ -2115,19 +2113,21 @@ function bindNotizieModalUI() {
           note: val,
           titolo: val,
           links: { notiziaId: n.id, immobileId:'', contattoId:'', attivitaId:'' },
-          prossimaAzione: { enabled:true, when: isoRecall, durataMin: 15, creaInAgenda: true }
+          prossimaAzione: isoRecall ? { enabled:true, when: isoRecall, durataMin: 15, creaInAgenda: true } : { enabled:false }
         });
       } catch (err) {
         console.warn('[NOTIZIE] pushInterazioneInTimeline da "Salva commento" fallita', err);
       }
 
-      try {
-        window.createRicontattoAppuntamentoFromNotizia && window.createRicontattoAppuntamentoFromNotizia(n, isoRecall, {
-          tipoDettaglio: 'telefonata',
-          descrizione: val ? ('Ricontatto: ' + val.slice(0,70)) : 'Ricontatto'
-        });
-      } catch (err) {
-        console.warn('[NOTIZIE] create ricontatto da "Salva commento" fallita', err);
+      if (isoRecall) {
+        try {
+          window.createRicontattoAppuntamentoFromNotizia && window.createRicontattoAppuntamentoFromNotizia(n, isoRecall, {
+            tipoDettaglio: 'telefonata',
+            descrizione: val ? ('Ricontatto: ' + val.slice(0,70)) : 'Ricontatto'
+          });
+        } catch (err) {
+          console.warn('[NOTIZIE] create ricontatto da "Salva commento" fallita', err);
+        }
       }
 
       try { saveList(STORAGE_KEYS.notizie, notizie); } catch {}
