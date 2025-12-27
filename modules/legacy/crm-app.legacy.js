@@ -2071,7 +2071,7 @@ function bindNotizieModalUI() {
 
       if (!dateVal) { alert('Seleziona una data di ricontatto.'); return; }
 
-      const iso = timeVal ? new Date(dateVal + 'T' + timeVal + ':00').toISOString() : new Date(dateVal + 'T09:00:00').toISOString();
+      const iso = timeVal ? (dateVal + 'T' + timeVal + ':00') : (dateVal + 'T09:00:00');
       n.ricontatto = iso;
       const isNoAnswer = !!n._pendingNoAnswer;
       n.nonRisponde = isNoAnswer;
@@ -2123,9 +2123,7 @@ function bindNotizieModalUI() {
       const timeEl = document.querySelector(`[data-not-recall-time="${window.cssEscape(id)}"]`);
       const dateVal = (dateEl?.value || '').trim();
       const timeVal = (timeEl?.value || '').trim();
-      const isoRecall = dateVal
-        ? (timeVal ? new Date(dateVal + 'T' + timeVal + ':00').toISOString() : new Date(dateVal + 'T09:00:00').toISOString())
-        : '';
+      const isoRecall = dateVal ? (timeVal ? (dateVal + 'T' + timeVal + ':00') : (dateVal + 'T09:00:00')) : '';
 
       n.commentoUltimaInterazione = val;
       n.ultimoContattoAt = new Date().toISOString();
