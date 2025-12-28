@@ -121,30 +121,29 @@ if (!window.createRicontattoAppuntamentoFromNotizia) {
   window.createRicontattoAppuntamentoFromNotizia = function(n, isoWhen, opts={}) {
     try {
       if (!n || !isoWhen) return null;
-      // Parse LOCAL datetime safely (avoid UTC shift)
-      let d = null;
-      if (isoWhen instanceof Date) {
-        d = isoWhen;
-      } else if (typeof isoWhen === 'string') {
-        const parts = isoWhen.split('T');
-        const datePart = parts[0] || '';
-        const timePart = (parts[1] || '00:00:00');
-        const dp = datePart.split('-').map(x=>parseInt(x,10));
-        const tp = timePart.split(':').map(x=>parseInt(x,10));
-        const Y = dp[0], M = dp[1], D = dp[2];
-        const h = tp[0] || 0, mi = tp[1] || 0, s = tp[2] || 0;
-        if (Y && M && D) d = new Date(Y, M-1, D, h, mi, s, 0);
-      }
-      if (!d || isNaN(d)) return null;
-
       const pad = (x)=>String(x).padStart(2,'0');
-      // Use LOCAL date (avoid UTC shift)
-      const dateIso = d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate());
-      const ora = pad(d.getHours()) + ':' + pad(d.getMinutes());
-      const end = new Date(d.getTime() + 15*60*1000);
-      const oraFine = pad(end.getHours()) + ':' + pad(end.getMinutes());
 
-      const staffId = (n.responsabileId) || ((staff && staff[0] && staff[0].id) || null);
+// Parse ISO-like datetime WITHOUT timezone to avoid day-shift (treat as local)
+const m = String(isoWhen || '').match(/^(\d{4}-\d{2}-\d{2})(?:[T\s](\d{2}):(\d{2})(?::(\d{2}))?)?/);
+if (!m) return null;
+let dateIso = m[1];
+let hh = parseInt(m[2] || '09', 10);
+let mm = parseInt(m[3] || '00', 10);
+// seconds not needed for agenda
+const ora = pad(hh) + ':' + pad(mm);
+
+// oraFine + possible day rollover
+let total = hh * 60 + mm + 15;
+let dayAdd = Math.floor(total / (24 * 60));
+total = total % (24 * 60);
+const oraFine = pad(Math.floor(total / 60)) + ':' + pad(total % 60);
+if (dayAdd > 0) {
+  const parts = dateIso.split('-').map(x => parseInt(x, 10));
+  const base = new Date(parts[0], parts[1]-1, parts[2]);
+  base.setDate(base.getDate() + dayAdd);
+  dateIso = base.getFullYear() + '-' + pad(base.getMonth()+1) + '-' + pad(base.getDate());
+}
+const staffId = (n.responsabileId) || ((staff && staff[0] && staff[0].id) || null);
 
       // trova/crea contatto collegato
       let contattoId = null;
@@ -217,98 +216,6 @@ if (!window.createRicontattoAppuntamentoFromNotizia) {
       return { taskId: task.id, appId: app.id };
     } catch (e) {
       console.warn('[createRicontattoAppuntamentoFromNotizia] errore', e);
-      return null;
-    }
-  };
-}
-
-// Crea SOLO appuntamento 15' in agenda per ricontatto da Notizia (senza automazioni "non risponde")
-if (!window.createRicontattoAgenda15FromNotizia) {
-  window.createRicontattoAgenda15FromNotizia = function(n, isoWhen, opts={}) {
-    try {
-      if (!n || !isoWhen) return null;
-      // Parse LOCAL datetime safely (avoid UTC shift)
-      let d = null;
-      if (isoWhen instanceof Date) {
-        d = isoWhen;
-      } else if (typeof isoWhen === 'string') {
-        const parts = isoWhen.split('T');
-        const datePart = parts[0] || '';
-        const timePart = (parts[1] || '00:00:00');
-        const dp = datePart.split('-').map(x=>parseInt(x,10));
-        const tp = timePart.split(':').map(x=>parseInt(x,10));
-        const Y = dp[0], M = dp[1], D = dp[2];
-        const h = tp[0] || 0, mi = tp[1] || 0, s = tp[2] || 0;
-        if (Y && M && D) d = new Date(Y, M-1, D, h, mi, s, 0);
-      }
-      if (!d || isNaN(d)) return null;
-
-      const pad = (x)=>String(x).padStart(2,'0');
-      // LOCAL date/time (evita shift UTC)
-      const dateIso = d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate());
-      const ora = pad(d.getHours()) + ':' + pad(d.getMinutes());
-      const end = new Date(d.getTime() + 15*60*1000);
-      const oraFine = pad(end.getHours()) + ':' + pad(end.getMinutes());
-
-      const staffId = (n.responsabileId) || ((staff && staff[0] && staff[0].id) || null);
-
-      // trova/crea contatto collegato (se possibile)
-      let contattoId = null;
-      try {
-        if (typeof findContattoFromNotizia === 'function') contattoId = findContattoFromNotizia(n);
-      } catch {}
-      if (!contattoId && Array.isArray(contatti) && ((n.telefono || n.proprietarioTelefono) || (n.email || n.proprietarioEmail) || (n.nome || n.proprietarioNome) || (n.cognome || ''))) {
-        const nomeCompleto = (((n.nome || n.proprietarioNome || '') + ' ' + (n.cognome || '')).trim());
-        const contatto = {
-          id: (typeof genId==='function' ? genId('cont') : ('cont_' + Date.now())),
-          nome: nomeCompleto || n.nome || '',
-          telefono: (n.telefono || n.proprietarioTelefono || ''),
-          email: (n.email || n.proprietarioEmail || ''),
-          origine: 'notizia',
-          notiziaId: n.id,
-          indirizzo: n.indirizzo || '',
-          citta: n.citta || '',
-          provincia: n.provincia || '',
-          ultimoContatto: dateIso
-        };
-        contatti.push(contatto);
-        try { saveList(STORAGE_KEYS.contatti, contatti); } catch {}
-        contattoId = contatto.id;
-      }
-
-      if (!Array.isArray(attivita)) attivita = [];
-
-      const descrBase = (opts && opts.descrizione) ? String(opts.descrizione) : 'Ricontatto';
-      const tipoDettaglio = (opts && opts.tipoDettaglio) ? String(opts.tipoDettaglio) : 'telefonata';
-
-      const app = {
-        id: (typeof genId==='function' ? genId('app') : ('app_' + Date.now())),
-        tipo: 'appuntamento',
-        stato: 'aperta',
-        data: dateIso,
-        ora,
-        oraFine,
-        tipoDettaglio,
-        descrizione: descrBase,
-        responsabileId: staffId,
-        clienteId: contattoId || '',
-        contattoId: contattoId || '',
-        notiziaId: n.id,
-        luogo: n.indirizzo || '',
-        inUfficio: false,
-        cittaUfficio: ''
-      };
-      attivita.push(app);
-
-      try { saveList(STORAGE_KEYS.attivita, attivita); } catch {}
-      try { renderAgendaWeek && renderAgendaWeek(); } catch {}
-      try { renderAgendaMonth && renderAgendaMonth(); } catch {}
-      try { renderAttivita && renderAttivita(); } catch {}
-      try { renderDashboard && renderDashboard(); } catch {}
-
-      return { appId: app.id };
-    } catch (e) {
-      console.warn('[createRicontattoAgenda15FromNotizia] errore', e);
       return null;
     }
   };
@@ -1667,11 +1574,11 @@ function renderAgendaMonth() {
               </div>
 
               <div class="notizia-actions-row">
-                <button class="btn btn-xs" data-not-noans="${escapeHtml(n.id)}">Non risponde</button>
+                <button class="btn btn-xs" data-not-noans-toggle="${escapeHtml(n.id)}">Non risponde</button>
                 ${ric ? `<div class="muted"><strong>Ricontatto:</strong> ${escapeHtml(ric)}</div>` : '<div class="muted">Ricontatto: —</div>'}
               </div>
 
-              <div class="notizia-recall-form" id="not-recall-${escapeHtml(n.id)}" style="display:block;">
+              <div class="notizia-recall-form" id="not-recall-${escapeHtml(n.id)}" style="display:none;">
                 <div class="notizia-grid" style="margin-top:8px;">
                   <div class="notizia-mini">
                     <div class="notizia-mini-k">Data ricontatto</div>
@@ -1698,7 +1605,7 @@ function renderAgendaMonth() {
             try {
               const stopSel = 'button, a, input, textarea, select, label, summary, details, ' +
                 '[data-not-jump], [data-not-edit], [data-not-del], [data-not-save-lastcomment], ' +
-                '[data-not-noans], [data-not-recall-date], [data-not-recall-time], [data-not-save-recall], ' +
+                '[data-not-noans-toggle], [data-not-recall-date], [data-not-recall-time], [data-not-save-recall], ' +
                 '.notizia-lastcomment-box, .notizia-actions-row, .notizia-mini';
               if (ev.target.closest(stopSel)) return;
             } catch(e) {
@@ -2137,33 +2044,33 @@ function bindNotizieModalUI() {
       return;
     }
 
-        const noans = e.target.closest?.('[data-not-noans]');
+    const noans = e.target.closest?.('[data-not-noans-toggle]');
     if (noans) {
-      const id = noans.getAttribute('data-not-noans');
+      const id = noans.getAttribute('data-not-noans-toggle');
+      const box = document.getElementById('not-recall-' + id);
+      let willShow = false;
+      if (box) {
+        willShow = (box.style.display === 'none' || !box.style.display);
+        box.style.display = willShow ? 'block' : 'none';
+      }
+
+
+      // prefill data/ora da ricontatto se presente
       const n = (notizie || []).find(x => x && x.id === id);
-      if (!n) return;
-
-      // Segna "non risponde" come stato (ma NON forza alcuna automazione di ricontatto)
-      n.nonRisponde = true;
-      n._pendingNoAnswer = false;
-
-      // Timeline: registra interazione "non risponde" (senza prossima azione obbligatoria)
-      try {
-        window.addInterazione && window.addInterazione({
-          tipo: 'chiamata',
-          esito: 'non risponde',
-          testo: 'Non risponde',
-          links: { notiziaId: n.id, immobileId:'', contattoId:'', attivitaId:'' },
-          prossimaAzione: { enabled:false }
-        });
-      } catch {}
-
-      try { saveList(STORAGE_KEYS.notizie, notizie); } catch {}
-      renderNotizie();
+      if (n && willShow) n._pendingNoAnswer = true;
+      if (n && n.ricontatto) {
+        const d = new Date(n.ricontatto);
+        if (!isNaN(d)) {
+          const dateEl = document.querySelector(`[data-not-recall-date="${window.cssEscape(id)}"]`);
+          const timeEl = document.querySelector(`[data-not-recall-time="${window.cssEscape(id)}"]`);
+          if (dateEl) dateEl.value = toLocalISODate(d);
+          if (timeEl) timeEl.value = String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+        }
+      }
       return;
     }
 
-        const saveRecall = e.target.closest?.('[data-not-save-recall]');
+    const saveRecall = e.target.closest?.('[data-not-save-recall]');
     if (saveRecall) {
       const id = saveRecall.getAttribute('data-not-save-recall');
       const n = (notizie || []).find(x => x && x.id === id);
@@ -2176,17 +2083,36 @@ function bindNotizieModalUI() {
 
       if (!dateVal) { alert('Seleziona una data di ricontatto.'); return; }
 
-      // ✅ Salva ricontatto come datetime "locale" (NO toISOString -> niente shift di giorno)
-      const isoLocal = timeVal ? (dateVal + 'T' + timeVal + ':00') : (dateVal + 'T09:00:00');
-      n.ricontatto = isoLocal;
+      const iso = timeVal ? (dateVal + 'T' + timeVal + ':00') : (dateVal + 'T09:00:00');
+      n.ricontatto = iso;
+      const isNoAnswer = !!n._pendingNoAnswer;
+      n.nonRisponde = isNoAnswer;
+      n._pendingNoAnswer = false;
 
-      // Crea appuntamento da 15' in agenda (indipendente da altre interazioni)
+      if (isNoAnswer) {
+        // ✅ timeline: "non risponde" + obbligo ricontatto (attività + appuntamento 15')
+        try {
+          window.addInterazione && window.addInterazione({
+            tipo: 'chiamata',
+            esito: 'non risponde',
+            testo: 'Non risponde',
+            descrizione: 'Non risponde',
+            commento: 'Non risponde',
+            note: 'Non risponde',
+            titolo: 'Non risponde',
+            links: { notiziaId: n.id, immobileId:'', contattoId:'', attivitaId:'' },
+            prossimaAzione: { enabled:true, when: iso, durataMin: 15, creaInAgenda: true }
+          });
+        } catch (err) { console.warn('[NOTIZIE] addInterazione non risponde err', err); }
+      }
+
+      // ✅ ricontatto: attività + appuntamento 15' (sia per "non risponde" che per "salva commento")
       try {
-        window.createRicontattoAgenda15FromNotizia && window.createRicontattoAgenda15FromNotizia(n, isoLocal, {
-          descrizione: 'Ricontatto',
-          tipoDettaglio: 'telefonata'
+        window.createRicontattoAppuntamentoFromNotizia && window.createRicontattoAppuntamentoFromNotizia(n, iso, {
+          tipoDettaglio: 'telefonata',
+          descrizione: isNoAnswer ? 'Ricontatto (non risponde)' : 'Ricontatto'
         });
-      } catch {}
+      } catch (err) { console.warn('[NOTIZIE] create ricontatto non risponde err', err); }
 
       try { saveList(STORAGE_KEYS.notizie, notizie); } catch {}
       renderNotizie();
@@ -2209,9 +2135,7 @@ function bindNotizieModalUI() {
       const timeEl = document.querySelector(`[data-not-recall-time="${window.cssEscape(id)}"]`);
       const dateVal = (dateEl?.value || '').trim();
       const timeVal = (timeEl?.value || '').trim();
-      const isoRecall = dateVal
-        ? (timeVal ? new Date(dateVal + 'T' + timeVal + ':00').toISOString() : new Date(dateVal + 'T09:00:00').toISOString())
-        : '';
+      const isoRecall = dateVal ? (timeVal ? (dateVal + 'T' + timeVal + ':00') : (dateVal + 'T09:00:00')) : '';
 
       n.commentoUltimaInterazione = val;
       n.ultimoContattoAt = new Date().toISOString();
