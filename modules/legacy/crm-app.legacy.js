@@ -1547,8 +1547,14 @@ function renderAgendaMonth() {
                 <div class="muted" style="margin-bottom:6px;">${escapeHtml(n.commentoUltimaInterazione || '')}</div>
 
                 <div class="notizia-lastcomment-box">
-                  <textarea class="input-sm" rows="2" placeholder="Scrivi qui il commento dell’ultimo contatto…"
-                    data-not-lastcomment="${escapeHtml(n.id)}">${escapeHtml(n._draftLastComment || '')}</textarea>
+                  <textarea
+                    class="input-sm"
+                    rows="2"
+                    placeholder="Scrivi qui il commento dell’ultimo contatto…"
+                    data-not-lastcomment="${escapeHtml(n.id)}"
+                    id="not-lastcomment-${escapeHtml(n.id)}"
+                    name="notizia_lastcomment_${escapeHtml(n.id)}"
+                  >${escapeHtml(n._draftLastComment || '')}</textarea>
                   <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:6px;">
                     <button class="btn btn-xs" data-not-save-lastcomment="${escapeHtml(n.id)}">Salva commento</button>
                   </div>
@@ -1564,11 +1570,11 @@ function renderAgendaMonth() {
                 <div class="notizia-grid" style="margin-top:8px;">
                   <div class="notizia-mini">
                     <div class="notizia-mini-k">Data ricontatto</div>
-                    <input class="input-sm" type="date" data-not-recall-date="${escapeHtml(n.id)}">
+                    <input class="input-sm" type="date" data-not-recall-date="${escapeHtml(n.id)}" id="not-recall-date-${escapeHtml(n.id)}" name="notizia_recall_date_${escapeHtml(n.id)}">
                   </div>
                   <div class="notizia-mini">
                     <div class="notizia-mini-k">Ora</div>
-                    <input class="input-sm" type="time" data-not-recall-time="${escapeHtml(n.id)}">
+                    <input class="input-sm" type="time" data-not-recall-time="${escapeHtml(n.id)}" id="not-recall-time-${escapeHtml(n.id)}" name="notizia_recall_time_${escapeHtml(n.id)}">
                   </div>
                   <div class="notizia-mini">
                     <div class="notizia-mini-k">&nbsp;</div>
@@ -3261,6 +3267,15 @@ function closeAppuntamentoDialog() {
 
     });
 
+      const tr = t.closest && t.closest('tr[data-att-id]');
+      if (tr && t.closest('table') && t.closest('#view-attivita') && !t.closest('button')) {
+        const id = tr.getAttribute('data-att-id');
+        const app = getAppuntamentoById(id);
+        if (app) {
+          openAppuntamentoDialogById(id);
+        }
+      }
+    });
 
     // filtri appuntamenti (ex attività)
     document.getElementById('att-filter-tipo')?.addEventListener('change', renderAttivita);
