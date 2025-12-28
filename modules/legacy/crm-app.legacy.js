@@ -1,4 +1,4 @@
-import { ensureNotiziaDetailDrawer } from '../notizie/notiziaDrawer.js';
+import { openNotiziaDetail as openNotiziaDetailDrawer } from '../notizie/notiziaDrawer.js';
 /* CRM-Cabella crm-app.js (FINAL) — generated 2025-12-17 18:20:08
    If you see this line in Sources, you have the right file.
 */
@@ -261,12 +261,6 @@ const staffId = (n.responsabileId) || ((staff && staff[0] && staff[0].id) || nul
 
 let __currentNotiziaDetail = null;
 
-function closeNotiziaDetail() {
-  const overlay = document.getElementById('notizia-detail-overlay');
-  if (overlay) overlay.style.display = 'none';
-  __currentNotiziaDetail = null;
-}
-
 function renderNotiziaDetail(n) {
   if (!n) return;
   __currentNotiziaDetail = n;
@@ -377,25 +371,6 @@ addInterazione({
     const t = document.getElementById('notd-int-testo');
     if (t) t.value = '';
   });
-}
-
-function openNotiziaDetail(n, focusId='') {
-  const overlay = ensureNotiziaDetailDrawer({ closeNotiziaDetail });
-  overlay.style.display = 'flex';
-  renderNotiziaDetail(n);
-
-  // focus se richiesto
-  if (focusId) {
-    const map = {
-      'not-indirizzo': 'notd-indirizzo',
-      'not-proprietario': 'notd-proprietario',
-      'not-ultimo-contatto': 'notd-timeline',
-      'not-commento': 'notd-timeline'
-    };
-    const targetId = map[focusId] || focusId;
-    const el = document.getElementById(targetId);
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
 }
 
   function formatEuro(val) {
@@ -1501,6 +1476,7 @@ function renderAgendaMonth() {
           const nomeCompleto = (((n.nome || n.proprietarioNome || '') + ' ' + (n.cognome || '')).trim());
           const indirizzoCompleto = [n.indirizzo || '', n.citta || '', n.provincia ? `(${n.provincia})` : '', n.cap || ''].filter(Boolean).join(' ');
           const ric = n.ricontatto ? formatDateTimeIT(n.ricontatto) : '';
+          const contactKey = (typeof buildKey === 'function') ? (buildKey({ telefono: n.telefono || '', email: n.email || '' }) || '') : '';
 
           const card = document.createElement('div');
           card.className = 'notizia-card';
@@ -1513,7 +1489,8 @@ function renderAgendaMonth() {
                 ${n.nonRisponde ? '<span class="badge">⛔ non risponde</span>' : ''}
               </div>
               <div class="notizia-card-actions">
-                <button class="btn btn-xs" data-not-edit="${escapeHtml(n.id)}">Apri</button>
+                <button class="btn btn-xs" data-not-open="${escapeHtml(n.id)}">Apri</button>
+                <button class="btn btn-xs" data-not-edit="${escapeHtml(n.id)}">Modifica</button>
                 <button class="btn btn-xs btn-danger" data-not-del="${escapeHtml(n.id)}">Elimina</button>
               </div>
             </div>
@@ -1544,11 +1521,11 @@ function renderAgendaMonth() {
               <div class="notizia-line" style="margin-top:10px;">
                 <div class="notizia-label">Proprietario</div>
                 <div class="notizia-owner">
-                  <span class="clickable" data-not-jump="${escapeHtml(n.id)}" data-jump="not-nome">
+                  <span class="clickable" ${contactKey ? `data-pro-open="${escapeHtml(contactKey)}"` : `data-not-jump="${escapeHtml(n.id)}" data-jump="not-nome"`}>
                     ${escapeHtml(nomeCompleto || '—')}
                   </span>
                   <span class="muted">·</span>
-                  <span class="clickable" data-not-jump="${escapeHtml(n.id)}" data-jump="not-telefono">
+                  <span class="clickable" ${contactKey ? `data-pro-open="${escapeHtml(contactKey)}"` : `data-not-jump="${escapeHtml(n.id)}" data-jump="not-telefono"`}>
                     ${escapeHtml(n.telefono || '—')}
                   </span>
                 </div>
@@ -1607,16 +1584,16 @@ function renderAgendaMonth() {
               const stopSel = 'button, a, input, textarea, select, label, summary, details, ' +
                 '[data-not-jump], [data-not-edit], [data-not-del], [data-not-save-lastcomment], ' +
                 '[data-not-noans-toggle], [data-not-recall-date], [data-not-recall-time], [data-not-save-recall], ' +
-                '.notizia-lastcomment-box, .notizia-actions-row, .notizia-mini';
+                '.notizia-lastcomment-box, .notizia-actions-row, .notizia-mini, [data-pro-open]';
               if (ev.target.closest(stopSel)) return;
             } catch(e) {
               return;
             }
 
-            openNotiziaDetail(n);
+            openNotiziaDetailDrawer(n, '', { renderNotiziaDetail });
           });
           card.addEventListener('keydown', (ev) => {
-            if (ev.key === 'Enter' && ev.target === card) openNotiziaDetail(n);
+            if (ev.key === 'Enter' && ev.target === card) openNotiziaDetailDrawer(n, '', { renderNotiziaDetail });
           });
 
           cardsContainer.appendChild(card);
@@ -2016,7 +1993,15 @@ function bindNotizieModalUI() {
   // delega click "modifica" (se presente nelle card o altrove)
   // deleghe click per azioni card Notizie
   document.addEventListener('click', (e) => {
-    const editBtn = e.target.closest?.('[data-not-edit]');
+        const openBtn = e.target.closest?.('[data-not-open]');
+    if (openBtn) {
+      const id = openBtn.getAttribute('data-not-open');
+      const n = (notizie || []).find(x => x && x.id === id);
+      if (n) openNotiziaDetailDrawer(n, '', { renderNotiziaDetail });
+      return;
+    }
+
+const editBtn = e.target.closest?.('[data-not-edit]');
     if (editBtn) {
       const id = editBtn.getAttribute('data-not-edit');
       const n = (notizie || []).find(x => x && x.id === id);
@@ -2041,7 +2026,7 @@ function bindNotizieModalUI() {
       const id = jumpEl.getAttribute('data-not-jump');
       const focusId = jumpEl.getAttribute('data-jump') || '';
       const n = (notizie || []).find(x => x && x.id === id);
-      if (n) openNotiziaDetail(n, focusId);
+      if (n) openNotiziaDetailDrawer(n, focusId, { renderNotiziaDetail });
       return;
     }
 

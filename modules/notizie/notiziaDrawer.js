@@ -134,3 +134,38 @@ export function ensureNotiziaDetailDrawer({ closeNotiziaDetail } = {}) {
 
   return overlayNode;
 }
+
+
+// ===============================
+// API Drawer (logica open/close fuori dal legacy)
+// ===============================
+export function closeNotiziaDetail() {
+  const ov = document.getElementById('notizia-detail-overlay');
+  if (!ov) return;
+  ov.classList.remove('show');
+  ov.style.display = 'none';
+}
+
+export function openNotiziaDetail(notizia, focusId = '', { renderNotiziaDetail } = {}) {
+  const overlayNode = ensureNotiziaDetailDrawer({ closeNotiziaDetail });
+  overlayNode.style.display = 'flex';
+  overlayNode.classList.add('show');
+
+  // render contenuto (fornito dal legacy)
+  if (typeof renderNotiziaDetail === 'function') {
+    renderNotiziaDetail(notizia);
+  }
+
+  // focus se richiesto
+  if (focusId) {
+    const map = {
+      'not-indirizzo': 'notd-indirizzo',
+      'not-proprietario': 'notd-proprietario',
+      'not-ultimo-contatto': 'notd-timeline',
+      'not-commento': 'notd-timeline'
+    };
+    const targetId = map[focusId] || focusId;
+    const el = document.getElementById(targetId);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
