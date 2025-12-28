@@ -252,7 +252,19 @@ const staffId = (n.responsabileId) || ((staff && staff[0] && staff[0].id) || nul
   }
 
   function genId(prefix = 'id') {
-  return `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
+  return `${prefix}
+
+// === Date helpers (LOCAL, avoid UTC day-shifts) ===
+function localISODate(input) {
+  const d = (input instanceof Date) ? input : new Date(input);
+  if (!d || isNaN(d)) return '';
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+_${Math.random().toString(36).slice(2, 9)}`;
 }
 
 /* ====== NOTIZIA DETTAGLIO (drawer) ====== */
@@ -1160,7 +1172,7 @@ function renderAgendaMonth() {
 
           if (dayNum > 0 && dayNum <= daysInMonth) {
             const dateObj = new Date(year, month, dayNum);
-            const iso = dateObj.toISOString().slice(0, 10);
+            const iso = localISODate(dateObj);
 
             // numero giorno
             const num = document.createElement("div");
@@ -1727,7 +1739,7 @@ function resetNotizieForm() {
 
     if (!found && (tel || mail || imm.proprietarioNome)) {
       const nome = imm.proprietarioNome || '';
-      const today = new Date().toISOString().slice(0, 10);
+      const today = localISODate(new Date());
       found = {
         id: genId('cont'),
         nome,
@@ -1754,7 +1766,7 @@ function resetNotizieForm() {
     if (!Array.isArray(attivita)) attivita = [];
 
     const today = new Date();
-    const dateIso = today.toISOString().slice(0, 10);
+    const dateIso = localISODate(today);
 
     const staffId = (staff && staff[0] && staff[0].id) || null;
     const clienteId = ensureContattoFromImmobile(imm);
@@ -1803,7 +1815,7 @@ function resetNotizieForm() {
     if (!Array.isArray(contatti)) contatti = [];
 
     const today = new Date();
-    const dateIso = today.toISOString().slice(0, 10);
+    const dateIso = localISODate(today);
 
     const staffId = (staff && staff[0] && staff[0].id) || null;
     let clienteId = findContattoFromNotizia(n);
@@ -1860,7 +1872,7 @@ function resetNotizieForm() {
     const already = contatti.some(c => c.telefono && notizia.telefono && c.telefono === notizia.telefono);
     if (already) return;
 
-    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    const today = localISODate(new Date()); // YYYY-MM-DD
 
     const contatto = {
       id: genId('cont'),
@@ -3024,7 +3036,7 @@ function closeAppuntamentoDialog() {
 
     // Nuova attività
     document.getElementById('att-new-btn')?.addEventListener('click', () => {
-      const todayIso = new Date().toISOString().slice(0, 10);
+      const todayIso = localISODate(new Date());
       const data = prompt('Data (YYYY-MM-DD):', todayIso);
       if (!data) return;
 
