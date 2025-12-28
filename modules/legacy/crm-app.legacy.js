@@ -1,3 +1,4 @@
+/* FIX5_define_addMinutesToTime 2025-12-28T18:02:00.243810 */
 /* FIX4_illegal_return_move_block_inside_click 2025-12-28T17:58:50.164447 */
 import { openNotiziaDetail as openNotiziaDetailDrawer } from '../notizie/notiziaDrawer.js';
 /* CRM-Cabella crm-app.js (FINAL) — generated 2025-12-17 18:20:08
@@ -2213,6 +2214,22 @@ function formatDateTimeIT(str) {
   const time = d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
   return `${date} ${time}`;
 }
+
+function addMinutesToTime(hhmm, minutesToAdd) {
+  // hhmm: "HH:MM" -> returns "HH:MM" (24h) after adding minutes (wraps over midnight)
+  if (!hhmm) return '';
+  const m = String(hhmm).match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return '';
+  let h = parseInt(m[1], 10);
+  let min = parseInt(m[2], 10);
+  if (isNaN(h) || isNaN(min)) return '';
+  let total = h * 60 + min + (parseInt(minutesToAdd, 10) || 0);
+  total = ((total % 1440) + 1440) % 1440; // keep in [0,1439]
+  const hh = String(Math.floor(total / 60)).padStart(2, '0');
+  const mm = String(total % 60).padStart(2, '0');
+  return `${hh}:${mm}`;
+}
+
 
 function escapeHtml(str) {
   if (!str) return '';
