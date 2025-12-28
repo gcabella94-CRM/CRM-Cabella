@@ -173,21 +173,10 @@ const staffId = (n.responsabileId) || ((staff && staff[0] && staff[0].id) || nul
       if (!Array.isArray(attivita)) attivita = [];
 
       const descrBase = (opts && opts.descrizione) ? String(opts.descrizione) : 'Ricontatto';
-      const tipoDettaglio = (opts && opts.tipoDettaglio) ? String(opts.tipoDettaglio) : 'telefonata';
+      const tipoDettaglio = (opts && opts.tipoDettaglio) ? String(opts.tipoDettaglio) : 'telefonico';
 
-      // 1) Attività (task) per follow-up
-      const task = {
-        id: (typeof genId==='function' ? genId('att') : ('att_' + Date.now())),
-        tipo: 'attività',
-        data: dateIso,
-        ora,
-        descrizione: descrBase,
-        responsabileId: staffId,
-        stato: 'aperta',
-        links: { notiziaId: n.id, immobileId:'', contattoId: contattoId || '', attivitaId:'' }
-      };
-      attivita.push(task);
-
+      // Appuntamento (unificato)
+      // 15' di default solo per 'telefonico'
       // 2) Appuntamento 15' in agenda
       const app = {
         id: (typeof genId==='function' ? genId('app') : ('app_' + Date.now())),
@@ -214,7 +203,7 @@ const staffId = (n.responsabileId) || ((staff && staff[0] && staff[0].id) || nul
       try { renderAttivita && renderAttivita(); } catch {}
       try { renderDashboard && renderDashboard(); } catch {}
 
-      return { taskId: task.id, appId: app.id };
+      return { appId: app.id };
     } catch (e) {
       console.warn('[createRicontattoAppuntamentoFromNotizia] errore', e);
       return null;
@@ -367,7 +356,7 @@ addInterazione({
     });
 
     if (isoWhen && creaAgenda) {
-      createRicontattoAppuntamentoFromNotizia(n, isoWhen, { tipoDettaglio: 'telefonata', descrizione: testo ? ('Ricontatto: ' + testo.slice(0,70)) : undefined });
+      createRicontattoAppuntamentoFromNotizia(n, isoWhen, { tipoDettaglio: 'telefonico', descrizione: testo ? ('Ricontatto: ' + testo.slice(0,70)) : undefined });
     }
 
     // refresh UI
@@ -461,7 +450,7 @@ function openNotiziaDetail(n, focusId='') {
         immobili: ['Immobili', 'Schede immobili base.'],
         notizie: ['Notizie', 'Fonti potenziali.'],
         rubrica: ['Rubrica', 'Contatti proprietari e collegamenti.'],
-        attivita: ['Attività', 'Task e appuntamenti.'],
+        attivita: ['Appuntamenti', 'Telefonate, sopralluoghi, trattative e fasi operative.'],
         operazioni: ['Operazioni concluse', 'Operazioni da immobili venduti/affittati.'],
         staff: ['Staff', 'Colori agenda e carichi.'],
         omi: ['Valori OMI', 'Range €/mq per zona.'],
@@ -978,6 +967,16 @@ function openNotiziaDetail(n, focusId='') {
             labelText = '🔥 ' + labelText;
             block.classList.add('agenda-block-hot');
           }
+
+          // Badge: appuntamento nel passato senza esito
+          try {
+            const dt = parseISODateTime(a.data, a.oraFine || a.ora || '00:00');
+            if (dt && dt < new Date() && !a.esito && (a.stato || 'aperta') !== 'chiusa') {
+              block.classList.add('agenda-block-pending');
+              labelText = '⏳ ' + labelText;
+            }
+          } catch {}
+
           block.textContent = labelText;
           block.title = labelText;
 
@@ -2133,7 +2132,7 @@ function bindNotizieModalUI() {
       // ✅ ricontatto: attività + appuntamento 15' (sia per "non risponde" che per "salva commento")
       try {
         window.createRicontattoAppuntamentoFromNotizia && window.createRicontattoAppuntamentoFromNotizia(n, iso, {
-          tipoDettaglio: 'telefonata',
+          tipoDettaglio: 'telefonico',
           descrizione: isNoAnswer ? 'Ricontatto (non risponde)' : 'Ricontatto'
         });
       } catch (err) { console.warn('[NOTIZIE] create ricontatto non risponde err', err); }
@@ -2189,7 +2188,7 @@ function bindNotizieModalUI() {
       if (isoRecall) {
         try {
           window.createRicontattoAppuntamentoFromNotizia && window.createRicontattoAppuntamentoFromNotizia(n, isoRecall, {
-            tipoDettaglio: 'telefonata',
+            tipoDettaglio: 'telefonico',
             descrizione: val ? ('Ricontatto: ' + val.slice(0,70)) : 'Ricontatto'
           });
         } catch (err) {
@@ -2644,18 +2643,37 @@ document.getElementById('rubrica-form')?.addEventListener('submit', e => {
     let attivitaRemindersShown = false;
 
     const APPUNTAMENTO_TIPI = [
+      'telefonico',
+      'videocall',
       'sopralluogo',
-      'stima',
       'acquisizione',
-      'visita',
-      'trattativa',
+      'ribasso',
+      'vendita',
+      'preliminare',
       'rogito',
-      'altro'
+      'generico'
     ];
 
-    function normalizeAttivitaItem(a) {
+        function normalizeAttivitaItem(a) {
+      if (!a) return a;
       if (!a.id) a.id = genId('att');
       if (!a.stato) a.stato = 'aperta'; // compatibilità vecchi record
+
+      // RIVOLUZIONE: tutto diventa "appuntamento"
+      // - vecchie "attività" (task) vengono convertite in appuntamenti "generico"
+      if (String(a.tipo || '').toLowerCase() === 'attività' || String(a.tipo || '').toLowerCase() === 'attivita') {
+        a.tipo = 'appuntamento';
+        if (!a.tipoDettaglio) a.tipoDettaglio = 'generico';
+        // se manca l'ora, metto un default leggero
+        if (!a.ora) a.ora = '09:00';
+        // le attività storiche non avevano oraFine: default 15' (follow-up)
+        if (!a.oraFine) a.oraFine = addMinutesToTime(a.ora, 15);
+      }
+
+      // per sicurezza: allineo eventuali record senza tipo
+      if (!a.tipo) a.tipo = 'appuntamento';
+      if (a.tipo === 'appuntamento' && !a.tipoDettaglio) a.tipoDettaglio = 'generico';
+
       return a;
     }
 
@@ -2737,16 +2755,28 @@ document.getElementById('rubrica-form')?.addEventListener('submit', e => {
       if (oraInput) oraInput.value = app.ora || '';
       if (oraFineInput) oraFineInput.value = app.oraFine || '';
 
+      // Durata default: 15 minuti SOLO per appuntamenti 'telefonico'
+      // (se non impostata, oppure se è un nuovo record appena creato)
+      try {
+        const isNewRecord = !(app.id && getAppuntamentoById(app.id));
+        if (isNewRecord && oraInput && oraInput.value && oraFineInput && !oraFineInput.value) {
+          const t = (tipoSel && tipoSel.value) ? tipoSel.value : (app.tipoDettaglio || 'generico');
+          const mins = (t === 'telefonico') ? 15 : 60;
+          oraFineInput.value = addMinutesToTime(oraInput.value, mins);
+        }
+      } catch {}
+
       if (tipoSel) {
         const tipiBase = [
+          'telefonico',
+          'videocall',
           'sopralluogo',
-          'stima',
           'acquisizione',
-          'visita',
-          'trattativa',
+          'ribasso',
+          'vendita',
+          'preliminare',
           'rogito',
-          'telefonata',
-          'altro'
+          'generico'
         ];
         const tipi = (typeof APPUNTAMENTO_TIPI !== 'undefined' && Array.isArray(APPUNTAMENTO_TIPI) && APPUNTAMENTO_TIPI.length)
           ? APPUNTAMENTO_TIPI
@@ -2873,6 +2903,25 @@ document.getElementById('rubrica-form')?.addEventListener('submit', e => {
           }
         };
       }
+      // Se cambio tipologia e l'utente non ha impostato manualmente l'ora fine,
+      // applico durata di default (15' solo per 'telefonico', altrimenti 60').
+      try {
+        let userChangedOraFine = false;
+        if (oraFineInput) {
+          oraFineInput.addEventListener('input', () => { userChangedOraFine = true; }, { once:false });
+        }
+        if (tipoSel) {
+          tipoSel.addEventListener('change', () => {
+            if (!oraInput || !oraInput.value || !oraFineInput) return;
+            if (userChangedOraFine) return;
+            const t = tipoSel.value || 'generico';
+            const mins = (t === 'telefonico') ? 15 : 60;
+            oraFineInput.value = addMinutesToTime(oraInput.value, mins);
+          });
+        }
+      } catch {}
+
+
 
       // Gestione visibilità pulsanti azione (elimina / esito) in base alla presenza di un id valido
       const delBtn = document.getElementById('app-elimina');
@@ -2896,42 +2945,64 @@ function closeAppuntamentoDialog() {
     }
 
 
+    
     function renderAttivitaFiltersOptions() {
-      const sel = document.getElementById('att-filter-resp');
-      if (!sel) return;
-      const current = sel.value || 'tutti';
+      // Responsabile
+      const selResp = document.getElementById('att-filter-resp');
+      if (selResp) {
+        const current = selResp.value || 'tutti';
+        selResp.innerHTML = '';
+        const optAll = document.createElement('option');
+        optAll.value = 'tutti';
+        optAll.textContent = 'Tutti';
+        selResp.appendChild(optAll);
 
-      sel.innerHTML = '';
-      const optAll = document.createElement('option');
-      optAll.value = 'tutti';
-      optAll.textContent = 'Tutti';
-      sel.appendChild(optAll);
+        const used = new Set();
+        (attivita || []).forEach(a => {
+          if (a && a.responsabileId) used.add(a.responsabileId);
+        });
 
-      const used = new Set();
-      (attivita || []).forEach(a => {
-        if (a && a.responsabileId) used.add(a.responsabileId);
-      });
+        const staffMap = {};
+        (staff || []).forEach(s => { staffMap[s.id] = s; });
 
-      const staffMap = {};
-      (staff || []).forEach(s => { staffMap[s.id] = s; });
+        used.forEach(id => {
+          const s = staffMap[id];
+          if (!s) return;
+          const opt = document.createElement('option');
+          opt.value = id;
+          opt.textContent = s.nome || 'Responsabile';
+          selResp.appendChild(opt);
+        });
 
-      used.forEach(id => {
-        const s = staffMap[id];
-        if (!s) return;
-        const opt = document.createElement('option');
-        opt.value = id;
-        opt.textContent = s.nome || 'Responsabile';
-        sel.appendChild(opt);
-      });
-
-      if (Array.from(used).includes(current)) {
-        sel.value = current;
-      } else {
-        sel.value = 'tutti';
+        selResp.value = Array.from(used).includes(current) ? current : 'tutti';
       }
-    }
 
-    function renderAttivita() {
+      // Tipologia
+      const selTipo = document.getElementById('att-filter-tipo');
+      if (selTipo) {
+        const curT = selTipo.value || 'tutti';
+        selTipo.innerHTML = '';
+        const oAll = document.createElement('option');
+        oAll.value = 'tutti';
+        oAll.textContent = 'Tutte';
+        selTipo.appendChild(oAll);
+
+        const tipi = (typeof APPUNTAMENTO_TIPI !== 'undefined' && Array.isArray(APPUNTAMENTO_TIPI) && APPUNTAMENTO_TIPI.length)
+          ? APPUNTAMENTO_TIPI
+          : ['generico'];
+
+        tipi.forEach(t => {
+          const o = document.createElement('option');
+          o.value = t;
+          o.textContent = t.charAt(0).toUpperCase() + t.slice(1);
+          selTipo.appendChild(o);
+        });
+
+        // keep selection if possible
+        const valid = ['tutti'].concat(tipi);
+        selTipo.value = valid.includes(curT) ? curT : 'tutti';
+      }
+    }function renderAttivita() {
       const tbody = document.getElementById('att-table-body');
       if (!tbody) return;
 
@@ -2940,11 +3011,12 @@ function closeAppuntamentoDialog() {
 
       renderAttivitaFiltersOptions();
 
-      const fStato = document.getElementById('att-filter-stato')?.value || 'tutte';
+      const fTipo = document.getElementById('att-filter-tipo')?.value || 'tutti';
       const fResp = document.getElementById('att-filter-resp')?.value || 'tutti';
+      const fDay = document.getElementById('att-filter-day')?.value || '';
       const fText = (document.getElementById('att-filter-text')?.value || '').toLowerCase();
 
-      let list = [...(attivita || [])];
+      let list = [...(attivita || [])].filter(a => a && a.tipo === 'appuntamento');
 
       // ordinamento data + ora
       list.sort((a, b) => {
@@ -2960,9 +3032,9 @@ function closeAppuntamentoDialog() {
       (staff || []).forEach(s => { staffMap[s.id] = s; });
 
       let countTot = 0;
-      let countAperte = 0;
       let countOggi = 0;
-      let countScadute = 0;
+      let countPendingEsito = 0;
+      let countChiusi = 0;
 
       const rows = [];
 
@@ -2971,15 +3043,26 @@ function closeAppuntamentoDialog() {
         const meta = getAttMeta(a);
 
         countTot++;
-        if (meta.baseStatus !== 'chiusa') countAperte++;
         if (meta.tag === 'oggi') countOggi++;
-        if (meta.tag === 'scaduta') countScadute++;
 
-        // filtri stato
-        if (fStato === 'aperte' && meta.baseStatus === 'chiusa') return;
-        if (fStato === 'chiuse' && meta.baseStatus !== 'chiusa') return;
-        if (fStato === 'oggi' && meta.tag !== 'oggi') return;
-        if (fStato === 'scadute' && meta.tag !== 'scaduta') return;
+        // Pending esito: appuntamento nel passato senza esito
+        try {
+          const dt = parseISODateTime(a.data, a.oraFine || a.ora || '00:00');
+          if (dt && dt < new Date() && !a.esito) countPendingEsito++;
+        } catch {}
+
+        if (meta.baseStatus === 'chiusa' || !!a.esito) countChiusi++;
+
+        // filtro tipologia
+        if (fTipo !== 'tutti') {
+          const t = (a.tipoDettaglio || 'generico');
+          if (t !== fTipo) return;
+        }
+
+        // filtro giorno (YYYY-MM-DD)
+        if (fDay) {
+          if ((a.data || '') !== fDay) return;
+        }
 
         // filtro responsabile
         if (fResp !== 'tutti' && a.responsabileId !== fResp) return;
@@ -3001,6 +3084,14 @@ function closeAppuntamentoDialog() {
 
         const tipoSafe = escapeHtml(a.tipoDettaglio || a.tipo || '');
         const descrSafe = escapeHtml(a.descrizione || '');
+        let pendingBadge = '';
+        try {
+          const dt = parseISODateTime(a.data, a.oraFine || a.ora || '00:00');
+          if (dt && dt < new Date() && !a.esito && meta.baseStatus !== 'chiusa') {
+            pendingBadge = ' <span class="badge badge-warn" title="Da esitare">⏳ esito</span>';
+          }
+        } catch {}
+
         const respSafe = escapeHtml(respName || '');
         const statoLabel = meta.label;
 
@@ -3008,7 +3099,7 @@ function closeAppuntamentoDialog() {
           <tr${rowStyle} data-att-id="${a.id}">
             <td>${formatDateIT(a.data)}</td>
             <td>${a.ora || ''}</td>
-            <td>${tipoSafe}</td>
+            <td>${tipoSafe}${pendingBadge}</td>
             <td>${descrSafe}</td>
             <td>${respSafe}</td>
             <td>${statoLabel}</td>
@@ -3033,11 +3124,11 @@ function closeAppuntamentoDialog() {
       const elTot = document.getElementById('att-count-tot');
       if (elTot) elTot.textContent = String(countTot);
       const elAp = document.getElementById('att-count-aperte');
-      if (elAp) elAp.textContent = String(countAperte);
+      if (elAp) elAp.textContent = String(countPendingEsito);
       const elOg = document.getElementById('att-count-oggi');
       if (elOg) elOg.textContent = String(countOggi);
       const elSc = document.getElementById('att-count-scadute');
-      if (elSc) elSc.textContent = String(countScadute);
+      if (elSc) elSc.textContent = String(countChiusi);
 
       // reminder semplice (una sola volta per sessione)
       if (!attivitaRemindersShown && (countOggi > 0 || countScadute > 0)) {
@@ -3100,6 +3191,26 @@ function closeAppuntamentoDialog() {
             a.stato = 'chiusa';
           }
         });
+
+        // Esito (positivo/negativo) — commento obbligatorio
+        try {
+          const formEl = document.getElementById('appuntamento-form');
+          const k = formEl?.dataset?.esitoKind || '';
+          const c = formEl?.dataset?.esitoComment || '';
+          if (k) {
+            if (!c || !String(c).trim()) {
+              alert('Commento esito obbligatorio.');
+              return;
+            }
+            app.esito = k;
+            app.esitoCommento = String(c).trim();
+            app.esitoAt = new Date().toISOString();
+            app.stato = 'chiusa';
+            // pulizia
+            try { delete formEl.dataset.esitoKind; delete formEl.dataset.esitoComment; } catch {}
+          }
+        } catch {}
+
         saveList(STORAGE_KEYS.attivita, attivita);
         renderAttivita();
         renderDashboardTodayActivities();
@@ -3164,14 +3275,17 @@ function closeAppuntamentoDialog() {
     });
 
     // filtri attivita
-    document.getElementById('att-filter-stato')?.addEventListener('change', renderAttivita);
+    document.getElementById('att-filter-tipo')?.addEventListener('change', renderAttivita);
+    document.getElementById('att-filter-day')?.addEventListener('change', renderAttivita);
     document.getElementById('att-filter-resp')?.addEventListener('change', renderAttivita);
     document.getElementById('att-filter-text')?.addEventListener('input', () => renderAttivita());
     document.getElementById('att-filter-clear')?.addEventListener('click', () => {
-      const fS = document.getElementById('att-filter-stato');
+      const fS = document.getElementById('att-filter-tipo');
+      const fD = document.getElementById('att-filter-day');
       const fR = document.getElementById('att-filter-resp');
       const fT = document.getElementById('att-filter-text');
-      if (fS) fS.value = 'tutte';
+      if (fS) fS.value = 'tutti';
+      if (fD) fD.value = '';
       if (fR) fR.value = 'tutti';
       if (fT) fT.value = '';
       renderAttivita();
@@ -5587,26 +5701,50 @@ function initPoligoniModule() {
       // Esito negativo: setta stato e lancia il salvataggio
       document.getElementById('app-esito-neg')?.addEventListener('click', (e) => {
         e.preventDefault();
+        const form = document.getElementById('appuntamento-form');
+        const idInput = document.getElementById('app-id');
+        const rawId = idInput ? (idInput.value || '') : '';
+        if (!rawId) {
+          alert('Salva prima l\'appuntamento, poi imposta l\'esito.');
+          return;
+        }
+        const commento = prompt('Commento esito (obbligatorio):', '');
+        if (!commento || !String(commento).trim()) {
+          alert('Per impostare un esito devi inserire un commento.');
+          return;
+        }
+        if (form) {
+          form.dataset.esitoKind = 'negativo';
+          form.dataset.esitoComment = String(commento).trim();
+        }
+        // forzo chiusura
         const statoSel = document.getElementById('app-stato');
         if (statoSel) statoSel.value = 'chiusa';
-        const descrInput = document.getElementById('app-descrizione');
-        if (descrInput && !descrInput.value.includes('[esito negativo]')) {
-          descrInput.value = (descrInput.value ? descrInput.value + ' ' : '') + '[esito negativo]';
-        }
-        const form = document.getElementById('appuntamento-form');
         if (form) form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
       });
 
       // Esito positivo: setta stato e lancia il salvataggio
       document.getElementById('app-esito-pos')?.addEventListener('click', (e) => {
         e.preventDefault();
+        const form = document.getElementById('appuntamento-form');
+        const idInput = document.getElementById('app-id');
+        const rawId = idInput ? (idInput.value || '') : '';
+        if (!rawId) {
+          alert('Salva prima l\'appuntamento, poi imposta l\'esito.');
+          return;
+        }
+        const commento = prompt('Commento esito (obbligatorio):', '');
+        if (!commento || !String(commento).trim()) {
+          alert('Per impostare un esito devi inserire un commento.');
+          return;
+        }
+        if (form) {
+          form.dataset.esitoKind = 'positivo';
+          form.dataset.esitoComment = String(commento).trim();
+        }
+        // forzo chiusura
         const statoSel = document.getElementById('app-stato');
         if (statoSel) statoSel.value = 'chiusa';
-        const descrInput = document.getElementById('app-descrizione');
-        if (descrInput && !descrInput.value.includes('[esito positivo]')) {
-          descrInput.value = (descrInput.value ? descrInput.value + ' ' : '') + '[esito positivo]';
-        }
-        const form = document.getElementById('appuntamento-form');
         if (form) form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
       });
 

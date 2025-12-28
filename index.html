@@ -116,8 +116,8 @@
           <div class="nav-item-main">
             <div class="nav-icon">📌</div>
             <div>
-              <div class="nav-label-title">Attività</div>
-              <div class="nav-label-sub">Task & follow-up</div>
+              <div class="nav-label-title">Appuntamenti</div>
+              <div class="nav-label-sub">Telefonate, sopralluoghi, fasi operative</div>
             </div>
           </div>
         </div>
@@ -500,7 +500,7 @@
                       <input type="text" id="imm-rif" placeholder="Es. MI-BORR-01">
                     </div>
                     <div class="form-group">
-                      <label>Stato</label>
+                      <label>Tipologia</label>
                       <select id="imm-stato">
                         <option value="in carico" selected>In carico</option>
                         <option value="trattativa">In trattativa</option>
@@ -973,21 +973,26 @@
                 <!-- Riepilogo -->
                 <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;font-size:12px;">
                   <div class="badge">Totali: <span id="att-count-tot">0</span></div>
-                  <div class="badge">Aperte: <span id="att-count-aperte">0</span></div>
+                  <div class="badge">Da esitare: <span id="att-count-aperte">0</span></div>
                   <div class="badge">Oggi: <span id="att-count-oggi">0</span></div>
-                  <div class="badge">Scadute: <span id="att-count-scadute">0</span></div>
+                  <div class="badge">Chiusi: <span id="att-count-scadute">0</span></div>
                 </div>
 
                 <!-- Filtri -->
                 <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
                   <div class="form-group" style="flex:0 0 160px;min-width:140px;">
-                    <label>Stato</label>
-                    <select id="att-filter-stato">
-                      <option value="tutte">Tutte</option>
-                      <option value="aperte">Aperte</option>
-                      <option value="chiuse">Chiuse</option>
-                      <option value="oggi">Oggi</option>
-                      <option value="scadute">Scadute</option>
+                    <label>Tipologia</label>
+                    <select id="att-filter-tipo">
+                      <option value="tutti">Tutte</option>
+                      <option value="telefonico">Telefonico</option>
+                      <option value="videocall">Videocall</option>
+                      <option value="sopralluogo">Sopralluogo</option>
+                      <option value="acquisizione">Acquisizione</option>
+                      <option value="ribasso">Ribasso</option>
+                      <option value="vendita">Vendita</option>
+                      <option value="preliminare">Preliminare</option>
+                      <option value="rogito">Rogito</option>
+                      <option value="generico">Generico</option>
                     </select>
                   </div>
                   <div class="form-group" style="flex:0 0 200px;min-width:160px;">
@@ -996,6 +1001,12 @@
                       <option value="tutti">Tutti</option>
                     </select>
                   </div>
+
+                  <div class="form-group" style="flex:0 0 170px;min-width:150px;">
+                    <label>Giorno</label>
+                    <input type="date" id="att-filter-day">
+                  </div>
+
                   <div class="form-group" style="flex:1 1 220px;min-width:180px;">
                     <label>Testo</label>
                     <input type="text" id="att-filter-text" placeholder="Cerca in tipo/descrizione…">
@@ -1384,7 +1395,7 @@
                     <textarea id="app-descrizione" rows="3"></textarea>
                   </div>
                   <div class="form-group">
-                    <label>Stato</label>
+                    <label>Tipologia</label>
                     <select id="app-stato">
                       <option value="aperta">Aperto</option>
                       <option value="chiusa">Chiuso</option>
