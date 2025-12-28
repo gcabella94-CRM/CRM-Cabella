@@ -121,28 +121,29 @@ if (!window.createRicontattoAppuntamentoFromNotizia) {
   window.createRicontattoAppuntamentoFromNotizia = function(n, isoWhen, opts={}) {
     try {
       if (!n || !isoWhen) return null;
+
+      // Parsing robusto in LOCALE: evita qualunque conversione UTC (niente new Date(string), niente toISOString)
+      const raw = String(isoWhen);
+      const parts = raw.split('T');
+      const dateIso = (parts[0] || '').trim(); // YYYY-MM-DD
+      let ora = (parts[1] || '').trim();       // HH:MM(:SS)
+      ora = ora ? ora.slice(0,5) : '09:00';
+
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dateIso)) return null;
+      if (!/^\d{2}:\d{2}$/.test(ora)) return null;
+
       const pad = (x)=>String(x).padStart(2,'0');
 
-// Parse ISO-like datetime WITHOUT timezone to avoid day-shift (treat as local)
-const m = String(isoWhen || '').match(/^(\d{4}-\d{2}-\d{2})(?:[T\s](\d{2}):(\d{2})(?::(\d{2}))?)?/);
-if (!m) return null;
-let dateIso = m[1];
-let hh = parseInt(m[2] || '09', 10);
-let mm = parseInt(m[3] || '00', 10);
-// seconds not needed for agenda
-const ora = pad(hh) + ':' + pad(mm);
+      // aggiungi 15 minuti a HH:MM (con carry su ora)
+      const hm = ora.split(':');
+      let hh = parseInt(hm[0],10);
+      let mm = parseInt(hm[1],10);
+      if (isNaN(hh) || isNaN(mm)) return null;
+      mm += 15;
+      if (mm >= 60) { mm -= 60; hh += 1; }
+      if (hh >= 24) { hh = hh % 24; } // in caso rarissimo di ricontatto a fine giornata
+      const oraFine = pad(hh) + ':' + pad(mm);
 
-// oraFine + possible day rollover
-let total = hh * 60 + mm + 15;
-let dayAdd = Math.floor(total / (24 * 60));
-total = total % (24 * 60);
-const oraFine = pad(Math.floor(total / 60)) + ':' + pad(total % 60);
-if (dayAdd > 0) {
-  const parts = dateIso.split('-').map(x => parseInt(x, 10));
-  const base = new Date(parts[0], parts[1]-1, parts[2]);
-  base.setDate(base.getDate() + dayAdd);
-  dateIso = base.getFullYear() + '-' + pad(base.getMonth()+1) + '-' + pad(base.getDate());
-}
 const staffId = (n.responsabileId) || ((staff && staff[0] && staff[0].id) || null);
 
       // trova/crea contatto collegato
@@ -252,19 +253,7 @@ const staffId = (n.responsabileId) || ((staff && staff[0] && staff[0].id) || nul
   }
 
   function genId(prefix = 'id') {
-  return `${prefix}
-
-// === Date helpers (LOCAL, avoid UTC day-shifts) ===
-function localISODate(input) {
-  const d = (input instanceof Date) ? input : new Date(input);
-  if (!d || isNaN(d)) return '';
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
-
-_${Math.random().toString(36).slice(2, 9)}`;
+  return `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
 }
 
 /* ====== NOTIZIA DETTAGLIO (drawer) ====== */
@@ -1172,7 +1161,7 @@ function renderAgendaMonth() {
 
           if (dayNum > 0 && dayNum <= daysInMonth) {
             const dateObj = new Date(year, month, dayNum);
-            const iso = localISODate(dateObj);
+            const iso = year + '-' + String(month + 1).padStart(2,'0') + '-' + String(dayNum).padStart(2,'0');
 
             // numero giorno
             const num = document.createElement("div");
@@ -1590,7 +1579,7 @@ function renderAgendaMonth() {
                 ${ric ? `<div class="muted"><strong>Ricontatto:</strong> ${escapeHtml(ric)}</div>` : '<div class="muted">Ricontatto: —</div>'}
               </div>
 
-              <div class="notizia-recall-form" id="not-recall-${escapeHtml(n.id)}" style="display:none;">
+              <div class="notizia-recall-form" id="not-recall-${escapeHtml(n.id)}" style="display:block;">
                 <div class="notizia-grid" style="margin-top:8px;">
                   <div class="notizia-mini">
                     <div class="notizia-mini-k">Data ricontatto</div>
@@ -1739,7 +1728,7 @@ function resetNotizieForm() {
 
     if (!found && (tel || mail || imm.proprietarioNome)) {
       const nome = imm.proprietarioNome || '';
-      const today = localISODate(new Date());
+      const today = new Date().toISOString().slice(0, 10);
       found = {
         id: genId('cont'),
         nome,
@@ -1766,7 +1755,7 @@ function resetNotizieForm() {
     if (!Array.isArray(attivita)) attivita = [];
 
     const today = new Date();
-    const dateIso = localISODate(today);
+    const dateIso = today.toISOString().slice(0, 10);
 
     const staffId = (staff && staff[0] && staff[0].id) || null;
     const clienteId = ensureContattoFromImmobile(imm);
@@ -1815,7 +1804,7 @@ function resetNotizieForm() {
     if (!Array.isArray(contatti)) contatti = [];
 
     const today = new Date();
-    const dateIso = localISODate(today);
+    const dateIso = today.toISOString().slice(0, 10);
 
     const staffId = (staff && staff[0] && staff[0].id) || null;
     let clienteId = findContattoFromNotizia(n);
@@ -1872,7 +1861,7 @@ function resetNotizieForm() {
     const already = contatti.some(c => c.telefono && notizia.telefono && c.telefono === notizia.telefono);
     if (already) return;
 
-    const today = localISODate(new Date()); // YYYY-MM-DD
+    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
 
     const contatto = {
       id: genId('cont'),
@@ -2059,30 +2048,52 @@ function bindNotizieModalUI() {
     const noans = e.target.closest?.('[data-not-noans-toggle]');
     if (noans) {
       const id = noans.getAttribute('data-not-noans-toggle');
-      const box = document.getElementById('not-recall-' + id);
-      let willShow = false;
-      if (box) {
-        willShow = (box.style.display === 'none' || !box.style.display);
-        box.style.display = willShow ? 'block' : 'none';
-      }
-
-
-      // prefill data/ora da ricontatto se presente
       const n = (notizie || []).find(x => x && x.id === id);
-      if (n && willShow) n._pendingNoAnswer = true;
-      if (n && n.ricontatto) {
-        const d = new Date(n.ricontatto);
-        if (!isNaN(d)) {
+      if (!n) return;
+
+      // Mantieni lo slot ricontatto SEMPRE visibile (nessuna automazione/toggle)
+      const box = document.getElementById('not-recall-' + id);
+      if (box) box.style.display = 'block';
+
+      // Registra l'esito "Non risponde" come interazione, senza creare automaticamente ricontatti in agenda
+      try {
+        const contattoId = (typeof findContattoFromNotizia === 'function') ? (findContattoFromNotizia(n) || '') : '';
+        if (typeof pushInterazioneInTimeline === 'function') {
+          pushInterazioneInTimeline({
+            tipo: 'telefonata',
+            esito: 'non risponde',
+            testo: 'Non risponde',
+            links: { notiziaId: n.id, immobileId:'', contattoId: contattoId, attivitaId:'' },
+            prossimaAzione: { enabled:false }
+          });
+        } else if (typeof addInterazione === 'function') {
+          addInterazione({
+            tipo: 'telefonata',
+            esito: 'non risponde',
+            testo: 'Non risponde',
+            links: { notiziaId: n.id, immobileId:'', contattoId: contattoId, attivitaId:'' },
+            prossimaAzione: { enabled:false }
+          });
+        }
+      } catch (err) {}
+
+      // Prefill data/ora da ricontatto se già presente
+      if (n.ricontatto) {
+        try {
+          const parts = String(n.ricontatto).split('T');
+          const dPart = parts[0] || '';
+          const tPart = (parts[1] || '').slice(0,5);
           const dateEl = document.querySelector(`[data-not-recall-date="${window.cssEscape(id)}"]`);
           const timeEl = document.querySelector(`[data-not-recall-time="${window.cssEscape(id)}"]`);
-          if (dateEl) dateEl.value = toLocalISODate(d);
-          if (timeEl) timeEl.value = String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
-        }
+          if (dateEl && dPart) dateEl.value = dPart;
+          if (timeEl && tPart) timeEl.value = tPart;
+        } catch {}
       }
       return;
     }
 
     const saveRecall = e.target.closest?.('[data-not-save-recall]');
+ = e.target.closest?.('[data-not-save-recall]');
     if (saveRecall) {
       const id = saveRecall.getAttribute('data-not-save-recall');
       const n = (notizie || []).find(x => x && x.id === id);
@@ -2095,7 +2106,8 @@ function bindNotizieModalUI() {
 
       if (!dateVal) { alert('Seleziona una data di ricontatto.'); return; }
 
-      const iso = timeVal ? (dateVal + 'T' + timeVal + ':00') : (dateVal + 'T09:00:00');
+      // Salva sempre in formato locale (no UTC / no shift)
+      const iso = dateVal + 'T' + (timeVal ? timeVal : '09:00') + ':00';
       n.ricontatto = iso;
       const isNoAnswer = !!n._pendingNoAnswer;
       n.nonRisponde = isNoAnswer;
@@ -2147,7 +2159,7 @@ function bindNotizieModalUI() {
       const timeEl = document.querySelector(`[data-not-recall-time="${window.cssEscape(id)}"]`);
       const dateVal = (dateEl?.value || '').trim();
       const timeVal = (timeEl?.value || '').trim();
-      const isoRecall = dateVal ? (timeVal ? (dateVal + 'T' + timeVal + ':00') : (dateVal + 'T09:00:00')) : '';
+      const isoRecall = dateVal ? (dateVal + 'T' + (timeVal ? timeVal : '09:00') + ':00') : '';
 
       n.commentoUltimaInterazione = val;
       n.ultimoContattoAt = new Date().toISOString();
@@ -3036,7 +3048,7 @@ function closeAppuntamentoDialog() {
 
     // Nuova attività
     document.getElementById('att-new-btn')?.addEventListener('click', () => {
-      const todayIso = localISODate(new Date());
+      const todayIso = new Date().toISOString().slice(0, 10);
       const data = prompt('Data (YYYY-MM-DD):', todayIso);
       if (!data) return;
 
