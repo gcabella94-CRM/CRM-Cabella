@@ -3261,15 +3261,6 @@ function closeAppuntamentoDialog() {
 
     });
 
-      const tr = t.closest && t.closest('tr[data-att-id]');
-      if (tr && t.closest('table') && t.closest('#view-attivita') && !t.closest('button')) {
-        const id = tr.getAttribute('data-att-id');
-        const app = getAppuntamentoById(id);
-        if (app) {
-          openAppuntamentoDialogById(id);
-        }
-      }
-    });
 
     // filtri appuntamenti (ex attività)
     document.getElementById('att-filter-tipo')?.addEventListener('change', renderAttivita);
