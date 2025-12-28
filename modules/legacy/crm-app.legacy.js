@@ -1029,7 +1029,7 @@ function clearAgendaDragHighlight() {
         ora: fmt(sh, sm),
         oraFine: fmt(eh, em),
         tipo: 'appuntamento',
-        tipoDettaglio: 'sopralluogo',
+        tipoDettaglio: 'telefonico',
         descrizione: '',
         responsabileId: staffId,
         clienteId: '',
@@ -1051,9 +1051,9 @@ function creaNuovoAppuntamentoDaBottone() {
         id: '', // id vuoto -> verrà generato alla conferma
         data: dateIso,
         ora: '09:00',
-        oraFine: '10:00',
+        oraFine: addMinutesToTime('09:00', 15),
         tipo: 'appuntamento',
-        tipoDettaglio: 'sopralluogo',
+        tipoDettaglio: 'telefonico',
         descrizione: '',
         responsabileId: staffId,
         clienteId: '',
@@ -1745,7 +1745,7 @@ function resetNotizieForm() {
       ora: '10:00',
       oraFine: '11:00',
       tipo: 'appuntamento',
-      tipoDettaglio: 'sopralluogo',
+      tipoDettaglio: 'telefonico',
       descrizione: '',
       responsabileId: staffId,
       clienteId: clienteId || '',
@@ -1814,7 +1814,7 @@ function resetNotizieForm() {
       ora: '10:00',
       oraFine: '11:00',
       tipo: 'appuntamento',
-      tipoDettaglio: 'sopralluogo',
+      tipoDettaglio: 'telefonico',
       descrizione: '',
       responsabileId: staffId,
       clienteId: clienteId || '',
@@ -2638,8 +2638,45 @@ document.getElementById('rubrica-form')?.addEventListener('submit', e => {
     ];
 
     function normalizeAttivitaItem(a) {
+      if (!a) return a;
       if (!a.id) a.id = genId('att');
-      if (!a.stato) a.stato = 'aperta'; // compatibilità vecchi record
+
+      // Unificazione: tutto diventa "appuntamento" (ex attività + appuntamenti agenda)
+      if (!a.tipo || a.tipo === 'attività' || a.tipo === 'attivita') a.tipo = 'appuntamento';
+
+      // Stato (aperta/chiusa)
+      if (!a.stato) a.stato = 'aperta'; // compat vecchi record
+
+      // Tipologia (dropdown)
+      const mapTipo = {
+        'telefonata': 'telefonico',
+        'chiamata': 'telefonico',
+        'call': 'telefonico',
+        'video': 'videocall',
+        'videochiamata': 'videocall',
+        'visita': 'vendita', // spesso era visita immobile: scegliamo "vendita" solo come fallback
+        'altro': 'generico'
+      };
+
+      let td = (a.tipoDettaglio || '').toString().trim().toLowerCase();
+      if (mapTipo[td]) td = mapTipo[td];
+
+      const allowed = [
+        'telefonico','videocall','sopralluogo','acquisizione','ribasso','vendita','preliminare','rogito','generico',
+        // legacy compat
+        'stima','visita','trattativa','telefonata','altro'
+      ];
+
+      if (!td) td = 'generico';
+      if (!allowed.includes(td)) td = 'generico';
+      a.tipoDettaglio = td;
+
+      // Default durata: 15 min SOLO per telefonico, altrimenti 60 se manca oraFine
+      if (a.data && a.ora && !a.oraFine) {
+        const mins = (td === 'telefonico') ? 15 : 60;
+        a.oraFine = addMinutesToTime(a.ora, mins);
+      }
+
       return a;
     }
 
@@ -2723,12 +2760,19 @@ document.getElementById('rubrica-form')?.addEventListener('submit', e => {
 
       if (tipoSel) {
         const tipiBase = [
+          'telefonico',
+          'videocall',
           'sopralluogo',
-          'stima',
           'acquisizione',
+          'ribasso',
+          'vendita',
+          'preliminare',
+          'rogito',
+          'generico',
+          // legacy compat
+          'stima',
           'visita',
           'trattativa',
-          'rogito',
           'telefonata',
           'altro'
         ];
@@ -2881,20 +2925,68 @@ function closeAppuntamentoDialog() {
 
 
     function renderAttivitaFiltersOptions() {
-      const sel = document.getElementById('att-filter-resp');
-      if (!sel) return;
-      const current = sel.value || 'tutti';
+      // Responsabile
+      const selResp = document.getElementById('att-filter-resp');
+      if (selResp) {
+        const current = selResp.value || 'tutti';
+        selResp.innerHTML = '';
+        const optAll = document.createElement('option');
+        optAll.value = 'tutti';
+        optAll.textContent = 'Tutti';
+        selResp.appendChild(optAll);
 
-      sel.innerHTML = '';
-      const optAll = document.createElement('option');
-      optAll.value = 'tutti';
-      optAll.textContent = 'Tutti';
-      sel.appendChild(optAll);
+        const used = new Set();
+        (attivita || []).forEach(a => { if (a && a.responsabileId) used.add(a.responsabileId); });
 
-      const used = new Set();
-      (attivita || []).forEach(a => {
-        if (a && a.responsabileId) used.add(a.responsabileId);
-      });
+        const staffMap = {};
+        (staff || []).forEach(s => { if (s && s.id) staffMap[s.id] = s; });
+
+        used.forEach(id => {
+          const s = staffMap[id];
+          if (!s) return;
+          const opt = document.createElement('option');
+          opt.value = id;
+          opt.textContent = s.nome || 'Responsabile';
+          selResp.appendChild(opt);
+        });
+
+        selResp.value = Array.from(used).includes(current) ? current : 'tutti';
+      }
+
+      // Tipologia
+      const selTipo = document.getElementById('att-filter-tipo');
+      if (selTipo) {
+        const currentT = selTipo.value || 'tutte';
+        selTipo.innerHTML = '';
+        const optAllT = document.createElement('option');
+        optAllT.value = 'tutte';
+        optAllT.textContent = 'Tutte';
+        selTipo.appendChild(optAllT);
+
+        const order = ['telefonico','videocall','sopralluogo','acquisizione','ribasso','vendita','preliminare','rogito','generico'];
+        const setT = new Set();
+        (attivita || []).forEach(a => { if (a && a.tipoDettaglio) setT.add(a.tipoDettaglio); });
+
+        const list = Array.from(setT);
+        list.sort((a,b) => {
+          const ia = order.indexOf(a); const ib = order.indexOf(b);
+          if (ia === -1 && ib === -1) return a.localeCompare(b);
+          if (ia === -1) return 1;
+          if (ib === -1) return -1;
+          return ia-ib;
+        });
+
+        list.forEach(t => {
+          if (!t) return;
+          const opt = document.createElement('option');
+          opt.value = t;
+          opt.textContent = t;
+          selTipo.appendChild(opt);
+        });
+
+        selTipo.value = list.includes(currentT) ? currentT : 'tutte';
+      }
+    });
 
       const staffMap = {};
       (staff || []).forEach(s => { staffMap[s.id] = s; });
@@ -2924,8 +3016,9 @@ function closeAppuntamentoDialog() {
 
       renderAttivitaFiltersOptions();
 
-      const fStato = document.getElementById('att-filter-stato')?.value || 'tutte';
+      const fTipo = document.getElementById('att-filter-tipo')?.value || 'tutte';
       const fResp = document.getElementById('att-filter-resp')?.value || 'tutti';
+      const fDay  = document.getElementById('att-filter-day')?.value || '';
       const fText = (document.getElementById('att-filter-text')?.value || '').toLowerCase();
 
       let list = [...(attivita || [])];
@@ -2959,11 +3052,9 @@ function closeAppuntamentoDialog() {
         if (meta.tag === 'oggi') countOggi++;
         if (meta.tag === 'scaduta') countScadute++;
 
-        // filtri stato
-        if (fStato === 'aperte' && meta.baseStatus === 'chiusa') return;
-        if (fStato === 'chiuse' && meta.baseStatus !== 'chiusa') return;
-        if (fStato === 'oggi' && meta.tag !== 'oggi') return;
-        if (fStato === 'scadute' && meta.tag !== 'scaduta') return;
+        // filtri (tipologia / responsabile / giorno)
+        if (fTipo !== 'tutte' && (a.tipoDettaglio || '') !== fTipo) return;
+        if (fDay && (a.data || '') !== fDay) return;
 
         // filtro responsabile
         if (fResp !== 'tutti' && a.responsabileId !== fResp) return;
@@ -2983,8 +3074,11 @@ function closeAppuntamentoDialog() {
           ? staffMap[a.responsabileId].nome
           : '';
 
-        const tipoSafe = escapeHtml(a.tipoDettaglio || a.tipo || '');
+        const tipoKey = (a.tipoDettaglio || 'generico');
+        const tipoSafe = escapeHtml(tipoKey);
+        const tipoBadge = `<span class="pill">${tipoSafe}</span>`;
         const descrSafe = escapeHtml(a.descrizione || '');
+        const esitoBadge = a.esito ? `<span class="pill pill-esito" title="${escapeHtml(a.esitoCommento || '')}">${a.esito === 'positivo' ? 'esito +' : 'esito -'}</span>` : '';
         const respSafe = escapeHtml(respName || '');
         const statoLabel = meta.label;
 
@@ -2992,14 +3086,18 @@ function closeAppuntamentoDialog() {
           <tr${rowStyle} data-att-id="${a.id}">
             <td>${formatDateIT(a.data)}</td>
             <td>${a.ora || ''}</td>
-            <td>${tipoSafe}</td>
-            <td>${descrSafe}</td>
+            <td>${tipoBadge}</td>
+            <td>${descrSafe} ${esitoBadge}</td>
             <td>${respSafe}</td>
             <td>${statoLabel}</td>
             <td>
               ${meta.baseStatus !== 'chiusa'
-                ? `<button class="btn btn-xs" data-att-done="${a.id}" title="Segna chiusa">✅</button>`
-                : ''
+                ? `
+                  <button class="btn btn-xs" data-att-edit="${a.id}" title="Apri">👁️</button>
+                  <button class="btn btn-xs" data-att-esito-pos="${a.id}" title="Esito positivo">✅</button>
+                  <button class="btn btn-xs" data-att-esito-neg="${a.id}" title="Esito negativo">❌</button>
+                `
+                : `<button class="btn btn-xs" data-att-edit="${a.id}" title="Apri">👁️</button>`
               }
               <button class="btn btn-xs" data-att-delete="${a.id}" title="Elimina">🗑️</button>
             </td>
@@ -3008,7 +3106,7 @@ function closeAppuntamentoDialog() {
       });
 
       if (!rows.length) {
-        tbody.innerHTML = `<tr><td colspan="7" class="muted">Nessuna attività registrata.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" class="muted">Nessun appuntamento registrato.</td></tr>`;
       } else {
         tbody.innerHTML = rows.join('');
       }
@@ -3025,50 +3123,37 @@ function closeAppuntamentoDialog() {
 
       // reminder semplice (una sola volta per sessione)
       if (!attivitaRemindersShown && (countOggi > 0 || countScadute > 0)) {
-        alert(`Hai ${countOggi} attività per oggi e ${countScadute} attività scadute ancora aperte.`);
+        alert(`Hai ${countOggi} appuntamenti per oggi e ${countScadute} appuntamenti scaduti ancora aperti.`);
         attivitaRemindersShown = true;
       }
     }
 
     // Nuova attività
     document.getElementById('att-new-btn')?.addEventListener('click', () => {
-      const todayIso = new Date().toISOString().slice(0, 10);
-      const data = prompt('Data (YYYY-MM-DD):', todayIso);
-      if (!data) return;
+      const today = new Date();
+      const dateIso = toLocalISODate(today);
 
-      const ora = prompt('Ora (HH:MM):', '10:00') || '';
-      const tipo = prompt('Tipo attività:', 'attività') || 'attività';
-      const descr = prompt('Descrizione attività:') || '';
-
-      let responsabileId = null;
-      if (Array.isArray(staff) && staff.length) {
-        const elenco = staff.map((s, idx) => `${idx + 1}) ${s.nome || 'Senza nome'}`).join('\n');
-        const scelta = prompt(`Responsabile (numero, lascia vuoto per nessuno):\n${elenco}`, '');
-        const idxSel = scelta ? parseInt(scelta, 10) : NaN;
-        if (!isNaN(idxSel) && idxSel >= 1 && idxSel <= staff.length) {
-          responsabileId = staff[idxSel - 1].id;
-        }
-      }
-
-      const act = {
-        id: genId('att'),
-        data,
-        ora,
-        tipo,
-        descrizione: descr,
-        responsabileId,
-        stato: 'aperta'
+      const app = {
+        id: '',
+        data: dateIso,
+        ora: '09:00',
+        oraFine: addMinutesToTime('09:00', 15),
+        tipo: 'appuntamento',
+        tipoDettaglio: 'telefonico',
+        descrizione: '',
+        responsabileId: (staff[0] && staff[0].id) || '',
+        clienteId: '',
+        immobileId: '',
+        notiziaId: '',
+        stato: 'aperta',
+        esito: '',
+        esitoCommento: ''
       };
 
-      if (!Array.isArray(attivita)) attivita = [];
-      attivita.push(act);
-      saveList(STORAGE_KEYS.attivita, attivita);
-      renderAttivita();
-      renderDashboardTodayActivities();
-      renderDashboardDaySummary();
+      openAppuntamentoDialog(app);
     });
 
-    // Nuovo appuntamento (crea record e apre scheda appuntamento)
+    // Nuovo appuntamento (agenda)
     document.getElementById('att-new-app-btn')?.addEventListener('click', () => {
       creaNuovoAppuntamentoDaBottone();
     });
@@ -3077,32 +3162,71 @@ function closeAppuntamentoDialog() {
     document.addEventListener('click', (e) => {
       const t = e.target;
 
-      if (t.dataset && t.dataset.attDone) {
-        const id = t.dataset.attDone;
-        (attivita || []).forEach(a => {
-          if (a && a.id === id) {
-            a.stato = 'chiusa';
-          }
-        });
+      // Azioni tabella appuntamenti (ex attività)
+      const editId = t?.dataset?.attEdit;
+      const delId  = t?.dataset?.attDelete;
+      const esPos  = t?.dataset?.attEsitoPos;
+      const esNeg  = t?.dataset?.attEsitoNeg;
+
+      if (editId) {
+        e.preventDefault();
+        openAppuntamentoDialogById(editId);
+        return;
+      }
+
+      if (esPos || esNeg) {
+        e.preventDefault();
+        const id = esPos || esNeg;
+        const a = (attivita || []).find(x => x && x.id === id);
+        if (!a) return;
+
+        const label = esPos ? 'positivo' : 'negativo';
+        let commento = prompt(`Commento obbligatorio per esito ${label}:`, '');
+        if (commento === null) return; // annulla
+        commento = (commento || '').trim();
+        if (!commento) {
+          alert('Il commento è obbligatorio per registrare l’esito.');
+          return;
+        }
+
+        a.esito = esPos ? 'positivo' : 'negativo';
+        a.esitoCommento = commento;
+        a.stato = 'chiusa';
+
         saveList(STORAGE_KEYS.attivita, attivita);
         renderAttivita();
+        renderAgendaWeek();
+        renderAgendaMonth();
         renderDashboardTodayActivities();
         renderDashboardDaySummary();
         return;
       }
 
-      if (t.dataset && t.dataset.attDelete) {
-        const id = t.dataset.attDelete;
-        if (!confirm('Eliminare questa attività?')) return;
-        attivita = (attivita || []).filter(a => !a || a.id !== id);
+      if (delId) {
+        e.preventDefault();
+        if (!confirm('Eliminare questo appuntamento?')) return;
+        attivita = (attivita || []).filter(a => !a || a.id !== delId);
         saveList(STORAGE_KEYS.attivita, attivita);
         renderAttivita();
+        renderAgendaWeek();
+        renderAgendaMonth();
         renderDashboardTodayActivities();
         renderDashboardDaySummary();
         return;
       }
 
-      // Crea attività/appuntamento collegato da immobile
+      // Click su riga (area libera): apri dettaglio appuntamento
+      const row = t?.closest && t.closest('tr[data-att-id]');
+      if (row) {
+        // ignora click su bottoni/controlli
+        if (t.closest('button, a, input, select, textarea, label')) return;
+        const id = row.getAttribute('data-att-id');
+        if (id) openAppuntamentoDialogById(id);
+        return;
+      }
+    });
+
+    // Crea attività/appuntamento collegato da immobile
       if (t.dataset && t.dataset.immAtt) {
         const immId = t.dataset.immAtt;
         if (immId) {
@@ -3147,16 +3271,28 @@ function closeAppuntamentoDialog() {
       }
     });
 
-    // filtri attivita
-    document.getElementById('att-filter-stato')?.addEventListener('change', renderAttivita);
+    // filtri appuntamenti (ex attività)
+    document.getElementById('att-filter-tipo')?.addEventListener('change', renderAttivita);
     document.getElementById('att-filter-resp')?.addEventListener('change', renderAttivita);
+    document.getElementById('att-filter-day')?.addEventListener('change', renderAttivita);
     document.getElementById('att-filter-text')?.addEventListener('input', () => renderAttivita());
-    document.getElementById('att-filter-clear')?.addEventListener('click', () => {
-      const fS = document.getElementById('att-filter-stato');
+
+    document.getElementById('att-filter-today')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      const d = document.getElementById('att-filter-day');
+      if (d) d.value = toLocalISODate(new Date());
+      renderAttivita();
+    });
+
+    document.getElementById('att-filter-clear')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      const fTipo = document.getElementById('att-filter-tipo');
       const fR = document.getElementById('att-filter-resp');
+      const fD = document.getElementById('att-filter-day');
       const fT = document.getElementById('att-filter-text');
-      if (fS) fS.value = 'tutte';
+      if (fTipo) fTipo.value = 'tutte';
       if (fR) fR.value = 'tutti';
+      if (fD) fD.value = '';
       if (fT) fT.value = '';
       renderAttivita();
     });
@@ -5550,6 +5686,40 @@ function initPoligoniModule() {
         closeAppuntamentoDialog();
       });
 
+      // Auto-durata: 15 min solo per "telefonico"
+      function syncDurataDefault() {
+        const tipoSel = document.getElementById('app-tipo');
+        const oraInput = document.getElementById('app-ora');
+        const oraFineInput = document.getElementById('app-ora-fine');
+        if (!tipoSel || !oraInput || !oraFineInput) return;
+
+        const tipo = (tipoSel.value || '').toLowerCase();
+        const ora = oraInput.value || '';
+        const oraFine = oraFineInput.value || '';
+
+        if (!ora) return;
+
+        const currentDur = (function() {
+          try {
+            const [h1,m1] = ora.split(':').map(x=>parseInt(x,10));
+            const [h2,m2] = (oraFine || ora).split(':').map(x=>parseInt(x,10));
+            if (isNaN(h1)||isNaN(m1)||isNaN(h2)||isNaN(m2)) return null;
+            return (h2*60+m2) - (h1*60+m1);
+          } catch { return null; }
+        })();
+
+        if (tipo === 'telefonico') {
+          if (currentDur !== 15) oraFineInput.value = addMinutesToTime(ora, 15);
+        } else {
+          // se era un telefonico e aveva 15 min, porta a 60 min
+          if (currentDur === 15) oraFineInput.value = addMinutesToTime(ora, 60);
+        }
+      }
+
+      document.getElementById('app-tipo')?.addEventListener('change', syncDurataDefault);
+      document.getElementById('app-ora')?.addEventListener('change', syncDurataDefault);
+
+
       // Elimina appuntamento direttamente dalla scheda
       document.getElementById('app-elimina')?.addEventListener('click', (e) => {
         e.preventDefault();
@@ -5639,7 +5809,7 @@ function initPoligoniModule() {
         if (dataInput && dataInput.value) app.data = dataInput.value;
         if (oraInput && oraInput.value) app.ora = oraInput.value;
         if (oraFineInput && oraFineInput.value) app.oraFine = oraFineInput.value;
-        if (tipoSel) app.tipoDettaglio = tipoSel.value || 'sopralluogo';
+        if (tipoSel) app.tipoDettaglio = tipoSel.value || 'generico';
         if (respSel) app.responsabileId = respSel.value || null;
         if (cliSel) {
           const val = cliSel.value || '';
@@ -5657,6 +5827,16 @@ function initPoligoniModule() {
         if (descrInput) app.descrizione = descrInput.value || '';
         if (bollenteChk) app.bollente = !!bollenteChk.checked;
         if (statoSel) app.stato = statoSel.value || 'aperta';
+        // Esito obbligatorio (se arriviamo dai pulsanti esito)
+        const form = document.getElementById('appuntamento-form');
+        if (form && form.dataset && form.dataset.forceEsito) {
+          app.esito = form.dataset.forceEsito;
+          app.esitoCommento = form.dataset.forceEsitoCommento || '';
+          // pulizia per prossimi salvataggi
+          delete form.dataset.forceEsito;
+          delete form.dataset.forceEsitoCommento;
+        }
+
         if (luogoInput) app.luogo = luogoInput.value || '';
         if (inUfficioChk) app.inUfficio = !!inUfficioChk.checked;
         if (cittaUfficioSel) app.cittaUfficio = cittaUfficioSel.value || '';
