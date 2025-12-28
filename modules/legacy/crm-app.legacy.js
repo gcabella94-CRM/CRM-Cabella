@@ -1,3 +1,4 @@
+/* PHASE2_APPUNTAMENTI_SYNTAXFIX_v2 2025-12-28T17:48:06.810646 */
 import { openNotiziaDetail as openNotiziaDetailDrawer } from '../notizie/notiziaDrawer.js';
 /* CRM-Cabella crm-app.js (FINAL) — generated 2025-12-17 18:20:08
    If you see this line in Sources, you have the right file.
