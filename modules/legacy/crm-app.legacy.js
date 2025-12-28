@@ -2986,25 +2986,6 @@ function closeAppuntamentoDialog() {
 
         selTipo.value = list.includes(currentT) ? currentT : 'tutte';
       }
-    });
-
-      const staffMap = {};
-      (staff || []).forEach(s => { staffMap[s.id] = s; });
-
-      used.forEach(id => {
-        const s = staffMap[id];
-        if (!s) return;
-        const opt = document.createElement('option');
-        opt.value = id;
-        opt.textContent = s.nome || 'Responsabile';
-        sel.appendChild(opt);
-      });
-
-      if (Array.from(used).includes(current)) {
-        sel.value = current;
-      } else {
-        sel.value = 'tutti';
-      }
     }
 
     function renderAttivita() {
