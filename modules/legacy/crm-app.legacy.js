@@ -1,3 +1,4 @@
+/* FIX7_remove_stray_after_click_block 2025-12-28T18:29:47.484492 removed=True */
 /* FIX6_move_notizia_blocks_inside_click_listener 2025-12-28T18:16:55.120171 */
 /* FIX5_define_addMinutesToTime 2025-12-28T18:02:00.243810 */
 /* FIX4_illegal_return_move_block_inside_click 2025-12-28T17:58:50.164447 */
@@ -3260,7 +3261,6 @@ function closeAppuntamentoDialog() {
 
     });
 
-      // Apertura scheda appuntamento cliccando sulla riga in tabella Attività
       const tr = t.closest && t.closest('tr[data-att-id]');
       if (tr && t.closest('table') && t.closest('#view-attivita') && !t.closest('button')) {
         const id = tr.getAttribute('data-att-id');
