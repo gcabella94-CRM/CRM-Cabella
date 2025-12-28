@@ -121,8 +121,21 @@ if (!window.createRicontattoAppuntamentoFromNotizia) {
   window.createRicontattoAppuntamentoFromNotizia = function(n, isoWhen, opts={}) {
     try {
       if (!n || !isoWhen) return null;
-      const d = new Date(isoWhen);
-      if (isNaN(d)) return null;
+      // Parse LOCAL datetime safely (avoid UTC shift)
+      let d = null;
+      if (isoWhen instanceof Date) {
+        d = isoWhen;
+      } else if (typeof isoWhen === 'string') {
+        const parts = isoWhen.split('T');
+        const datePart = parts[0] || '';
+        const timePart = (parts[1] || '00:00:00');
+        const dp = datePart.split('-').map(x=>parseInt(x,10));
+        const tp = timePart.split(':').map(x=>parseInt(x,10));
+        const Y = dp[0], M = dp[1], D = dp[2];
+        const h = tp[0] || 0, mi = tp[1] || 0, s = tp[2] || 0;
+        if (Y && M && D) d = new Date(Y, M-1, D, h, mi, s, 0);
+      }
+      if (!d || isNaN(d)) return null;
 
       const pad = (x)=>String(x).padStart(2,'0');
       // Use LOCAL date (avoid UTC shift)
@@ -214,8 +227,21 @@ if (!window.createRicontattoAgenda15FromNotizia) {
   window.createRicontattoAgenda15FromNotizia = function(n, isoWhen, opts={}) {
     try {
       if (!n || !isoWhen) return null;
-      const d = new Date(isoWhen);
-      if (isNaN(d)) return null;
+      // Parse LOCAL datetime safely (avoid UTC shift)
+      let d = null;
+      if (isoWhen instanceof Date) {
+        d = isoWhen;
+      } else if (typeof isoWhen === 'string') {
+        const parts = isoWhen.split('T');
+        const datePart = parts[0] || '';
+        const timePart = (parts[1] || '00:00:00');
+        const dp = datePart.split('-').map(x=>parseInt(x,10));
+        const tp = timePart.split(':').map(x=>parseInt(x,10));
+        const Y = dp[0], M = dp[1], D = dp[2];
+        const h = tp[0] || 0, mi = tp[1] || 0, s = tp[2] || 0;
+        if (Y && M && D) d = new Date(Y, M-1, D, h, mi, s, 0);
+      }
+      if (!d || isNaN(d)) return null;
 
       const pad = (x)=>String(x).padStart(2,'0');
       // LOCAL date/time (evita shift UTC)
