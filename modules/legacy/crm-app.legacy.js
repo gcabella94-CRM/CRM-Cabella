@@ -1,3 +1,4 @@
+/* FIX3_illegal_return_removed 2025-12-28T17:52:44.263242 */
 /* PHASE2_APPUNTAMENTI_SYNTAXFIX_v2 2025-12-28T17:48:06.810646 */
 import { openNotiziaDetail as openNotiziaDetailDrawer } from '../notizie/notiziaDrawer.js';
 /* CRM-Cabella crm-app.js (FINAL) — generated 2025-12-17 18:20:08
@@ -3206,9 +3207,8 @@ function closeAppuntamentoDialog() {
         if (id) openAppuntamentoDialogById(id);
         return;
       }
-    });
 
-    // Crea attività/appuntamento collegato da immobile
+      // Crea attività/appuntamento collegato da immobile
       if (t.dataset && t.dataset.immAtt) {
         const immId = t.dataset.immAtt;
         if (immId) {
