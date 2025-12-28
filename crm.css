@@ -85,6 +85,13 @@
       color: #6b7280;
       margin: 6px 4px 2px;
     }
+    .form-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      display: block;
+      margin-bottom: 2px;
+    }
+
 
     .nav-group {
       border-radius: 12px;
@@ -1252,10 +1259,3 @@
   white-space: pre-wrap;
   word-break: break-word;
 }
-
-
-/* Badge warning (esito pending) */
-.badge.badge-warn{border-color:rgba(245,158,11,0.45);background:rgba(245,158,11,0.12);}
-
-/* Agenda block pending esito */
-.agenda-block.agenda-block-pending{border-style:dashed;filter:saturate(0.9);}
