@@ -2227,25 +2227,37 @@ function setTextAny(ids, value) {
 function getRubricaArray() {
   // Adatta questi nomi se nel tuo CRM si chiamano diversamente
   const candidates = [
+    window.contatti,
     window.rubrica,
     window.rubricaData,
     window.data?.rubrica,
     window.STATE?.rubrica,
-    window.appState?.rubrica
+    window.STATE?.contatti,
+    window.appState?.rubrica,
+    window.appState?.contatti
   ];
 
   for (const c of candidates) {
     if (Array.isArray(c)) return c;
   }
 
-  // fallback: prova localStorage
+  // fallback 1: usa la funzione loadList se esiste (chiave ufficiale)
   try {
-    const raw = localStorage.getItem('rubrica') || localStorage.getItem('crm_rubrica');
+    if (typeof loadList === 'function' && typeof STORAGE_KEYS !== 'undefined' && STORAGE_KEYS?.contatti) {
+      const arr = loadList(STORAGE_KEYS.contatti);
+      if (Array.isArray(arr)) return arr;
+    }
+  } catch (_) {}
+
+  // fallback 2: localStorage diretto
+  try {
+    const key = (typeof STORAGE_KEYS !== 'undefined' && STORAGE_KEYS?.contatti) ? STORAGE_KEYS.contatti : 'crm10_contatti';
+    const raw = localStorage.getItem(key);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) return parsed;
-      if (Array.isArray(parsed?.rubrica)) return parsed.rubrica;
-      if (Array.isArray(parsed?.data?.rubrica)) return parsed.data.rubrica;
+      if (Array.isArray(parsed?.contatti)) return parsed.contatti;
+      if (Array.isArray(parsed?.data?.contatti)) return parsed.data.contatti;
     }
   } catch (_) {}
 
@@ -6021,7 +6033,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function getContacts() {
     try {
-      return JSON.parse(localStorage.getItem('rubrica') || '[]');
+      return JSON.parse(localStorage.getItem(STORAGE_KEYS.contatti) || '[]');
     } catch {
       return [];
     }
@@ -6097,7 +6109,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function getContacts(){
-    try { return JSON.parse(localStorage.getItem('rubrica')||'[]'); }
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEYS.contatti)||'[]'); }
     catch { return []; }
   }
 
@@ -6160,7 +6172,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const list = document.getElementById('rubrica-list');
 
   function getContacts(){
-    try { return JSON.parse(localStorage.getItem('rubrica')||'[]'); }
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEYS.contatti)||'[]'); }
     catch { return []; }
   }
 
@@ -6288,7 +6300,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function getContacts(){
-    try { return JSON.parse(localStorage.getItem('rubrica')||'[]'); }
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEYS.contatti)||'[]'); }
     catch { return []; }
   }
 
@@ -6466,7 +6478,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function upgradeDashboardMarkup(){
     // if current markup doesn't have rb-row/rb-card, rewrite it based on current numbers
     const a = (function(){
-      try { return JSON.parse(localStorage.getItem('rubrica')||'[]'); } catch { return []; }
+      try { return JSON.parse(localStorage.getItem(STORAGE_KEYS.contatti)||'[]'); } catch { return []; }
     })();
     const s = {
       all:a.length,
