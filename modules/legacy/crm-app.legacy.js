@@ -2443,10 +2443,11 @@ function renderRubrica() {
   // Contatori globali per la home rubrica
   const all = Array.isArray(contatti) ? contatti : [];
   const totalCount = all.length;
-  const acqCount = all.filter(c => c && c.isAcquirente).length;
-  const vendCount = all.filter(c => c && c.isVenditore).length;
-  const collCount = all.filter(c => c && c.isCollaboratore).length;
-  const altroCount = all.filter(c => c && c.isAltro).length;
+  // I flag possono esistere come booleani o stringhe, e con chiavi diverse (legacy/nuove)
+  const acqCount  = all.filter(c => c && (asBool(c.isAcquirente) || asBool(c.acquirente) || asBool(c.buyer))).length;
+  const vendCount = all.filter(c => c && (asBool(c.isVenditore)  || asBool(c.venditore)  || asBool(c.seller))).length;
+  const collCount = all.filter(c => c && (asBool(c.isCollaboratore) || asBool(c.collaboratore) || asBool(c.collaborator))).length;
+  const altroCount= all.filter(c => c && (asBool(c.isAltro) || asBool(c.altro) || asBool(c.other))).length;
   const counterEl = document.getElementById('rubrica-counter');
   if (counterEl) {
     counterEl.textContent = `Contatti totali: ${totalCount} · Acquirenti: ${acqCount} · Venditori: ${vendCount} · Collaboratori: ${collCount} · Altro: ${altroCount}`;
@@ -3331,50 +3332,6 @@ function closeAppuntamentoDialog() {
       }
     });
 
-    // Crea attività/appuntamento collegato da immobile
-      if (t.dataset && t.dataset.immAtt) {
-        const immId = t.dataset.immAtt;
-        if (immId) {
-          creaAppuntamentoDaImmobileId(immId);
-        }
-        return;
-      }
-
-      // Crea attività/appuntamento collegato da notizia
-      if (t.dataset && t.dataset.notAtt) {
-        const notId = t.dataset.notAtt;
-        if (notId) {
-          creaAppuntamentoDaNotiziaId(notId);
-        }
-        return;
-      }
-
-      // Modifica notizia
-      if (t.dataset && t.dataset.notEdit) {
-        const notId = t.dataset.notEdit;
-        if (notId) startEditNotizia(notId);
-        return;
-      }
-
-      // Apri scheda inserimento immobile partendo da notizia
-      if (t.dataset && t.dataset.notImm) {
-        const notId = t.dataset.notImm;
-        if (notId) {
-          apriSchedaImmobileDaNotizia(notId);
-        }
-        return;
-      }
-
-      // Apertura scheda appuntamento cliccando sulla riga in tabella Attività
-      const tr = t.closest && t.closest('tr[data-att-id]');
-      if (tr && t.closest('table') && t.closest('#view-attivita') && !t.closest('button')) {
-        const id = tr.getAttribute('data-att-id');
-        const app = getAppuntamentoById(id);
-        if (app) {
-          openAppuntamentoDialogById(id);
-        }
-      }
-    });
 
     // filtri appuntamenti (ex attività)
     document.getElementById('att-filter-tipo')?.addEventListener('change', renderAttivita);
