@@ -1051,7 +1051,7 @@ function creaNuovoAppuntamentoDaBottone() {
         id: '', // id vuoto -> verrà generato alla conferma
         data: dateIso,
         ora: '09:00',
-        oraFine: addMinutesToTimeSafe('09:00', 15),
+        oraFine: addMinutesToTime('09:00', 15),
         tipo: 'appuntamento',
         tipoDettaglio: 'telefonico',
         descrizione: '',
@@ -2227,37 +2227,25 @@ function setTextAny(ids, value) {
 function getRubricaArray() {
   // Adatta questi nomi se nel tuo CRM si chiamano diversamente
   const candidates = [
-    window.contatti,
     window.rubrica,
     window.rubricaData,
     window.data?.rubrica,
     window.STATE?.rubrica,
-    window.STATE?.contatti,
-    window.appState?.rubrica,
-    window.appState?.contatti
+    window.appState?.rubrica
   ];
 
   for (const c of candidates) {
     if (Array.isArray(c)) return c;
   }
 
-  // fallback 1: usa la funzione loadList se esiste (chiave ufficiale)
+  // fallback: prova localStorage
   try {
-    if (typeof loadList === 'function' && typeof STORAGE_KEYS !== 'undefined' && STORAGE_KEYS?.contatti) {
-      const arr = loadList(STORAGE_KEYS.contatti);
-      if (Array.isArray(arr)) return arr;
-    }
-  } catch (_) {}
-
-  // fallback 2: localStorage diretto
-  try {
-    const key = (typeof STORAGE_KEYS !== 'undefined' && STORAGE_KEYS?.contatti) ? STORAGE_KEYS.contatti : 'crm10_contatti';
-    const raw = localStorage.getItem(key);
+    const raw = localStorage.getItem('rubrica') || localStorage.getItem('crm_rubrica');
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) return parsed;
-      if (Array.isArray(parsed?.contatti)) return parsed.contatti;
-      if (Array.isArray(parsed?.data?.contatti)) return parsed.data.contatti;
+      if (Array.isArray(parsed?.rubrica)) return parsed.rubrica;
+      if (Array.isArray(parsed?.data?.rubrica)) return parsed.data.rubrica;
     }
   } catch (_) {}
 
@@ -2432,6 +2420,31 @@ function groupRubrica(data) {
   return groups.sort((a, b) => a.nome.localeCompare(b.nome));
 }
 
+
+// ==== TIME UTILS (robusto) ====
+// HH:MM + minuti (gestisce overflow su mezzanotte). Usata da attività/agenda.
+function addMinutesToTimeSafe(timeStr, minutes) {
+  if (!timeStr || typeof timeStr !== 'string') return timeStr || '';
+  const parts = timeStr.split(':');
+  if (parts.length < 2) return timeStr;
+  const h = parseInt(parts[0], 10);
+  const m = parseInt(parts[1], 10);
+  if (isNaN(h) || isNaN(m)) return timeStr;
+
+  const d = new Date(2000, 0, 1, h, m, 0, 0);
+  d.setMinutes(d.getMinutes() + (Number(minutes) || 0));
+
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  return `${hh}:${mm}`;
+}
+
+// Back-compat: in tutto il legacy usiamo addMinutesToTime(...)
+function addMinutesToTime(timeStr, minutes) {
+  return addMinutesToTimeSafe(timeStr, minutes);
+}
+
+
 function renderRubrica() {
   const list = document.getElementById('rubrica-list');
   if (!list) return;
@@ -2443,11 +2456,10 @@ function renderRubrica() {
   // Contatori globali per la home rubrica
   const all = Array.isArray(contatti) ? contatti : [];
   const totalCount = all.length;
-  // I flag possono esistere come booleani o stringhe, e con chiavi diverse (legacy/nuove)
-  const acqCount  = all.filter(c => c && (asBool(c.isAcquirente) || asBool(c.acquirente) || asBool(c.buyer))).length;
-  const vendCount = all.filter(c => c && (asBool(c.isVenditore)  || asBool(c.venditore)  || asBool(c.seller))).length;
-  const collCount = all.filter(c => c && (asBool(c.isCollaboratore) || asBool(c.collaboratore) || asBool(c.collaborator))).length;
-  const altroCount= all.filter(c => c && (asBool(c.isAltro) || asBool(c.altro) || asBool(c.other))).length;
+  const acqCount = all.filter(c => c && c.isAcquirente).length;
+  const vendCount = all.filter(c => c && c.isVenditore).length;
+  const collCount = all.filter(c => c && c.isCollaboratore).length;
+  const altroCount = all.filter(c => c && c.isAltro).length;
   const counterEl = document.getElementById('rubrica-counter');
   if (counterEl) {
     counterEl.textContent = `Contatti totali: ${totalCount} · Acquirenti: ${acqCount} · Venditori: ${vendCount} · Collaboratori: ${collCount} · Altro: ${altroCount}`;
@@ -2765,19 +2777,6 @@ document.getElementById('rubrica-form')?.addEventListener('submit', e => {
     function normalizeAttivitaItem(a) {
       if (!a) return a;
       if (!a.id) a.id = genId('att');
-    function addMinutesToTimeSafe(timeStr, minutes) {
-  if (!timeStr || typeof timeStr !== 'string') return timeStr;
-  const [h, m] = timeStr.split(':').map(Number);
-  if (isNaN(h) || isNaN(m)) return timeStr;
-
-  const d = new Date(2000, 0, 1, h, m);
-  d.setMinutes(d.getMinutes() + (Number(minutes) || 0));
-
-  const hh = String(d.getHours()).padStart(2, '0');
-  const mm = String(d.getMinutes()).padStart(2, '0');
-  return `${hh}:${mm}`;
-}
-
 
       // Unificazione: tutto diventa "appuntamento" (ex attività + appuntamenti agenda)
       if (!a.tipo || a.tipo === 'attività' || a.tipo === 'attivita') a.tipo = 'appuntamento';
@@ -2812,7 +2811,7 @@ document.getElementById('rubrica-form')?.addEventListener('submit', e => {
       // Default durata: 15 min SOLO per telefonico, altrimenti 60 se manca oraFine
       if (a.data && a.ora && !a.oraFine) {
         const mins = (td === 'telefonico') ? 15 : 60;
-        a.oraFine = addMinutesToTimeSafe(a.ora, mins);
+        a.oraFine = addMinutesToTime(a.ora, mins);
       }
 
       return a;
@@ -3256,7 +3255,7 @@ function closeAppuntamentoDialog() {
         id: '',
         data: dateIso,
         ora: '09:00',
-        oraFine: addMinutesToTimeSafe('09:00', 15),
+        oraFine: addMinutesToTime('09:00', 15),
         tipo: 'appuntamento',
         tipoDettaglio: 'telefonico',
         descrizione: '',
@@ -3345,6 +3344,50 @@ function closeAppuntamentoDialog() {
       }
     });
 
+    // Crea attività/appuntamento collegato da immobile
+      if (t.dataset && t.dataset.immAtt) {
+        const immId = t.dataset.immAtt;
+        if (immId) {
+          creaAppuntamentoDaImmobileId(immId);
+        }
+        return;
+      }
+
+      // Crea attività/appuntamento collegato da notizia
+      if (t.dataset && t.dataset.notAtt) {
+        const notId = t.dataset.notAtt;
+        if (notId) {
+          creaAppuntamentoDaNotiziaId(notId);
+        }
+        return;
+      }
+
+      // Modifica notizia
+      if (t.dataset && t.dataset.notEdit) {
+        const notId = t.dataset.notEdit;
+        if (notId) startEditNotizia(notId);
+        return;
+      }
+
+      // Apri scheda inserimento immobile partendo da notizia
+      if (t.dataset && t.dataset.notImm) {
+        const notId = t.dataset.notImm;
+        if (notId) {
+          apriSchedaImmobileDaNotizia(notId);
+        }
+        return;
+      }
+
+      // Apertura scheda appuntamento cliccando sulla riga in tabella Attività
+      const tr = t.closest && t.closest('tr[data-att-id]');
+      if (tr && t.closest('table') && t.closest('#view-attivita') && !t.closest('button')) {
+        const id = tr.getAttribute('data-att-id');
+        const app = getAppuntamentoById(id);
+        if (app) {
+          openAppuntamentoDialogById(id);
+        }
+      }
+    });
 
     // filtri appuntamenti (ex attività)
     document.getElementById('att-filter-tipo')?.addEventListener('change', renderAttivita);
@@ -5784,10 +5827,10 @@ function initPoligoniModule() {
         })();
 
         if (tipo === 'telefonico') {
-          if (currentDur !== 15) oraFineInput.value = addMinutesToTimeSafe(ora, 15);
+          if (currentDur !== 15) oraFineInput.value = addMinutesToTime(ora, 15);
         } else {
           // se era un telefonico e aveva 15 min, porta a 60 min
-          if (currentDur === 15) oraFineInput.value = addMinutesToTimeSafe(ora, 60);
+          if (currentDur === 15) oraFineInput.value = addMinutesToTime(ora, 60);
         }
       }
 
@@ -6003,7 +6046,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function getContacts() {
     try {
-      return JSON.parse(localStorage.getItem(STORAGE_KEYS.contatti) || '[]');
+      return JSON.parse(localStorage.getItem('rubrica') || '[]');
     } catch {
       return [];
     }
@@ -6079,7 +6122,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function getContacts(){
-    try { return JSON.parse(localStorage.getItem(STORAGE_KEYS.contatti)||'[]'); }
+    try { return JSON.parse(localStorage.getItem('rubrica')||'[]'); }
     catch { return []; }
   }
 
@@ -6142,7 +6185,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const list = document.getElementById('rubrica-list');
 
   function getContacts(){
-    try { return JSON.parse(localStorage.getItem(STORAGE_KEYS.contatti)||'[]'); }
+    try { return JSON.parse(localStorage.getItem('rubrica')||'[]'); }
     catch { return []; }
   }
 
@@ -6270,7 +6313,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function getContacts(){
-    try { return JSON.parse(localStorage.getItem(STORAGE_KEYS.contatti)||'[]'); }
+    try { return JSON.parse(localStorage.getItem('rubrica')||'[]'); }
     catch { return []; }
   }
 
@@ -6448,7 +6491,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function upgradeDashboardMarkup(){
     // if current markup doesn't have rb-row/rb-card, rewrite it based on current numbers
     const a = (function(){
-      try { return JSON.parse(localStorage.getItem(STORAGE_KEYS.contatti)||'[]'); } catch { return []; }
+      try { return JSON.parse(localStorage.getItem('rubrica')||'[]'); } catch { return []; }
     })();
     const s = {
       all:a.length,
