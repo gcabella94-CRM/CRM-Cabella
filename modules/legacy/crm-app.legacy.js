@@ -1,7 +1,3 @@
-/* FIX7_remove_stray_after_click_block 2025-12-28T18:29:47.484492 removed=True */
-/* FIX6_move_notizia_blocks_inside_click_listener 2025-12-28T18:16:55.120171 */
-/* FIX5_define_addMinutesToTime 2025-12-28T18:02:00.243810 */
-/* FIX4_illegal_return_move_block_inside_click 2025-12-28T17:58:50.164447 */
 import { openNotiziaDetail as openNotiziaDetailDrawer } from '../notizie/notiziaDrawer.js';
 /* CRM-Cabella crm-app.js (FINAL) — generated 2025-12-17 18:20:08
    If you see this line in Sources, you have the right file.
@@ -1548,7 +1544,7 @@ function renderAgendaMonth() {
 
                 <div class="notizia-lastcomment-box">
                   <textarea class="input-sm" rows="2" placeholder="Scrivi qui il commento dell’ultimo contatto…"
-                    data-not-lastcomment="${escapeHtml(n.id)}" id="not-lastcomment-${escapeHtml(n.id)}" name="notizia_lastcomment_${escapeHtml(n.id)}">${escapeHtml(n._draftLastComment || '')}</textarea>
+                    data-not-lastcomment="${escapeHtml(n.id)}">${escapeHtml(n._draftLastComment || '')}</textarea>
                   <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:6px;">
                     <button class="btn btn-xs" data-not-save-lastcomment="${escapeHtml(n.id)}">Salva commento</button>
                   </div>
@@ -1564,11 +1560,11 @@ function renderAgendaMonth() {
                 <div class="notizia-grid" style="margin-top:8px;">
                   <div class="notizia-mini">
                     <div class="notizia-mini-k">Data ricontatto</div>
-                    <input class="input-sm" type="date" data-not-recall-date="${escapeHtml(n.id)}" id="not-recall-date-${escapeHtml(n.id)}" name="notizia_recall_date_${escapeHtml(n.id)}">
+                    <input class="input-sm" type="date" data-not-recall-date="${escapeHtml(n.id)}">
                   </div>
                   <div class="notizia-mini">
                     <div class="notizia-mini-k">Ora</div>
-                    <input class="input-sm" type="time" data-not-recall-time="${escapeHtml(n.id)}" id="not-recall-time-${escapeHtml(n.id)}" name="notizia_recall_time_${escapeHtml(n.id)}">
+                    <input class="input-sm" type="time" data-not-recall-time="${escapeHtml(n.id)}">
                   </div>
                   <div class="notizia-mini">
                     <div class="notizia-mini-k">&nbsp;</div>
@@ -2199,6 +2195,118 @@ document.getElementById('not-new-btn')?.addEventListener('click', () => {
 
 /* ====== RUBRICA / CONTATTI ====== */
 
+/* =========================
+   RUBRICA – DASHBOARD COUNTS (ROBUST)
+   ========================= */
+
+// Converte valori "truthy" tipici (true, "true", 1, "1", "yes", "on") in boolean
+function asBool(v) {
+  if (v === true) return true;
+  if (v === false || v == null) return false;
+  const s = String(v).trim().toLowerCase();
+  return s === 'true' || s === '1' || s === 'yes' || s === 'y' || s === 'on';
+}
+
+// Setta testo solo se l'elemento esiste
+function setTextSafe(id, value) {
+  const el = document.getElementById(id);
+  if (!el) return false;
+  el.textContent = String(value ?? '');
+  return true;
+}
+
+// Prova più id possibili (così non “muore” se hai rinominato qualcosa)
+function setTextAny(ids, value) {
+  for (const id of ids) {
+    if (setTextSafe(id, value)) return true;
+  }
+  return false;
+}
+
+// Estrae l’array contatti da varie possibili strutture globali
+function getRubricaArray() {
+  // Adatta questi nomi se nel tuo CRM si chiamano diversamente
+  const candidates = [
+    window.rubrica,
+    window.rubricaData,
+    window.data?.rubrica,
+    window.STATE?.rubrica,
+    window.appState?.rubrica
+  ];
+
+  for (const c of candidates) {
+    if (Array.isArray(c)) return c;
+  }
+
+  // fallback: prova localStorage
+  try {
+    const raw = localStorage.getItem('rubrica') || localStorage.getItem('crm_rubrica');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+      if (Array.isArray(parsed?.rubrica)) return parsed.rubrica;
+      if (Array.isArray(parsed?.data?.rubrica)) return parsed.data.rubrica;
+    }
+  } catch (_) {}
+
+  return [];
+}
+
+// Calcola contatori
+function computeRubricaCounts(list) {
+  const arr = Array.isArray(list) ? list : [];
+  const total = arr.length;
+
+  let acq = 0, ven = 0, col = 0, alt = 0;
+
+  for (const c of arr) {
+    // Nomi flag “probabili”: adatta se usi chiavi diverse
+    if (asBool(c?.acquirente) || asBool(c?.buyer)) acq++;
+    if (asBool(c?.venditore) || asBool(c?.seller)) ven++;
+    if (asBool(c?.collaboratore) || asBool(c?.collaborator)) col++;
+    if (asBool(c?.altro) || asBool(c?.other)) alt++;
+  }
+
+  return { total, acq, ven, col, alt };
+}
+
+// Aggiorna i contatori nel DOM
+function updateRubricaDashboardCounts(listOverride) {
+  const list = Array.isArray(listOverride) ? listOverride : getRubricaArray();
+  const { total, acq, ven, col, alt } = computeRubricaCounts(list);
+
+  // Metti qui gli ID che hai davvero nel tuo HTML (anche 2-3 varianti per sicurezza)
+  setTextAny(['rub-counter-total', 'rubrica-counter-total', 'rubCountTotal'], total);
+  setTextAny(['rub-counter-acq', 'rubrica-counter-acq', 'rubCountAcq', 'rub-counter-acquirenti'], acq);
+  setTextAny(['rub-counter-ven', 'rubrica-counter-ven', 'rubCountVen', 'rub-counter-venditori'], ven);
+  setTextAny(['rub-counter-col', 'rubrica-counter-col', 'rubCountCol', 'rub-counter-collaboratori'], col);
+  setTextAny(['rub-counter-alt', 'rubrica-counter-alt', 'rubCountAlt', 'rub-counter-altro'], alt);
+
+  return { total, acq, ven, col, alt };
+}
+
+/* ---- Hook “anti timing”: chiama più volte quando la UI potrebbe non essere pronta ---- */
+function scheduleRubricaCountsRefresh() {
+  // subito
+  updateRubricaDashboardCounts();
+
+  // dopo paint / render
+  requestAnimationFrame(() => updateRubricaDashboardCounts());
+
+  // dopo eventuali sync async
+  setTimeout(() => updateRubricaDashboardCounts(), 150);
+  setTimeout(() => updateRubricaDashboardCounts(), 600);
+}
+
+// Se vuoi: aggiorna automaticamente quando torni sulla tab rubrica
+document.addEventListener('click', (e) => {
+  const t = e.target;
+  // adatta i selettori ai tuoi bottoni/menu
+  if (t?.closest?.('[data-view="rubrica"]') || t?.closest?.('[data-nav="rubrica"]') || t?.id === 'nav-rubrica') {
+    scheduleRubricaCountsRefresh();
+  }
+});
+
 function buildKey(c) {
   return (c.telefono || c.email || c.id || '').trim().toLowerCase();
 }
@@ -2216,22 +2324,6 @@ function formatDateTimeIT(str) {
   const time = d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
   return `${date} ${time}`;
 }
-
-function addMinutesToTime(hhmm, minutesToAdd) {
-  // hhmm: "HH:MM" -> returns "HH:MM" (24h) after adding minutes (wraps over midnight)
-  if (!hhmm) return '';
-  const m = String(hhmm).match(/^(\d{1,2}):(\d{2})$/);
-  if (!m) return '';
-  let h = parseInt(m[1], 10);
-  let min = parseInt(m[2], 10);
-  if (isNaN(h) || isNaN(min)) return '';
-  let total = h * 60 + min + (parseInt(minutesToAdd, 10) || 0);
-  total = ((total % 1440) + 1440) % 1440; // keep in [0,1439]
-  const hh = String(Math.floor(total / 60)).padStart(2, '0');
-  const mm = String(total % 60).padStart(2, '0');
-  return `${hh}:${mm}`;
-}
-
 
 function escapeHtml(str) {
   if (!str) return '';
@@ -3225,6 +3317,8 @@ function closeAppuntamentoDialog() {
         if (id) openAppuntamentoDialogById(id);
         return;
       }
+    });
+
     // Crea attività/appuntamento collegato da immobile
       if (t.dataset && t.dataset.immAtt) {
         const immId = t.dataset.immAtt;
@@ -3233,6 +3327,7 @@ function closeAppuntamentoDialog() {
         }
         return;
       }
+
       // Crea attività/appuntamento collegato da notizia
       if (t.dataset && t.dataset.notAtt) {
         const notId = t.dataset.notAtt;
@@ -3258,8 +3353,17 @@ function closeAppuntamentoDialog() {
         return;
       }
 
-
+      // Apertura scheda appuntamento cliccando sulla riga in tabella Attività
+      const tr = t.closest && t.closest('tr[data-att-id]');
+      if (tr && t.closest('table') && t.closest('#view-attivita') && !t.closest('button')) {
+        const id = tr.getAttribute('data-att-id');
+        const app = getAppuntamentoById(id);
+        if (app) {
+          openAppuntamentoDialogById(id);
+        }
+      }
     });
+
     // filtri appuntamenti (ex attività)
     document.getElementById('att-filter-tipo')?.addEventListener('change', renderAttivita);
     document.getElementById('att-filter-resp')?.addEventListener('change', renderAttivita);
