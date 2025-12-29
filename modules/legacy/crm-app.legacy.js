@@ -2765,6 +2765,19 @@ document.getElementById('rubrica-form')?.addEventListener('submit', e => {
     function normalizeAttivitaItem(a) {
       if (!a) return a;
       if (!a.id) a.id = genId('att');
+    function addMinutesToTimeSafe(timeStr, minutes) {
+  if (!timeStr || typeof timeStr !== 'string') return timeStr;
+  const [h, m] = timeStr.split(':').map(Number);
+  if (isNaN(h) || isNaN(m)) return timeStr;
+
+  const d = new Date(2000, 0, 1, h, m);
+  d.setMinutes(d.getMinutes() + (Number(minutes) || 0));
+
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  return `${hh}:${mm}`;
+}
+
 
       // Unificazione: tutto diventa "appuntamento" (ex attività + appuntamenti agenda)
       if (!a.tipo || a.tipo === 'attività' || a.tipo === 'attivita') a.tipo = 'appuntamento';
