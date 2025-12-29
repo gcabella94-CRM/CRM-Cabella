@@ -1051,7 +1051,7 @@ function creaNuovoAppuntamentoDaBottone() {
         id: '', // id vuoto -> verrà generato alla conferma
         data: dateIso,
         ora: '09:00',
-        oraFine: addMinutesToTime('09:00', 15),
+        oraFine: addMinutesToTimeSafe('09:00', 15),
         tipo: 'appuntamento',
         tipoDettaglio: 'telefonico',
         descrizione: '',
@@ -2812,7 +2812,7 @@ document.getElementById('rubrica-form')?.addEventListener('submit', e => {
       // Default durata: 15 min SOLO per telefonico, altrimenti 60 se manca oraFine
       if (a.data && a.ora && !a.oraFine) {
         const mins = (td === 'telefonico') ? 15 : 60;
-        a.oraFine = addMinutesToTime(a.ora, mins);
+        a.oraFine = addMinutesToTimeSafe(a.ora, mins);
       }
 
       return a;
@@ -3256,7 +3256,7 @@ function closeAppuntamentoDialog() {
         id: '',
         data: dateIso,
         ora: '09:00',
-        oraFine: addMinutesToTime('09:00', 15),
+        oraFine: addMinutesToTimeSafe('09:00', 15),
         tipo: 'appuntamento',
         tipoDettaglio: 'telefonico',
         descrizione: '',
@@ -5784,10 +5784,10 @@ function initPoligoniModule() {
         })();
 
         if (tipo === 'telefonico') {
-          if (currentDur !== 15) oraFineInput.value = addMinutesToTime(ora, 15);
+          if (currentDur !== 15) oraFineInput.value = addMinutesToTimeSafe(ora, 15);
         } else {
           // se era un telefonico e aveva 15 min, porta a 60 min
-          if (currentDur === 15) oraFineInput.value = addMinutesToTime(ora, 60);
+          if (currentDur === 15) oraFineInput.value = addMinutesToTimeSafe(ora, 60);
         }
       }
 
