@@ -174,21 +174,8 @@ const staffId = (n.responsabileId) || ((staff && staff[0] && staff[0].id) || nul
 
       const descrBase = (opts && opts.descrizione) ? String(opts.descrizione) : 'Ricontatto';
       const tipoDettaglio = (opts && opts.tipoDettaglio) ? String(opts.tipoDettaglio) : 'telefonata';
+      // Appuntamento 15' in agenda
 
-      // 1) Attività (task) per follow-up
-      const task = {
-        id: (typeof genId==='function' ? genId('att') : ('att_' + Date.now())),
-        tipo: 'attività',
-        data: dateIso,
-        ora,
-        descrizione: descrBase,
-        responsabileId: staffId,
-        stato: 'aperta',
-        links: { notiziaId: n.id, immobileId:'', contattoId: contattoId || '', attivitaId:'' }
-      };
-      attivita.push(task);
-
-      // 2) Appuntamento 15' in agenda
       const app = {
         id: (typeof genId==='function' ? genId('app') : ('app_' + Date.now())),
         tipo: 'appuntamento',
@@ -214,7 +201,7 @@ const staffId = (n.responsabileId) || ((staff && staff[0] && staff[0].id) || nul
       try { renderAttivita && renderAttivita(); } catch {}
       try { renderDashboard && renderDashboard(); } catch {}
 
-      return { taskId: task.id, appId: app.id };
+      return { appId: app.id };
     } catch (e) {
       console.warn('[createRicontattoAppuntamentoFromNotizia] errore', e);
       return null;
@@ -2451,19 +2438,44 @@ function renderRubrica() {
 
   const ft = (document.getElementById('rubrica-filter')?.value || '').toLowerCase();
   const activeTabEl = document.querySelector('.rubrica-subtab.active');
-  const activeTab = activeTabEl?.dataset.sub || 'lista';
-
-  // Contatori globali per la home rubrica
+  const activeTab = activeTabEl?.dataset.sub || 'lista';  // Contatori + cruscotto (home rubrica)
   const all = Array.isArray(contatti) ? contatti : [];
-  const totalCount = all.length;
-  const acqCount = all.filter(c => c && c.isAcquirente).length;
-  const vendCount = all.filter(c => c && c.isVenditore).length;
-  const collCount = all.filter(c => c && c.isCollaboratore).length;
-  const altroCount = all.filter(c => c && c.isAltro).length;
+  const groupsAll = groupRubrica(all);
+
+  const totalCount = groupsAll.length;
+  const acqCount   = groupsAll.filter(g => g && g.isAcquirente).length;
+  const vendCount  = groupsAll.filter(g => g && g.isVenditore).length;
+  const collCount  = groupsAll.filter(g => g && g.isCollaboratore).length;
+  const altroCount = groupsAll.filter(g => g && g.isAltro).length;
+
   const counterEl = document.getElementById('rubrica-counter');
   if (counterEl) {
-    counterEl.textContent = `Contatti totali: ${totalCount} · Acquirenti: ${acqCount} · Venditori: ${vendCount} · Collaboratori: ${collCount} · Altro: ${altroCount}`;
+    counterEl.innerHTML = `
+      <div class="rubrica-dashboard">
+        <div class="rubrica-kpi" data-go="lista">👥 Tutti<br><strong>${totalCount}</strong></div>
+        <div class="rubrica-kpi" data-go="acquirenti">🏡 Acquirenti<br><strong>${acqCount}</strong></div>
+        <div class="rubrica-kpi" data-go="venditori">🏠 Venditori<br><strong>${vendCount}</strong></div>
+        <div class="rubrica-kpi" data-go="collaboratori">🤝 Collaboratori<br><strong>${collCount}</strong></div>
+        <div class="rubrica-kpi" data-go="altro">📌 Altro<br><strong>${altroCount}</strong></div>
+      </div>`;
+
+    const setTab = (sub) => {
+      document.querySelectorAll('.rubrica-subtab').forEach(el => {
+        if (!el) return;
+        el.classList.toggle('active', (el.dataset.sub || '') === sub);
+      });
+    };
+
+    counterEl.querySelectorAll('.rubrica-kpi').forEach(k => {
+      k.addEventListener('click', () => {
+        const go = k.dataset.go || 'lista';
+        setTab(go);
+        renderRubrica();
+      });
+    });
   }
+
+  
 
   let groups = groupRubrica(all).filter(g =>
     g.nome.toLowerCase().includes(ft) ||
