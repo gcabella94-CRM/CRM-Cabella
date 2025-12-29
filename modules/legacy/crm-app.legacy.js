@@ -3342,7 +3342,8 @@ function closeAppuntamentoDialog() {
         if (id) openAppuntamentoDialogById(id);
         return;
       }
-      // [FIX] rimosso chiusura prematura del document.click: il listener continua sotto
+
+      // [FIX] non chiudere qui il document.click: il listener continua sotto
 
     // Crea attività/appuntamento collegato da immobile
       if (t.dataset && t.dataset.immAtt) {
