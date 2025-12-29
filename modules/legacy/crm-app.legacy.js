@@ -1547,14 +1547,8 @@ function renderAgendaMonth() {
                 <div class="muted" style="margin-bottom:6px;">${escapeHtml(n.commentoUltimaInterazione || '')}</div>
 
                 <div class="notizia-lastcomment-box">
-                  <textarea
-                    class="input-sm"
-                    rows="2"
-                    placeholder="Scrivi qui il commento dell’ultimo contatto…"
-                    data-not-lastcomment="${escapeHtml(n.id)}"
-                    id="not-lastcomment-${escapeHtml(n.id)}"
-                    name="notizia_lastcomment_${escapeHtml(n.id)}"
-                  >${escapeHtml(n._draftLastComment || '')}</textarea>
+                  <textarea class="input-sm" rows="2" placeholder="Scrivi qui il commento dell’ultimo contatto…"
+                    data-not-lastcomment="${escapeHtml(n.id)}" id="not-lastcomment-${escapeHtml(n.id)}" name="notizia_lastcomment_${escapeHtml(n.id)}">${escapeHtml(n._draftLastComment || '')}</textarea>
                   <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:6px;">
                     <button class="btn btn-xs" data-not-save-lastcomment="${escapeHtml(n.id)}">Salva commento</button>
                   </div>
@@ -3266,8 +3260,6 @@ function closeAppuntamentoDialog() {
 
 
     });
-
-
     // filtri appuntamenti (ex attività)
     document.getElementById('att-filter-tipo')?.addEventListener('change', renderAttivita);
     document.getElementById('att-filter-resp')?.addEventListener('change', renderAttivita);
