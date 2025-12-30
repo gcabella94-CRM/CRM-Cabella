@@ -136,8 +136,8 @@ if (!window.createRicontattoAppuntamentoFromNotizia) {
 
       const pad = (x)=>String(x).padStart(2,'0');
 
-      // durata appuntamento (min). Default: 60 (1h). Puoi passare opts.durataMin.
-      const durataMin = (opts && Number.isFinite(opts.durataMin)) ? opts.durataMin : 60;
+      // durata appuntamento (min). Default: 15 (15'). Puoi passare opts.durataMin.
+      const durataMin = (opts && Number.isFinite(opts.durataMin)) ? opts.durataMin : 15;
 
       // aggiungi durataMin minuti a HH:MM (con carry su ora)
       const hm = ora.split(':');
@@ -2131,6 +2131,7 @@ const editBtn = e.target.closest?.('[data-not-edit]');
       // ✅ ricontatto: attività + appuntamento 15' (sia per "non risponde" che per "salva commento")
       try {
         window.createRicontattoAppuntamentoFromNotizia && window.createRicontattoAppuntamentoFromNotizia(n, iso, {
+            durataMin: 15,
           tipoDettaglio: 'telefonata',
           descrizione: isNoAnswer ? 'Ricontatto (non risponde)' : 'Ricontatto'
         });
@@ -2187,6 +2188,7 @@ const editBtn = e.target.closest?.('[data-not-edit]');
       if (isoRecall) {
         try {
           window.createRicontattoAppuntamentoFromNotizia && window.createRicontattoAppuntamentoFromNotizia(n, isoRecall, {
+            durataMin: 15,
             tipoDettaglio: 'telefonata',
             descrizione: val ? ('Ricontatto: ' + val.slice(0,70)) : 'Ricontatto'
           });
