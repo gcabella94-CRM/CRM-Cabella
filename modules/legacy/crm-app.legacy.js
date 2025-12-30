@@ -1,4 +1,5 @@
 import { applyBlockLayout } from '../agenda/layout.js';
+import { getOverlaps, hasSameResponsabileOverlap } from '../agenda/overlap.js';
 import { openNotiziaDetail as openNotiziaDetailDrawer } from '../notizie/notiziaDrawer.js';
 /* CRM-Cabella crm-app.js (FINAL) — generated 2025-12-17 18:20:08
    If you see this line in Sources, you have the right file.
@@ -350,9 +351,13 @@ addInterazione({
       note: testo,
       titolo: testo,
       links: { notiziaId: n.id, immobileId:'', contattoId:'', attivitaId:'' },
-      prossimaAzione: isoWhen ? { enabled:true, when: isoWhen, durataMin: 15, creaInAgenda: creaAgenda } : { enabled:false }
+      prossimaAzione: isoWhen ? { enabled:true, when: isoWhen, durataMin: 15, creaInAgenda: false } : { enabled:false }
     });
-    // Nota: niente chiamata diretta a createRicontattoAppuntamentoFromNotizia qui: addInterazione.prossimaAzione.creaInAgenda gestisce l'agenda (evita doppioni)
+
+    if (isoWhen && creaAgenda) {
+      createRicontattoAppuntamentoFromNotizia(n, isoWhen, { durataMin: 15,  tipoDettaglio: 'telefonata', descrizione: testo ? ('Ricontatto: ' + testo.slice(0,70)) : undefined });
+    }
+
     // refresh UI
     renderNotiziaDetail(n);
     try { renderNotizie(); } catch {}
@@ -690,48 +695,6 @@ addInterazione({
 
     /* ====== AGENDA ====== */
 
-/* (Nota) Se presente agenda.bundle.js, il legacy userà window.AGENDA.* */
-  /* ====== AGENDA: overlap helpers (importati dai moduli, ma inline per compatibilità) ====== */
-function getOverlaps(a, dayApps) {
-  return (dayApps || []).filter(ev => {
-    if (!ev || ev === a) return false;
-    return (ev._startMin < a._endMin) && (ev._endMin > a._startMin);
-  });
-}
-
-function computeColumnsForEvent(a, dayApps) {
-  const overlaps = getOverlaps(a, dayApps);
-  if (overlaps.length === 0) return { cols: 1, index: 0, overlaps };
-
-  const cols = overlaps.length + 1;
-  const index = Math.min(a._colIndex || 0, cols - 1);
-  return { cols, index, overlaps };
-}
-
-function hasSameResponsabileOverlap(a, overlaps) {
-  if (!a || !a.responsabileId) return false;
-  return (overlaps || []).some(ev => ev && ev.responsabileId === a.responsabileId);
-}
-
-function applyBlockLayout(block, a, dayApps) {
-  if (!block) return;
-
-  // reset (evita "effetto 50%" persistente)
-  block.style.left = '0%';
-  block.style.width = '100%';
-
-  const { cols, index } = computeColumnsForEvent(a, dayApps);
-  if (cols === 1) return;
-
-  const widthPercent = 100 / cols;
-  const leftPercent = widthPercent * index;
-  block.style.left = leftPercent + '%';
-  block.style.width = widthPercent + '%';
-}
-/* ====== /AGENDA overlap helpers ====== */
-
-
-
     let agendaWeekAnchor = startOfWeek(new Date());
     let agendaDrag = {
       isDragging: false,
@@ -979,9 +942,7 @@ function applyBlockLayout(block, a, dayApps) {
 
           // crea il blocco interno
           const block = document.createElement('div');
-const appBlock = block; // ✅ FIX: definisce appBlock
-appBlock.className = 'agenda-block';
-
+          appBlock.className = 'agenda-block';
           // colore responsabile
           let respColor = '#22c55e';
           if (respObj && (respObj.colore || respObj.color)) {
@@ -1008,13 +969,19 @@ appBlock.className = 'agenda-block';
           if (lastCreatedAppId && a.id === lastCreatedAppId) {
             appBlock.classList.add('agenda-block-new');
           }
+
+          const colIndex = a._colIndex || 0;
+          const colCount = a._colCount || 1;
+          const widthPercent = 100 / colCount;
+          const leftPercent = widthPercent * colIndex;
+
           appBlock.style.position = 'absolute';
           appBlock.style.top = '0';
-(window.AGENDA && window.AGENDA.applyBlockLayout ? window.AGENDA.applyBlockLayout : applyBlockLayout)(block, a, dayApps);
+applyBlockLayout(block, a, dayApps);
 const overlaps = getOverlaps(a, dayApps);
 if (hasSameResponsabileOverlap(a, overlaps)) {
-  appBlock.classList.add('agenda-block-collision');
-  appBlock.title = '⚠️ Collisione responsabile\n' + (appBlock.title || '');
+  block.classList.add('agenda-block-collision');
+  block.title = '⚠️ Collisione responsabile\n' + (block.title || '');
 }
           appBlock.style.height = (slotPx * totalSlots - 2) + 'px';
 
@@ -2159,7 +2126,15 @@ const editBtn = e.target.closest?.('[data-not-edit]');
           });
         } catch (err) { console.warn('[NOTIZIE] addInterazione non risponde err', err); }
       }
-      // ✅ ricontatto: la creazione in agenda avviene tramite addInterazione.prossimaAzione.creaInAgenda (evita duplicati)
+
+      // ✅ ricontatto: attività + appuntamento 15' (sia per "non risponde" che per "salva commento")
+      try {
+        window.createRicontattoAppuntamentoFromNotizia && window.createRicontattoAppuntamentoFromNotizia(n, iso, { durataMin: 15, 
+          tipoDettaglio: 'telefonata',
+          descrizione: isNoAnswer ? 'Ricontatto (non risponde)' : 'Ricontatto'
+        });
+      } catch (err) { console.warn('[NOTIZIE] create ricontatto non risponde err', err); }
+
       try { saveList(STORAGE_KEYS.notizie, notizie); } catch {}
       renderNotizie();
       return;
@@ -2202,7 +2177,7 @@ const editBtn = e.target.closest?.('[data-not-edit]');
           note: val,
           titolo: 'Risposta',
           links: { notiziaId: n.id, immobileId:'', contattoId:'', attivitaId:'' },
-          prossimaAzione: isoRecall ? { enabled:true, when: isoRecall, durataMin: 15, creaInAgenda: true } : { enabled:false }
+          prossimaAzione: isoRecall ? { enabled:true, when: isoRecall, durataMin: 15, creaInAgenda: false } : { enabled:false }
         });
       } catch (err) {
         console.warn('[NOTIZIE] addInterazione da "Salva commento" fallita', err);
@@ -2210,7 +2185,7 @@ const editBtn = e.target.closest?.('[data-not-edit]');
 
       if (isoRecall) {
         try {
-          window.createRicontattoAppuntamentoFromNotizia && window.createRicontattoAppuntamentoFromNotizia(n, isoRecall, {
+          window.createRicontattoAppuntamentoFromNotizia && window.createRicontattoAppuntamentoFromNotizia(n, isoRecall, { durataMin: 15, 
             tipoDettaglio: 'telefonata',
             descrizione: val ? ('Ricontatto: ' + val.slice(0,70)) : 'Ricontatto'
           });
