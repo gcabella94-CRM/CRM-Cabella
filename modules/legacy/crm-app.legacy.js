@@ -1,3 +1,6 @@
+import { applyBlockLayout } from '../agenda/layout.js';
+import { getOverlaps, hasSameResponsabileOverlap } from '../agenda/overlap.js';
+import { openNotiziaDetail as openNotiziaDetailDrawer } from '../notizie/notiziaDrawer.js';
 /* CRM-Cabella crm-app.js (FINAL) — generated 2025-12-17 18:20:08
    If you see this line in Sources, you have the right file.
 */
@@ -133,8 +136,8 @@ if (!window.createRicontattoAppuntamentoFromNotizia) {
 
       const pad = (x)=>String(x).padStart(2,'0');
 
-      // durata appuntamento (min). Default: 60 (1h). Puoi passare opts.durataMin.
-      const durataMin = (opts && Number.isFinite(opts.durataMin)) ? opts.durataMin : 60;
+      // durata appuntamento (min). Default: 15 (15'). Puoi passare opts.durataMin.
+      const durataMin = (opts && Number.isFinite(opts.durataMin)) ? opts.durataMin : 15;
 
       // aggiungi durataMin minuti a HH:MM (con carry su ora)
       const hm = ora.split(':');
@@ -352,7 +355,7 @@ addInterazione({
     });
 
     if (isoWhen && creaAgenda) {
-      createRicontattoAppuntamentoFromNotizia(n, isoWhen, { tipoDettaglio: 'telefonata', descrizione: testo ? ('Ricontatto: ' + testo.slice(0,70)) : undefined });
+      createRicontattoAppuntamentoFromNotizia(n, isoWhen, { durataMin: 15,  tipoDettaglio: 'telefonata', descrizione: testo ? ('Ricontatto: ' + testo.slice(0,70)) : undefined });
     }
 
     // refresh UI
@@ -2126,7 +2129,7 @@ const editBtn = e.target.closest?.('[data-not-edit]');
 
       // ✅ ricontatto: attività + appuntamento 15' (sia per "non risponde" che per "salva commento")
       try {
-        window.createRicontattoAppuntamentoFromNotizia && window.createRicontattoAppuntamentoFromNotizia(n, iso, {
+        window.createRicontattoAppuntamentoFromNotizia && window.createRicontattoAppuntamentoFromNotizia(n, iso, { durataMin: 15, 
           tipoDettaglio: 'telefonata',
           descrizione: isNoAnswer ? 'Ricontatto (non risponde)' : 'Ricontatto'
         });
@@ -2182,7 +2185,7 @@ const editBtn = e.target.closest?.('[data-not-edit]');
 
       if (isoRecall) {
         try {
-          window.createRicontattoAppuntamentoFromNotizia && window.createRicontattoAppuntamentoFromNotizia(n, isoRecall, {
+          window.createRicontattoAppuntamentoFromNotizia && window.createRicontattoAppuntamentoFromNotizia(n, isoRecall, { durataMin: 15, 
             tipoDettaglio: 'telefonata',
             descrizione: val ? ('Ricontatto: ' + val.slice(0,70)) : 'Ricontatto'
           });
