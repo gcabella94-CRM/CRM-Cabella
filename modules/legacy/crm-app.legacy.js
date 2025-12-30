@@ -134,13 +134,18 @@ if (!window.createRicontattoAppuntamentoFromNotizia) {
 
       const pad = (x)=>String(x).padStart(2,'0');
 
-      // aggiungi 15 minuti a HH:MM (con carry su ora)
+      // durata appuntamento (min). Default: 60 (1h). Puoi passare opts.durataMin.
+      const durataMin = (opts && Number.isFinite(opts.durataMin)) ? opts.durataMin : 60;
+
+      // aggiungi durataMin minuti a HH:MM (con carry su ora)
       const hm = ora.split(':');
       let hh = parseInt(hm[0],10);
       let mm = parseInt(hm[1],10);
       if (isNaN(hh) || isNaN(mm)) return null;
-      mm += 15;
-      if (mm >= 60) { mm -= 60; hh += 1; }
+
+      let add = Math.max(15, Math.round(durataMin / 15) * 15); // snap 15'
+      mm += add;
+      while (mm >= 60) { mm -= 60; hh += 1; }
       if (hh >= 24) { hh = hh % 24; } // in caso rarissimo di ricontatto a fine giornata
       const oraFine = pad(hh) + ':' + pad(mm);
 
@@ -855,6 +860,21 @@ addInterazione({
           if (col + 1 > maxCols) maxCols = col + 1;
         });
 
+        // calcola quante colonne servono *per ciascun appuntamento* (solo se è davvero in contemporanea)
+        // Evita l'effetto "tutto al 50%" quando in quella giornata c'è stata una collisione in un altro orario.
+        dayApps.forEach(a => {
+          let localMaxCols = (a._colIndex || 0) + 1;
+          dayApps.forEach(b => {
+            if (a === b) return;
+            // overlap reale sugli intervalli [start,end)
+            if (a._startMin < b._endMin && b._startMin < a._endMin) {
+              localMaxCols = Math.max(localMaxCols, (b._colIndex || 0) + 1);
+            }
+          });
+          a._colCount = Math.max(1, localMaxCols);
+        });
+
+
         // mappa staff per recuperare velocemente il nome del responsabile
         const staffMap = {};
         (staff || []).forEach(s => {
@@ -919,47 +939,45 @@ addInterazione({
           }
 
           // crea il blocco interno
-          // ====== collisioni REALI per questo evento (layout + warning responsabile) ======
-const overlaps = (dayApps || []).filter(ev => {
-  if (!ev || ev === a) return false;
-  return (ev._startMin < a._endMin) && (ev._endMin > a._startMin);
-});
+          const block = document.createElement('div');
+          block.className = 'agenda-block';
+          // colore responsabile
+          let respColor = '#22c55e';
+          if (respObj && (respObj.colore || respObj.color)) {
+            respColor = respObj.colore || respObj.color;
+          }
+          /* gradient plastico più saturo */
+          block.style.background = `linear-gradient(135deg, ${respColor}ee 0%, ${respColor}cc 45%, ${respColor}aa 100%)`;
+          block.style.border = '3px solid ' + respColor;
 
-// ⚠️ warning solo se collisione con STESSO responsabile (non bloccante)
-const sameRespOverlap = !!a.responsabileId && overlaps.some(ev => ev.responsabileId === a.responsabileId);
+          // glow e ombra dinamica in base alla durata
+          const depth = Math.min(18, 4 + totalSlots * 1.2);
+          block.style.boxShadow = `0 0 0 1px ${respColor}88, 0 4px ${depth}px rgba(0,0,0,0.45)`;
 
-if (sameRespOverlap) {
-  // evidenza visiva: bordo/ombra più “alert”, ma senza bloccare nulla
-  block.classList.add('agenda-block-collision');
-  block.style.borderColor = '#ff4d4d';
-  block.style.boxShadow = `0 0 0 2px rgba(255,77,77,0.65), 0 6px 18px rgba(0,0,0,0.55)`;
+          // contenuto testo + icona fiamma se bollente
+          let labelText = text;
+          if (a.bollente) {
+            labelText = '🔥 ' + labelText;
+            block.classList.add('agenda-block-hot');
+          }
+          block.textContent = labelText;
+          block.title = labelText;
 
-  // tooltip più utile
-  const who = respLabel ? ` (${respLabel})` : '';
-  block.title = `⚠️ Collisione responsabile${who}\n` + block.title;
+          // evidenzia blocco appena creato
+          if (lastCreatedAppId && a.id === lastCreatedAppId) {
+            block.classList.add('agenda-block-new');
+          }
 
-  // (opzionale) prefisso testo nel blocco
-  block.textContent = '⚠️ ' + block.textContent;
-}
+          const colIndex = a._colIndex || 0;
+          const colCount = a._colCount || 1;
+          const widthPercent = 100 / colCount;
+          const leftPercent = widthPercent * colIndex;
 
-// ====== layout per-evento (NO maxCols globale) ======
-if (overlaps.length === 0) {
-  block.style.left = '0%';
-  block.style.width = '100%';
-} else {
-  const realCols = overlaps.length + 1;
-  const realIndex = Math.min(a._colIndex || 0, realCols - 1);
-
-  const widthPercent = 100 / realCols;
-  const leftPercent  = widthPercent * realIndex;
-
-  block.style.left = leftPercent + '%';
-  block.style.width = widthPercent + '%';
-}
-
-block.style.position = 'absolute';
-block.style.top = '0';
-block.style.height = (slotPx * totalSlots - 2) + 'px';
+          block.style.position = 'absolute';
+          block.style.top = '0';
+          block.style.left = leftPercent + '%';
+          block.style.width = widthPercent + '%';
+          block.style.height = (slotPx * totalSlots - 2) + 'px';
 
           block.addEventListener('click', handleClick);
 
