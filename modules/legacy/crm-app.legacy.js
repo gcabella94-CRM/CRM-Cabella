@@ -948,16 +948,20 @@ addInterazione({
             block.classList.add('agenda-block-new');
           }
 
-          const colIndex = a._colIndex || 0;
-          const colCount = maxCols || 1;
-          const widthPercent = 100 / colCount;
-          const leftPercent = widthPercent * colIndex;
+const colIndex = a._colIndex || 0;
+const colCount = maxCols || 1;
 
-          block.style.position = 'absolute';
-          block.style.top = '0';
-          block.style.left = leftPercent + '%';
-          block.style.width = widthPercent + '%';
-          block.style.height = (slotPx * totalSlots - 2) + 'px';
+// 🔧 PATCH: se è l'unico evento, forza colonna piena
+const realCols = (colCount <= 1) ? 1 : colCount;
+
+const widthPercent = 100 / realCols;
+const leftPercent = widthPercent * colIndex;
+
+block.style.position = 'absolute';
+block.style.top = '0';
+block.style.left = leftPercent + '%';
+block.style.width = widthPercent + '%';
+block.style.height = (slotPx * totalSlots - 2) + 'px';
 
           block.addEventListener('click', handleClick);
 
