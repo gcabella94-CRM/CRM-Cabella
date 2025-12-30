@@ -695,7 +695,8 @@ addInterazione({
 
     /* ====== AGENDA ====== */
 
-/* ====== AGENDA: overlap helpers (importati dai moduli, ma inline per compatibilità) ====== */
+/* (Nota) Se presente agenda.bundle.js, il legacy userà window.AGENDA.* */
+  /* ====== AGENDA: overlap helpers (importati dai moduli, ma inline per compatibilità) ====== */
 function getOverlaps(a, dayApps) {
   return (dayApps || []).filter(ev => {
     if (!ev || ev === a) return false;
@@ -1014,7 +1015,7 @@ appBlock.className = 'agenda-block';
           }
           appBlock.style.position = 'absolute';
           appBlock.style.top = '0';
-applyBlockLayout(block, a, dayApps);
+(window.AGENDA && window.AGENDA.applyBlockLayout ? window.AGENDA.applyBlockLayout : applyBlockLayout)(block, a, dayApps);
 const overlaps = getOverlaps(a, dayApps);
 if (hasSameResponsabileOverlap(a, overlaps)) {
   appBlock.classList.add('agenda-block-collision');
