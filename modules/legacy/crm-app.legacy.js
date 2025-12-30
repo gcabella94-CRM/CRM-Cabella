@@ -136,8 +136,8 @@ if (!window.createRicontattoAppuntamentoFromNotizia) {
 
       const pad = (x)=>String(x).padStart(2,'0');
 
-      // durata appuntamento (min). Default: 15 (15'). Puoi passare opts.durataMin.
-      const durataMin = (opts && Number.isFinite(opts.durataMin)) ? opts.durataMin : 15;
+      // durata appuntamento (min). Default: 60 (1h). Puoi passare opts.durataMin.
+      const durataMin = (opts && Number.isFinite(opts.durataMin)) ? opts.durataMin : 60;
 
       // aggiungi durataMin minuti a HH:MM (con carry su ora)
       const hm = ora.split(':');
@@ -355,7 +355,7 @@ addInterazione({
     });
 
     if (isoWhen && creaAgenda) {
-      createRicontattoAppuntamentoFromNotizia(n, isoWhen, { durataMin: 15,  tipoDettaglio: 'telefonata', descrizione: testo ? ('Ricontatto: ' + testo.slice(0,70)) : undefined });
+      createRicontattoAppuntamentoFromNotizia(n, isoWhen, { tipoDettaglio: 'telefonata', descrizione: testo ? ('Ricontatto: ' + testo.slice(0,70)) : undefined });
     }
 
     // refresh UI
@@ -942,6 +942,7 @@ addInterazione({
 
           // crea il blocco interno
           const block = document.createElement('div');
+          const appBlock = block; // ✅ FIX: definisce appBlock
           appBlock.className = 'agenda-block';
           // colore responsabile
           let respColor = '#22c55e';
@@ -2129,7 +2130,7 @@ const editBtn = e.target.closest?.('[data-not-edit]');
 
       // ✅ ricontatto: attività + appuntamento 15' (sia per "non risponde" che per "salva commento")
       try {
-        window.createRicontattoAppuntamentoFromNotizia && window.createRicontattoAppuntamentoFromNotizia(n, iso, { durataMin: 15, 
+        window.createRicontattoAppuntamentoFromNotizia && window.createRicontattoAppuntamentoFromNotizia(n, iso, {
           tipoDettaglio: 'telefonata',
           descrizione: isNoAnswer ? 'Ricontatto (non risponde)' : 'Ricontatto'
         });
@@ -2185,7 +2186,7 @@ const editBtn = e.target.closest?.('[data-not-edit]');
 
       if (isoRecall) {
         try {
-          window.createRicontattoAppuntamentoFromNotizia && window.createRicontattoAppuntamentoFromNotizia(n, isoRecall, { durataMin: 15, 
+          window.createRicontattoAppuntamentoFromNotizia && window.createRicontattoAppuntamentoFromNotizia(n, isoRecall, {
             tipoDettaglio: 'telefonata',
             descrizione: val ? ('Ricontatto: ' + val.slice(0,70)) : 'Ricontatto'
           });
