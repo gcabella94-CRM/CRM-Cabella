@@ -959,19 +959,32 @@ const overlapping = (cellEvents || []).filter(ev => {
   );
 });
 
-// numero reale di colonne per QUESTO evento
-const realCols = overlapping.length > 0 ? overlapping.length + 1 : 1;
+// 🔎 calcola SOLO le sovrapposizioni reali di questo evento
+const overlapping = (cellEvents || []).filter(ev => {
+  if (!ev || ev === a) return false;
+  return (
+    ev._startMinutes < a._endMinutes &&
+    ev._endMinutes > a._startMinutes
+  );
+});
 
-// indice colonna coerente (se non c'è overlap, deve stare a 0)
-const realColIndex = realCols === 1 ? 0 : (a._colIndex || 0);
+// se non ci sono sovrapposizioni REALI → colonna piena
+if (overlapping.length === 0) {
+  block.style.left = '0%';
+  block.style.width = '100%';
+} else {
+  // numero colonne SOLO per questo cluster temporale
+  const realCols = overlapping.length + 1;
 
-const widthPercent = 100 / realCols;
-const leftPercent = widthPercent * realColIndex;
+  // ricalcolo indice colonna coerente
+  const realIndex = Math.min(a._colIndex || 0, realCols - 1);
 
-block.style.position = 'absolute';
-block.style.top = '0';
-block.style.left = leftPercent + '%';
-block.style.width = widthPercent + '%';
+  const widthPercent = 100 / realCols;
+  const leftPercent = widthPercent * realIndex;
+
+  block.style.left = leftPercent + '%';
+  block.style.width = widthPercent + '%';
+}
 block.style.height = (slotPx * totalSlots - 2) + 'px';
 
           block.addEventListener('click', handleClick);
