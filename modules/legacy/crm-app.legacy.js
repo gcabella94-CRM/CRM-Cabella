@@ -692,44 +692,6 @@ addInterazione({
     /* ====== AGENDA ====== */
 
 /* (Nota) Se presente agenda.bundle.js, il legacy userà window.AGENDA.* */
-  /* ====== AGENDA: overlap helpers (importati dai moduli, ma inline per compatibilità) ====== */
-function getOverlaps(a, dayApps) {
-  return (dayApps || []).filter(ev => {
-    if (!ev || ev === a) return false;
-    return (ev._startMin < a._endMin) && (ev._endMin > a._startMin);
-  });
-}
-
-function computeColumnsForEvent(a, dayApps) {
-  const overlaps = getOverlaps(a, dayApps);
-  if (overlaps.length === 0) return { cols: 1, index: 0, overlaps };
-
-  const cols = overlaps.length + 1;
-  const index = Math.min(a._colIndex || 0, cols - 1);
-  return { cols, index, overlaps };
-}
-
-function hasSameResponsabileOverlap(a, overlaps) {
-  if (!a || !a.responsabileId) return false;
-  return (overlaps || []).some(ev => ev && ev.responsabileId === a.responsabileId);
-}
-
-function applyBlockLayout(block, a, dayApps) {
-  if (!block) return;
-
-  // reset (evita "effetto 50%" persistente)
-  block.style.left = '0%';
-  block.style.width = '100%';
-
-  const { cols, index } = computeColumnsForEvent(a, dayApps);
-  if (cols === 1) return;
-
-  const widthPercent = 100 / cols;
-  const leftPercent = widthPercent * index;
-  block.style.left = leftPercent + '%';
-  block.style.width = widthPercent + '%';
-}
-/* ====== /AGENDA overlap helpers ====== */
 
 
 
