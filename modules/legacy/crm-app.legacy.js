@@ -1,5 +1,5 @@
 import { applyBlockLayout } from '../agenda/layout.js';
-import { getOverlaps, hasSameResponsabileOverlap } from '../agenda/overlap.js';
+import { _legacy_getOverlaps, _legacy_hasSameResponsabileOverlap } from '../agenda/overlap.js';
 import { openNotiziaDetail as openNotiziaDetailDrawer } from '../notizie/notiziaDrawer.js';
 /* CRM-Cabella crm-app.js (FINAL) — generated 2025-12-17 18:20:08
    If you see this line in Sources, you have the right file.
@@ -136,8 +136,8 @@ if (!window.createRicontattoAppuntamentoFromNotizia) {
 
       const pad = (x)=>String(x).padStart(2,'0');
 
-      // durata appuntamento (min). Default: 15 (15'). Puoi passare opts.durataMin.
-      const durataMin = (opts && Number.isFinite(opts.durataMin)) ? opts.durataMin : 15;
+      // durata appuntamento (min). Default: 60 (1h). Puoi passare opts.durataMin.
+      const durataMin = (opts && Number.isFinite(opts.durataMin)) ? opts.durataMin : 60;
 
       // aggiungi durataMin minuti a HH:MM (con carry su ora)
       const hm = ora.split(':');
@@ -351,11 +351,11 @@ addInterazione({
       note: testo,
       titolo: testo,
       links: { notiziaId: n.id, immobileId:'', contattoId:'', attivitaId:'' },
-      prossimaAzione: isoWhen ? { enabled:true, when: isoWhen, durataMin: 15, creaInAgenda: false } : { enabled:false }
+      prossimaAzione: isoWhen ? { enabled:true, when: isoWhen, durataMin: 15, creaInAgenda: creaAgenda } : { enabled:false }
     });
 
     if (isoWhen && creaAgenda) {
-      createRicontattoAppuntamentoFromNotizia(n, isoWhen, { durataMin: 15,  tipoDettaglio: 'telefonata', descrizione: testo ? ('Ricontatto: ' + testo.slice(0,70)) : undefined });
+      createRicontattoAppuntamentoFromNotizia(n, isoWhen, { tipoDettaglio: 'telefonata', descrizione: testo ? ('Ricontatto: ' + testo.slice(0,70)) : undefined });
     }
 
     // refresh UI
@@ -978,8 +978,8 @@ addInterazione({
           appBlock.style.position = 'absolute';
           appBlock.style.top = '0';
 applyBlockLayout(block, a, dayApps);
-const overlaps = getOverlaps(a, dayApps);
-if (hasSameResponsabileOverlap(a, overlaps)) {
+const overlaps = _legacy_getOverlaps(a, dayApps);
+if (_legacy_hasSameResponsabileOverlap(a, overlaps)) {
   block.classList.add('agenda-block-collision');
   block.title = '⚠️ Collisione responsabile\n' + (block.title || '');
 }
@@ -2129,7 +2129,7 @@ const editBtn = e.target.closest?.('[data-not-edit]');
 
       // ✅ ricontatto: attività + appuntamento 15' (sia per "non risponde" che per "salva commento")
       try {
-        window.createRicontattoAppuntamentoFromNotizia && window.createRicontattoAppuntamentoFromNotizia(n, iso, { durataMin: 15, 
+        window.createRicontattoAppuntamentoFromNotizia && window.createRicontattoAppuntamentoFromNotizia(n, iso, {
           tipoDettaglio: 'telefonata',
           descrizione: isNoAnswer ? 'Ricontatto (non risponde)' : 'Ricontatto'
         });
@@ -2177,7 +2177,7 @@ const editBtn = e.target.closest?.('[data-not-edit]');
           note: val,
           titolo: 'Risposta',
           links: { notiziaId: n.id, immobileId:'', contattoId:'', attivitaId:'' },
-          prossimaAzione: isoRecall ? { enabled:true, when: isoRecall, durataMin: 15, creaInAgenda: false } : { enabled:false }
+          prossimaAzione: isoRecall ? { enabled:true, when: isoRecall, durataMin: 15, creaInAgenda: true } : { enabled:false }
         });
       } catch (err) {
         console.warn('[NOTIZIE] addInterazione da "Salva commento" fallita', err);
@@ -2185,7 +2185,7 @@ const editBtn = e.target.closest?.('[data-not-edit]');
 
       if (isoRecall) {
         try {
-          window.createRicontattoAppuntamentoFromNotizia && window.createRicontattoAppuntamentoFromNotizia(n, isoRecall, { durataMin: 15, 
+          window.createRicontattoAppuntamentoFromNotizia && window.createRicontattoAppuntamentoFromNotizia(n, isoRecall, {
             tipoDettaglio: 'telefonata',
             descrizione: val ? ('Ricontatto: ' + val.slice(0,70)) : 'Ricontatto'
           });
