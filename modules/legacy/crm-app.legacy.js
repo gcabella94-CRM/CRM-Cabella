@@ -942,7 +942,9 @@ addInterazione({
 
           // crea il blocco interno
           const block = document.createElement('div');
-          appBlock.className = 'agenda-block';
+const appBlock = block; // ✅ FIX: definisce appBlock
+appBlock.className = 'agenda-block';
+
           // colore responsabile
           let respColor = '#22c55e';
           if (respObj && (respObj.colore || respObj.color)) {
