@@ -1,6 +1,3 @@
-import { applyBlockLayout } from '../agenda/layout.js';
-import { getOverlaps, hasSameResponsabileOverlap } from '../agenda/overlap.js';
-import { openNotiziaDetail as openNotiziaDetailDrawer } from '../notizie/notiziaDrawer.js';
 /* CRM-Cabella crm-app.js (FINAL) — generated 2025-12-17 18:20:08
    If you see this line in Sources, you have the right file.
 */
@@ -942,7 +939,6 @@ addInterazione({
 
           // crea il blocco interno
           const block = document.createElement('div');
-          const appBlock = block;
           appBlock.className = 'agenda-block';
           // colore responsabile
           let respColor = '#22c55e';
