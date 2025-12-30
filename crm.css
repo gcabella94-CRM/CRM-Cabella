@@ -626,6 +626,10 @@
       background: rgba(34, 197, 94, 0.16);
       cursor: pointer;
     }
+.agenda-block-collision{
+  border-color:#ff4d4d !important;
+  box-shadow: 0 0 0 2px rgba(255,77,77,.65), 0 6px 18px rgba(0,0,0,.55) !important;
+}
 
     /* Prima cella (inizio appuntamento) */
     .agenda-slot-app-start { /* niente bordo interno, lo mette solo l'ultima */

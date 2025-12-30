@@ -1,3 +1,5 @@
+import { applyBlockLayout } from '../agenda/layout.js';
+import { getOverlaps, hasSameResponsabileOverlap } from '../agenda/overlap.js';
 import { openNotiziaDetail as openNotiziaDetailDrawer } from '../notizie/notiziaDrawer.js';
 /* CRM-Cabella crm-app.js (FINAL) — generated 2025-12-17 18:20:08
    If you see this line in Sources, you have the right file.
@@ -975,8 +977,12 @@ addInterazione({
 
           appBlock.style.position = 'absolute';
           appBlock.style.top = '0';
-          appBlock.style.left = leftPercent + '%';
-          appBlock.style.width = widthPercent + '%';
+applyBlockLayout(block, a, dayApps);
+const overlaps = getOverlaps(a, dayApps);
+if (hasSameResponsabileOverlap(a, overlaps)) {
+  block.classList.add('agenda-block-collision');
+  block.title = '⚠️ Collisione responsabile\n' + (block.title || '');
+}
           appBlock.style.height = (slotPx * totalSlots - 2) + 'px';
 
           appBlock.addEventListener('click', handleClick);
