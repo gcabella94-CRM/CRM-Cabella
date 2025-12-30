@@ -948,14 +948,25 @@ addInterazione({
             block.classList.add('agenda-block-new');
           }
 
-const colIndex = a._colIndex || 0;
-const colCount = maxCols || 1;
+// 🔎 individua gli eventi che si sovrappongono DAVVERO a questo
+const overlapping = (cellEvents || []).filter(ev => {
+  if (!ev || ev === a) return false;
 
-// 🔧 PATCH: se è l'unico evento, forza colonna piena
-const realCols = (colCount <= 1) ? 1 : colCount;
+  // confronto temporale reale
+  return (
+    ev._startMinutes < a._endMinutes &&
+    ev._endMinutes > a._startMinutes
+  );
+});
+
+// numero reale di colonne per QUESTO evento
+const realCols = overlapping.length > 0 ? overlapping.length + 1 : 1;
+
+// indice colonna coerente (se non c'è overlap, deve stare a 0)
+const realColIndex = realCols === 1 ? 0 : (a._colIndex || 0);
 
 const widthPercent = 100 / realCols;
-const leftPercent = widthPercent * colIndex;
+const leftPercent = widthPercent * realColIndex;
 
 block.style.position = 'absolute';
 block.style.top = '0';
