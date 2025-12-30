@@ -919,72 +919,46 @@ addInterazione({
           }
 
           // crea il blocco interno
-          const block = document.createElement('div');
-          block.className = 'agenda-block';
-          // colore responsabile
-          let respColor = '#22c55e';
-          if (respObj && (respObj.colore || respObj.color)) {
-            respColor = respObj.colore || respObj.color;
-          }
-          /* gradient plastico più saturo */
-          block.style.background = `linear-gradient(135deg, ${respColor}ee 0%, ${respColor}cc 45%, ${respColor}aa 100%)`;
-          block.style.border = '3px solid ' + respColor;
-
-          // glow e ombra dinamica in base alla durata
-          const depth = Math.min(18, 4 + totalSlots * 1.2);
-          block.style.boxShadow = `0 0 0 1px ${respColor}88, 0 4px ${depth}px rgba(0,0,0,0.45)`;
-
-          // contenuto testo + icona fiamma se bollente
-          let labelText = text;
-          if (a.bollente) {
-            labelText = '🔥 ' + labelText;
-            block.classList.add('agenda-block-hot');
-          }
-          block.textContent = labelText;
-          block.title = labelText;
-
-          // evidenzia blocco appena creato
-          if (lastCreatedAppId && a.id === lastCreatedAppId) {
-            block.classList.add('agenda-block-new');
-          }
-
-// 🔎 individua gli eventi che si sovrappongono DAVVERO a questo
-const overlapping = (cellEvents || []).filter(ev => {
+          // ====== collisioni REALI per questo evento (layout + warning responsabile) ======
+const overlaps = (dayApps || []).filter(ev => {
   if (!ev || ev === a) return false;
-
-  // confronto temporale reale
-  return (
-    ev._startMinutes < a._endMinutes &&
-    ev._endMinutes > a._startMinutes
-  );
+  return (ev._startMin < a._endMin) && (ev._endMin > a._startMin);
 });
 
-// 🔎 calcola SOLO le sovrapposizioni reali di questo evento
-const overlapping = (cellEvents || []).filter(ev => {
-  if (!ev || ev === a) return false;
-  return (
-    ev._startMinutes < a._endMinutes &&
-    ev._endMinutes > a._startMinutes
-  );
-});
+// ⚠️ warning solo se collisione con STESSO responsabile (non bloccante)
+const sameRespOverlap = !!a.responsabileId && overlaps.some(ev => ev.responsabileId === a.responsabileId);
 
-// se non ci sono sovrapposizioni REALI → colonna piena
-if (overlapping.length === 0) {
+if (sameRespOverlap) {
+  // evidenza visiva: bordo/ombra più “alert”, ma senza bloccare nulla
+  block.classList.add('agenda-block-collision');
+  block.style.borderColor = '#ff4d4d';
+  block.style.boxShadow = `0 0 0 2px rgba(255,77,77,0.65), 0 6px 18px rgba(0,0,0,0.55)`;
+
+  // tooltip più utile
+  const who = respLabel ? ` (${respLabel})` : '';
+  block.title = `⚠️ Collisione responsabile${who}\n` + block.title;
+
+  // (opzionale) prefisso testo nel blocco
+  block.textContent = '⚠️ ' + block.textContent;
+}
+
+// ====== layout per-evento (NO maxCols globale) ======
+if (overlaps.length === 0) {
   block.style.left = '0%';
   block.style.width = '100%';
 } else {
-  // numero colonne SOLO per questo cluster temporale
-  const realCols = overlapping.length + 1;
-
-  // ricalcolo indice colonna coerente
+  const realCols = overlaps.length + 1;
   const realIndex = Math.min(a._colIndex || 0, realCols - 1);
 
   const widthPercent = 100 / realCols;
-  const leftPercent = widthPercent * realIndex;
+  const leftPercent  = widthPercent * realIndex;
 
   block.style.left = leftPercent + '%';
   block.style.width = widthPercent + '%';
 }
+
+block.style.position = 'absolute';
+block.style.top = '0';
 block.style.height = (slotPx * totalSlots - 2) + 'px';
 
           block.addEventListener('click', handleClick);
