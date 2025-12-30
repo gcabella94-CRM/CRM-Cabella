@@ -136,8 +136,8 @@ if (!window.createRicontattoAppuntamentoFromNotizia) {
 
       const pad = (x)=>String(x).padStart(2,'0');
 
-      // durata appuntamento (min). Default: 60 (1h). Puoi passare opts.durataMin.
-      const durataMin = (opts && Number.isFinite(opts.durataMin)) ? opts.durataMin : 60;
+      // durata appuntamento (min). Default: 15 (15'). Puoi passare opts.durataMin.
+      const durataMin = (opts && Number.isFinite(opts.durataMin)) ? opts.durataMin : 15;
 
       // aggiungi durataMin minuti a HH:MM (con carry su ora)
       const hm = ora.split(':');
@@ -353,11 +353,7 @@ addInterazione({
       links: { notiziaId: n.id, immobileId:'', contattoId:'', attivitaId:'' },
       prossimaAzione: isoWhen ? { enabled:true, when: isoWhen, durataMin: 15, creaInAgenda: creaAgenda } : { enabled:false }
     });
-
-    if (isoWhen && creaAgenda) {
-      createRicontattoAppuntamentoFromNotizia(n, isoWhen, { tipoDettaglio: 'telefonata', descrizione: testo ? ('Ricontatto: ' + testo.slice(0,70)) : undefined });
-    }
-
+    // Nota: niente chiamata diretta a createRicontattoAppuntamentoFromNotizia qui: addInterazione.prossimaAzione.creaInAgenda gestisce l'agenda (evita doppioni)
     // refresh UI
     renderNotiziaDetail(n);
     try { renderNotizie(); } catch {}
@@ -2164,15 +2160,7 @@ const editBtn = e.target.closest?.('[data-not-edit]');
           });
         } catch (err) { console.warn('[NOTIZIE] addInterazione non risponde err', err); }
       }
-
-      // ✅ ricontatto: attività + appuntamento 15' (sia per "non risponde" che per "salva commento")
-      try {
-        window.createRicontattoAppuntamentoFromNotizia && window.createRicontattoAppuntamentoFromNotizia(n, iso, {
-          tipoDettaglio: 'telefonata',
-          descrizione: isNoAnswer ? 'Ricontatto (non risponde)' : 'Ricontatto'
-        });
-      } catch (err) { console.warn('[NOTIZIE] create ricontatto non risponde err', err); }
-
+      // ✅ ricontatto: la creazione in agenda avviene tramite addInterazione.prossimaAzione.creaInAgenda (evita duplicati)
       try { saveList(STORAGE_KEYS.notizie, notizie); } catch {}
       renderNotizie();
       return;
