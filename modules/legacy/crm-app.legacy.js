@@ -940,32 +940,32 @@ addInterazione({
 
           // crea il blocco interno
           const block = document.createElement('div');
-          block.className = 'agenda-block';
+          appBlock.className = 'agenda-block';
           // colore responsabile
           let respColor = '#22c55e';
           if (respObj && (respObj.colore || respObj.color)) {
             respColor = respObj.colore || respObj.color;
           }
           /* gradient plastico più saturo */
-          block.style.background = `linear-gradient(135deg, ${respColor}ee 0%, ${respColor}cc 45%, ${respColor}aa 100%)`;
-          block.style.border = '3px solid ' + respColor;
+          appBlock.style.background = `linear-gradient(135deg, ${respColor}ee 0%, ${respColor}cc 45%, ${respColor}aa 100%)`;
+          appBlock.style.border = '3px solid ' + respColor;
 
           // glow e ombra dinamica in base alla durata
           const depth = Math.min(18, 4 + totalSlots * 1.2);
-          block.style.boxShadow = `0 0 0 1px ${respColor}88, 0 4px ${depth}px rgba(0,0,0,0.45)`;
+          appBlock.style.boxShadow = `0 0 0 1px ${respColor}88, 0 4px ${depth}px rgba(0,0,0,0.45)`;
 
           // contenuto testo + icona fiamma se bollente
           let labelText = text;
           if (a.bollente) {
             labelText = '🔥 ' + labelText;
-            block.classList.add('agenda-block-hot');
+            appBlock.classList.add('agenda-block-hot');
           }
-          block.textContent = labelText;
-          block.title = labelText;
+          appBlock.textContent = labelText;
+          appBlock.title = labelText;
 
           // evidenzia blocco appena creato
           if (lastCreatedAppId && a.id === lastCreatedAppId) {
-            block.classList.add('agenda-block-new');
+            appBlock.classList.add('agenda-block-new');
           }
 
           const colIndex = a._colIndex || 0;
@@ -973,15 +973,15 @@ addInterazione({
           const widthPercent = 100 / colCount;
           const leftPercent = widthPercent * colIndex;
 
-          block.style.position = 'absolute';
-          block.style.top = '0';
-          block.style.left = leftPercent + '%';
-          block.style.width = widthPercent + '%';
-          block.style.height = (slotPx * totalSlots - 2) + 'px';
+          appBlock.style.position = 'absolute';
+          appBlock.style.top = '0';
+          appBlock.style.left = leftPercent + '%';
+          appBlock.style.width = widthPercent + '%';
+          appBlock.style.height = (slotPx * totalSlots - 2) + 'px';
 
-          block.addEventListener('click', handleClick);
+          appBlock.addEventListener('click', handleClick);
 
-          cell.appendChild(block);
+          cell.appendChild(appBlock);
         });
       });;
     }
