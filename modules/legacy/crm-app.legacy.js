@@ -695,6 +695,47 @@ addInterazione({
 
     /* ====== AGENDA ====== */
 
+/* ====== AGENDA: overlap helpers (importati dai moduli, ma inline per compatibilità) ====== */
+function getOverlaps(a, dayApps) {
+  return (dayApps || []).filter(ev => {
+    if (!ev || ev === a) return false;
+    return (ev._startMin < a._endMin) && (ev._endMin > a._startMin);
+  });
+}
+
+function computeColumnsForEvent(a, dayApps) {
+  const overlaps = getOverlaps(a, dayApps);
+  if (overlaps.length === 0) return { cols: 1, index: 0, overlaps };
+
+  const cols = overlaps.length + 1;
+  const index = Math.min(a._colIndex || 0, cols - 1);
+  return { cols, index, overlaps };
+}
+
+function hasSameResponsabileOverlap(a, overlaps) {
+  if (!a || !a.responsabileId) return false;
+  return (overlaps || []).some(ev => ev && ev.responsabileId === a.responsabileId);
+}
+
+function applyBlockLayout(block, a, dayApps) {
+  if (!block) return;
+
+  // reset (evita "effetto 50%" persistente)
+  block.style.left = '0%';
+  block.style.width = '100%';
+
+  const { cols, index } = computeColumnsForEvent(a, dayApps);
+  if (cols === 1) return;
+
+  const widthPercent = 100 / cols;
+  const leftPercent = widthPercent * index;
+  block.style.left = leftPercent + '%';
+  block.style.width = widthPercent + '%';
+}
+/* ====== /AGENDA overlap helpers ====== */
+
+
+
     let agendaWeekAnchor = startOfWeek(new Date());
     let agendaDrag = {
       isDragging: false,
@@ -971,19 +1012,13 @@ appBlock.className = 'agenda-block';
           if (lastCreatedAppId && a.id === lastCreatedAppId) {
             appBlock.classList.add('agenda-block-new');
           }
-
-          const colIndex = a._colIndex || 0;
-          const colCount = a._colCount || 1;
-          const widthPercent = 100 / colCount;
-          const leftPercent = widthPercent * colIndex;
-
           appBlock.style.position = 'absolute';
           appBlock.style.top = '0';
 applyBlockLayout(block, a, dayApps);
 const overlaps = getOverlaps(a, dayApps);
 if (hasSameResponsabileOverlap(a, overlaps)) {
-  block.classList.add('agenda-block-collision');
-  block.title = '⚠️ Collisione responsabile\n' + (block.title || '');
+  appBlock.classList.add('agenda-block-collision');
+  appBlock.title = '⚠️ Collisione responsabile\n' + (appBlock.title || '');
 }
           appBlock.style.height = (slotPx * totalSlots - 2) + 'px';
 
