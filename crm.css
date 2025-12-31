@@ -1266,3 +1266,8 @@
 
 
 .pill-esito{ margin-left:6px; opacity:0.9; }
+
+
+/* Vista mensile: giorno con conflitto responsabile */
+.agenda-month-conflict { box-shadow: 0 0 0 2px rgba(255,77,77,.65) inset; position: relative; }
+.agenda-month-conflict::after{ content:'⚠️'; position:absolute; right:4px; top:2px; font-size:12px; opacity:.9; }

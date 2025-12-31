@@ -1,3 +1,24 @@
+/* ====== AGENDA: collision tracking (non bloccante + alert solo su nuove collisioni) ====== */
+const __agendaCollisionSeen = new Set(); // chiave canonica collisione
+let __agendaCollisionAlertEnabled = true;
+
+function _agendaCollisionKey(dayKey, respId, a, b) {
+  const ida = a && (a.id || a._id || a.uuid || a.key || '') || '';
+  const idb = b && (b.id || b._id || b.uuid || b.key || '') || '';
+  const pair = [String(ida), String(idb)].sort().join('~');
+  const spanA = (a && Number.isFinite(a._startMin) && Number.isFinite(a._endMin)) ? `${a._startMin}-${a._endMin}` : '';
+  const spanB = (b && Number.isFinite(b._startMin) && Number.isFinite(b._endMin)) ? `${b._startMin}-${b._endMin}` : '';
+  return `${dayKey}|${respId||''}|${spanA}|${spanB}|${pair}`;
+}
+
+function _agendaRegisterCollision(dayKey, respId, a, b) {
+  const k = _agendaCollisionKey(dayKey, respId, a, b);
+  const isNew = !__agendaCollisionSeen.has(k);
+  if (isNew) __agendaCollisionSeen.add(k);
+  return isNew;
+}
+/* ====== /AGENDA collision tracking ====== */
+
 import { applyBlockLayout } from '../agenda/layout.js';
 import { getOverlaps, hasSameResponsabileOverlap } from '../agenda/overlap.js';
 import { openNotiziaDetail as openNotiziaDetailDrawer } from '../notizie/notiziaDrawer.js';
@@ -136,8 +157,8 @@ if (!window.createRicontattoAppuntamentoFromNotizia) {
 
       const pad = (x)=>String(x).padStart(2,'0');
 
-      // durata appuntamento (min). Default: 15 (15'). Puoi passare opts.durataMin.
-      const durataMin = (opts && Number.isFinite(opts.durataMin)) ? opts.durataMin : 15;
+      // durata appuntamento (min). Default: 60 (1h). Puoi passare opts.durataMin.
+      const durataMin = (opts && Number.isFinite(opts.durataMin)) ? opts.durataMin : 60;
 
       // aggiungi durataMin minuti a HH:MM (con carry su ora)
       const hm = ora.split(':');
@@ -351,11 +372,11 @@ addInterazione({
       note: testo,
       titolo: testo,
       links: { notiziaId: n.id, immobileId:'', contattoId:'', attivitaId:'' },
-      prossimaAzione: isoWhen ? { enabled:true, when: isoWhen, durataMin: 15, creaInAgenda: false } : { enabled:false }
+      prossimaAzione: isoWhen ? { enabled:true, when: isoWhen, durataMin: 15, creaInAgenda: creaAgenda } : { enabled:false }
     });
 
     if (isoWhen && creaAgenda) {
-      createRicontattoAppuntamentoFromNotizia(n, isoWhen, { durataMin: 15, tipoDettaglio: 'telefonata', descrizione: testo ? ('Ricontatto: ' + testo.slice(0,70)) : undefined });
+      createRicontattoAppuntamentoFromNotizia(n, isoWhen, { tipoDettaglio: 'telefonata', descrizione: testo ? ('Ricontatto: ' + testo.slice(0,70)) : undefined });
     }
 
     // refresh UI
@@ -979,6 +1000,7 @@ addInterazione({
           appBlock.style.top = '0';
 applyBlockLayout(block, a, dayApps);
 const overlaps = getOverlaps(a, dayApps);
+      const overlapsSameResp = (overlaps || []).filter(ev => ev && ev.responsabileId && a && ev.responsabileId === a.responsabileId);
 if (hasSameResponsabileOverlap(a, overlaps)) {
   block.classList.add('agenda-block-collision');
   block.title = '⚠️ Collisione responsabile\n' + (block.title || '');
@@ -2177,7 +2199,7 @@ const editBtn = e.target.closest?.('[data-not-edit]');
           note: val,
           titolo: 'Risposta',
           links: { notiziaId: n.id, immobileId:'', contattoId:'', attivitaId:'' },
-          prossimaAzione: isoRecall ? { enabled:true, when: isoRecall, durataMin: 15, creaInAgenda: false } : { enabled:false }
+          prossimaAzione: isoRecall ? { enabled:true, when: isoRecall, durataMin: 15, creaInAgenda: true } : { enabled:false }
         });
       } catch (err) {
         console.warn('[NOTIZIE] addInterazione da "Salva commento" fallita', err);
@@ -2186,7 +2208,7 @@ const editBtn = e.target.closest?.('[data-not-edit]');
       if (isoRecall) {
         try {
           window.createRicontattoAppuntamentoFromNotizia && window.createRicontattoAppuntamentoFromNotizia(n, isoRecall, {
-            durataMin: 15, tipoDettaglio: 'telefonata',
+            tipoDettaglio: 'telefonata',
             descrizione: val ? ('Ricontatto: ' + val.slice(0,70)) : 'Ricontatto'
           });
         } catch (err) {
