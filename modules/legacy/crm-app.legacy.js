@@ -351,11 +351,11 @@ addInterazione({
       note: testo,
       titolo: testo,
       links: { notiziaId: n.id, immobileId:'', contattoId:'', attivitaId:'' },
-      prossimaAzione: isoWhen ? { enabled:true, when: isoWhen, durataMin: 15, creaInAgenda: creaAgenda } : { enabled:false }
+      prossimaAzione: isoWhen ? { enabled:true, when: isoWhen, durataMin: 15, creaInAgenda: false } : { enabled:false }
     });
 
     if (isoWhen && creaAgenda) {
-      createRicontattoAppuntamentoFromNotizia(n, isoWhen, { tipoDettaglio: 'telefonata', descrizione: testo ? ('Ricontatto: ' + testo.slice(0,70)) : undefined });
+      createRicontattoAppuntamentoFromNotizia(n, isoWhen, { durataMin: 15, tipoDettaglio: 'telefonata', descrizione: testo ? ('Ricontatto: ' + testo.slice(0,70)) : undefined });
     }
 
     // refresh UI
@@ -942,7 +942,6 @@ addInterazione({
 
           // crea il blocco interno
           const block = document.createElement('div');
-          const appBlock = block; // ✅ FIX: definisce appBlock
           appBlock.className = 'agenda-block';
           // colore responsabile
           let respColor = '#22c55e';
@@ -2131,7 +2130,6 @@ const editBtn = e.target.closest?.('[data-not-edit]');
       // ✅ ricontatto: attività + appuntamento 15' (sia per "non risponde" che per "salva commento")
       try {
         window.createRicontattoAppuntamentoFromNotizia && window.createRicontattoAppuntamentoFromNotizia(n, iso, {
-            durataMin: 15,
           tipoDettaglio: 'telefonata',
           descrizione: isNoAnswer ? 'Ricontatto (non risponde)' : 'Ricontatto'
         });
@@ -2179,7 +2177,7 @@ const editBtn = e.target.closest?.('[data-not-edit]');
           note: val,
           titolo: 'Risposta',
           links: { notiziaId: n.id, immobileId:'', contattoId:'', attivitaId:'' },
-          prossimaAzione: isoRecall ? { enabled:true, when: isoRecall, durataMin: 15, creaInAgenda: true } : { enabled:false }
+          prossimaAzione: isoRecall ? { enabled:true, when: isoRecall, durataMin: 15, creaInAgenda: false } : { enabled:false }
         });
       } catch (err) {
         console.warn('[NOTIZIE] addInterazione da "Salva commento" fallita', err);
@@ -2188,8 +2186,7 @@ const editBtn = e.target.closest?.('[data-not-edit]');
       if (isoRecall) {
         try {
           window.createRicontattoAppuntamentoFromNotizia && window.createRicontattoAppuntamentoFromNotizia(n, isoRecall, {
-            durataMin: 15,
-            tipoDettaglio: 'telefonata',
+            durataMin: 15, tipoDettaglio: 'telefonata',
             descrizione: val ? ('Ricontatto: ' + val.slice(0,70)) : 'Ricontatto'
           });
         } catch (err) {
