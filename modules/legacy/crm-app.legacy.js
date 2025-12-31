@@ -1,24 +1,3 @@
-/* ====== AGENDA: collision tracking (non bloccante + alert solo su nuove collisioni) ====== */
-const __agendaCollisionSeen = new Set(); // chiave canonica collisione
-let __agendaCollisionAlertEnabled = true;
-
-function _agendaCollisionKey(dayKey, respId, a, b) {
-  const ida = a && (a.id || a._id || a.uuid || a.key || '') || '';
-  const idb = b && (b.id || b._id || b.uuid || b.key || '') || '';
-  const pair = [String(ida), String(idb)].sort().join('~');
-  const spanA = (a && Number.isFinite(a._startMin) && Number.isFinite(a._endMin)) ? `${a._startMin}-${a._endMin}` : '';
-  const spanB = (b && Number.isFinite(b._startMin) && Number.isFinite(b._endMin)) ? `${b._startMin}-${b._endMin}` : '';
-  return `${dayKey}|${respId||''}|${spanA}|${spanB}|${pair}`;
-}
-
-function _agendaRegisterCollision(dayKey, respId, a, b) {
-  const k = _agendaCollisionKey(dayKey, respId, a, b);
-  const isNew = !__agendaCollisionSeen.has(k);
-  if (isNew) __agendaCollisionSeen.add(k);
-  return isNew;
-}
-/* ====== /AGENDA collision tracking ====== */
-
 import { applyBlockLayout } from '../agenda/layout.js';
 import { getOverlaps, hasSameResponsabileOverlap } from '../agenda/overlap.js';
 import { openNotiziaDetail as openNotiziaDetailDrawer } from '../notizie/notiziaDrawer.js';
@@ -963,6 +942,7 @@ addInterazione({
 
           // crea il blocco interno
           const block = document.createElement('div');
+          const appBlock = block; // ✅ FIX: definisce appBlock
           appBlock.className = 'agenda-block';
           // colore responsabile
           let respColor = '#22c55e';
@@ -1000,7 +980,6 @@ addInterazione({
           appBlock.style.top = '0';
 applyBlockLayout(block, a, dayApps);
 const overlaps = getOverlaps(a, dayApps);
-      const overlapsSameResp = (overlaps || []).filter(ev => ev && ev.responsabileId && a && ev.responsabileId === a.responsabileId);
 if (hasSameResponsabileOverlap(a, overlaps)) {
   block.classList.add('agenda-block-collision');
   block.title = '⚠️ Collisione responsabile\n' + (block.title || '');
