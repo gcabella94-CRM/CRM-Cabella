@@ -1,3 +1,21 @@
+/* ====== AGENDA: alert collisioni solo su nuove (stesso responsabile) ====== */
+const __agendaCollisionSeen = new Set();
+function __agendaCollisionKey(dayKey, respId, a, b) {
+  const ida = a && (a.id || a._id || a.uuid || a.key || '') || '';
+  const idb = b && (b.id || b._id || b.uuid || b.key || '') || '';
+  const pair = [String(ida), String(idb)].sort().join('~');
+  const spanA = (a && Number.isFinite(a._startMin) && Number.isFinite(a._endMin)) ? `${a._startMin}-${a._endMin}` : '';
+  const spanB = (b && Number.isFinite(b._startMin) && Number.isFinite(b._endMin)) ? `${b._startMin}-${b._endMin}` : '';
+  return `${dayKey}|${respId||''}|${spanA}|${spanB}|${pair}`;
+}
+function __agendaIsNewCollision(dayKey, respId, a, b) {
+  const k = __agendaCollisionKey(dayKey, respId, a, b);
+  if (__agendaCollisionSeen.has(k)) return false;
+  __agendaCollisionSeen.add(k);
+  return true;
+}
+/* ====== /AGENDA: alert collisioni ====== */
+
 import { applyBlockLayout } from '../agenda/layout.js';
 import { getOverlaps, hasSameResponsabileOverlap } from '../agenda/overlap.js';
 import { openNotiziaDetail as openNotiziaDetailDrawer } from '../notizie/notiziaDrawer.js';
@@ -942,7 +960,6 @@ addInterazione({
 
           // crea il blocco interno
           const block = document.createElement('div');
-          const appBlock = block; // ✅ FIX: definisce appBlock
           appBlock.className = 'agenda-block';
           // colore responsabile
           let respColor = '#22c55e';
@@ -981,8 +998,21 @@ addInterazione({
 applyBlockLayout(block, a, dayApps);
 const overlaps = getOverlaps(a, dayApps);
 if (hasSameResponsabileOverlap(a, overlaps)) {
-  block.classList.add('agenda-block-collision');
-  block.title = '⚠️ Collisione responsabile\n' + (block.title || '');
+  appBlock.classList.add('agenda-block-collision');
+  appBlock.title = '⚠️ Collisione responsabile
+' + (appBlock.title || '');
+
+  // Popup solo se collisione "nuova" (OK per chiudere)
+  try {
+    const dayKey = (dDay && !isNaN(dDay)) ? dDay.toISOString().slice(0,10) : '';
+    const respId = a && a.responsabileId ? a.responsabileId : '';
+    const other = (overlaps || []).find(ev => ev && ev.responsabileId && ev.responsabileId === respId) || null;
+    if (other && __agendaIsNewCollision(dayKey, respId, a, other)) {
+      alert('⚠️ Nuova collisione: due appuntamenti per lo stesso responsabile sono in contemporanea.
+
+Ho evidenziato i blocchi in rosso.');
+    }
+  } catch(e) {}
 }
           appBlock.style.height = (slotPx * totalSlots - 2) + 'px';
 
