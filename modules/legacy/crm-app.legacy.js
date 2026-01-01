@@ -1,9 +1,14 @@
-import { renderAgendaWeek as renderAgendaWeekModule, renderAgendaMonth as renderAgendaMonthModule, bindAgendaNavAndFilters as bindAgendaNavAndFiltersModule, setAgendaWeekAnchor as setAgendaWeekAnchorModule } from '../agenda/index.js';
+import { applyBlockLayout } from '../agenda/layout.js';
+import { getOverlaps, hasSameResponsabileOverlap } from '../agenda/overlap.js';
 import { openNotiziaDetail as openNotiziaDetailDrawer } from '../notizie/notiziaDrawer.js';
 /* CRM-Cabella crm-app.js (FINAL) — generated 2025-12-17 18:20:08
    If you see this line in Sources, you have the right file.
 */
 window.__CRM_APP_LOADED__ = true;
+
+// Toggle per migrazione moduli (legacy -> modules)
+const ENABLE_LEGACY_NOTIZIE = false;
+
 
 // ===============================
 // cssEscape – global safe helper
@@ -694,25 +699,331 @@ addInterazione({
 
     /* ====== AGENDA ====== */
 
-    // Delego tutta la render Agenda (week) al modulo dedicato.
-    // Il legacy conserva solo i dialog / routing.
-    function agendaCtx() {
-      return {
-        attivita,
-        staff,
-        lastCreatedAppId,
-        openAgendaRangeDialog,
-        openAppuntamentoDialogById,
-        setView,
-        creaNuovoAppuntamentoDaBottone,
-      };
+    let agendaWeekAnchor = startOfWeek(new Date());
+    let agendaDrag = {
+      isDragging: false,
+      start: null, // { date, minutes }
+      end: null    // { date, minutes }
+    };
+
+    
+    function renderAgendaWeek() {
+      const labelEl = document.getElementById('agenda-week-label');
+      const grid = document.getElementById('agenda-week-grid');
+      if (!grid) return;
+
+      const weekStart = agendaWeekAnchor;
+      const weekEnd = addDays(weekStart, 6);
+      if (labelEl) {
+        labelEl.textContent = `Settimana ${weekStart.toLocaleDateString('it-IT')} – ${weekEnd.toLocaleDateString('it-IT')}`;
+      }
+
+      grid.innerHTML = '';
+
+      const giorni = [];
+      for (let i = 0; i < 7; i++) {
+        giorni.push(addDays(weekStart, i));
+      }
+
+      const typeFilter = document.getElementById('agenda-type-filter')?.value || 'tutti';
+      const staffFilter = document.getElementById('agenda-staff-filter')?.value || 'tutti';
+
+      const minStart = 8 * 60;   // 08:00
+      const minEnd   = 20 * 60;  // 20:00
+      const slotSize = 15;       // 15 minuti
+
+      const slotMap = {}; // key: date|minutes -> cell
+
+      // Angolo in alto a sinistra
+      const corner = document.createElement('div');
+      corner.className = 'agenda-hour-cell';
+      grid.appendChild(corner);
+
+      // Header giorni
+      const dayNames = ['Lun','Mar','Mer','Gio','Ven','Sab','Dom'];
+      giorni.forEach((d, idx) => {
+        const h = document.createElement('div');
+        h.className = 'agenda-hour-cell';
+        h.style.textAlign = 'center';
+        const lab = d.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' });
+        h.textContent = `${dayNames[idx]} ${lab}`;
+        grid.appendChild(h);
+      });
+
+      // Corpo: righe da 15 minuti
+      for (let minutes = minStart; minutes < minEnd; minutes += slotSize) {
+        const hour = Math.floor(minutes / 60);
+        const mins = minutes % 60;
+
+        // colonna orari
+        const hourCell = document.createElement('div');
+        hourCell.className = 'agenda-hour-cell';
+        hourCell.textContent = mins === 0 ? `${String(hour).padStart(2,'0')}:00` : '';
+        grid.appendChild(hourCell);
+
+        // celle per ciascun giorno
+        giorni.forEach(d => {
+          const iso = toLocalISODate(d);
+          const cell = document.createElement('div');
+          cell.className = 'agenda-slot';
+          cell.dataset.date = iso;
+          cell.dataset.minutes = String(minutes);
+
+          // drag a 15 minuti
+          cell.addEventListener('mousedown', (e) => {
+            if (e.button !== 0) return;
+            // se clicco su un blocco appuntamento esistente, non avvio drag
+            if (e.target && e.target.closest && (e.target.closest('.agenda-slot-app-start') || e.target.closest('.agenda-slot-app-mid') || e.target.closest('.agenda-slot-app-end'))) {
+              return;
+            }
+            e.preventDefault();
+            agendaDrag.isDragging = true;
+            agendaDrag.start = { date: iso, minutes };
+            agendaDrag.end = { date: iso, minutes };
+            updateAgendaDragHighlight();
+          });
+
+          cell.addEventListener('mouseenter', () => {
+            if (!agendaDrag.isDragging || !agendaDrag.start) return;
+            if (agendaDrag.start.date !== iso) return; // drag vincolato alla stessa colonna giorno
+            agendaDrag.end = { date: iso, minutes };
+            updateAgendaDragHighlight();
+          });
+
+          cell.addEventListener('mouseup', () => {
+            if (!agendaDrag.isDragging || !agendaDrag.start || !agendaDrag.end) return;
+            agendaDrag.isDragging = false;
+
+            const { start, end } = agendaDrag;
+            if (start.date === end.date) {
+              const mStart = Math.min(start.minutes, end.minutes);
+              const mEnd   = Math.max(start.minutes, end.minutes) + slotSize; // includo l'ultimo slot
+              openAgendaRangeDialog(start.date, mStart, mEnd);
+            }
+
+            agendaDrag.start = null;
+            agendaDrag.end = null;
+            updateAgendaDragHighlight();
+          });
+
+          const key = `${iso}|${minutes}`;
+          slotMap[key] = cell;
+          grid.appendChild(cell);
+        });
+      }
+
+      // render appuntamenti
+      const settimanaIso = giorni.map(d => toLocalISODate(d));
+      const apps = (attivita || []).filter(a => {
+        if (!a || a.tipo !== 'appuntamento') return false;
+        if (!settimanaIso.includes(a.data)) return false;
+        if (typeFilter !== 'tutti' && a.tipoDettaglio !== typeFilter) return false;
+        if (staffFilter !== 'tutti' && a.responsabileId !== staffFilter) return false;
+        return true;
+      });
+
+      
+      const appsByDay = {};
+      apps.forEach(a => {
+        if (!a || !a.data) return;
+        if (!appsByDay[a.data]) appsByDay[a.data] = [];
+        appsByDay[a.data].push(a);
+      });
+
+      Object.keys(appsByDay).forEach(iso => {
+        const dayApps = appsByDay[iso];
+
+        // calcolo start/end in minuti e colonne per gestione contemporaneità
+        const colEnd = [];
+        let maxCols = 0;
+
+        dayApps.forEach(a => {
+          const startParts = (a.ora || '09:00').split(':');
+          const endParts   = (a.oraFine || a.ora || '10:00').split(':');
+
+          let startMin = parseInt(startParts[0],10) * 60 + parseInt(startParts[1] || '0',10);
+          let endMin   = parseInt(endParts[0],10) * 60 + parseInt(endParts[1] || '0',10);
+
+          // snap a 15'
+          startMin = Math.max(minStart, Math.floor(startMin / slotSize) * slotSize);
+          endMin   = Math.min(minEnd, Math.ceil(endMin / slotSize) * slotSize);
+          if (endMin <= startMin) endMin = startMin + slotSize;
+
+          a._startMin = startMin;
+          a._endMin = endMin;
+        });
+
+        // ordina per inizio
+        dayApps.sort((a,b) => a._startMin - b._startMin || a._endMin - b._endMin);
+
+        dayApps.forEach(a => {
+          let col = 0;
+          while (col < colEnd.length && a._startMin < colEnd[col]) {
+            col++;
+          }
+          colEnd[col] = a._endMin;
+          a._colIndex = col;
+          if (col + 1 > maxCols) maxCols = col + 1;
+        });
+
+        // calcola quante colonne servono *per ciascun appuntamento* (solo se è davvero in contemporanea)
+        // Evita l'effetto "tutto al 50%" quando in quella giornata c'è stata una collisione in un altro orario.
+        dayApps.forEach(a => {
+          let localMaxCols = (a._colIndex || 0) + 1;
+          dayApps.forEach(b => {
+            if (a === b) return;
+            // overlap reale sugli intervalli [start,end)
+            if (a._startMin < b._endMin && b._startMin < a._endMin) {
+              localMaxCols = Math.max(localMaxCols, (b._colIndex || 0) + 1);
+            }
+          });
+          a._colCount = Math.max(1, localMaxCols);
+        });
+
+
+        // mappa staff per recuperare velocemente il nome del responsabile
+        const staffMap = {};
+        (staff || []).forEach(s => {
+          if (!s || !s.id) return;
+          staffMap[s.id] = s;
+        });
+
+        dayApps.forEach(a => {
+          const baseKey = `${iso}|`;
+          const startMin = a._startMin;
+          const endMin = a._endMin;
+          const totalSlots = (endMin - startMin) / slotSize;
+
+          // handler click unico
+          const handleClick = (e) => {
+            e.stopPropagation();
+            if (typeof openAppuntamentoDialogById === 'function') {
+              openAppuntamentoDialogById(a.id);
+            }
+          };
+
+          // trova la prima cella e l'altezza di uno slot
+          const firstCell = slotMap[baseKey + String(startMin)];
+          if (!firstCell) return;
+          const slotPx = firstCell.offsetHeight || 18;
+
+          // marca le celle come parte di un appuntamento (solo per logica/drag)
+          for (let m = startMin; m < endMin; m += slotSize) {
+            const cell = slotMap[baseKey + String(m)];
+            if (!cell) continue;
+            cell.classList.add('agenda-slot-app');
+          }
+
+          // costruisci il blocco visuale nella prima cella
+          const cell = firstCell;
+          cell.classList.add('agenda-slot-app-start');
+
+          const rangeLabel = `${a.ora || ''}${a.oraFine ? '–' + a.oraFine : ''}`.trim();
+          const tipologia = (a.tipoDettaglio || a.tipo || '').toString();
+
+          // luogo
+          let luogoLabel = '';
+          if (a.inUfficio && a.cittaUfficio) {
+            luogoLabel = `Ufficio ${a.cittaUfficio}`;
+          } else if (a.luogo) {
+            luogoLabel = a.luogo;
+          }
+
+          // responsabile
+          const respObj = a.responsabileId ? staffMap[a.responsabileId] : null;
+          const respLabel = respObj && respObj.nome ? respObj.nome : '';
+
+          // componi testo: ora · luogo · responsabile
+          const parts = [];
+          if (rangeLabel) parts.push(rangeLabel);
+          if (luogoLabel) parts.push(luogoLabel);
+          if (respLabel) parts.push(respLabel);
+
+          let text = parts.join(' · ');
+          if (!text) {
+            text = `${rangeLabel} ${tipologia}`.trim();
+          }
+
+          // crea il blocco interno
+          const block = document.createElement('div');
+          appBlock.className = 'agenda-block';
+          // colore responsabile
+          let respColor = '#22c55e';
+          if (respObj && (respObj.colore || respObj.color)) {
+            respColor = respObj.colore || respObj.color;
+          }
+          /* gradient plastico più saturo */
+          appBlock.style.background = `linear-gradient(135deg, ${respColor}ee 0%, ${respColor}cc 45%, ${respColor}aa 100%)`;
+          appBlock.style.border = '3px solid ' + respColor;
+
+          // glow e ombra dinamica in base alla durata
+          const depth = Math.min(18, 4 + totalSlots * 1.2);
+          appBlock.style.boxShadow = `0 0 0 1px ${respColor}88, 0 4px ${depth}px rgba(0,0,0,0.45)`;
+
+          // contenuto testo + icona fiamma se bollente
+          let labelText = text;
+          if (a.bollente) {
+            labelText = '🔥 ' + labelText;
+            appBlock.classList.add('agenda-block-hot');
+          }
+          appBlock.textContent = labelText;
+          appBlock.title = labelText;
+
+          // evidenzia blocco appena creato
+          if (lastCreatedAppId && a.id === lastCreatedAppId) {
+            appBlock.classList.add('agenda-block-new');
+          }
+
+          const colIndex = a._colIndex || 0;
+          const colCount = a._colCount || 1;
+          const widthPercent = 100 / colCount;
+          const leftPercent = widthPercent * colIndex;
+
+          appBlock.style.position = 'absolute';
+          appBlock.style.top = '0';
+applyBlockLayout(block, a, dayApps);
+const overlaps = getOverlaps(a, dayApps);
+if (hasSameResponsabileOverlap(a, overlaps)) {
+  block.classList.add('agenda-block-collision');
+  block.title = ' Collisione responsabile\n' + (block.title || '');
+}
+          appBlock.style.height = (slotPx * totalSlots - 2) + 'px';
+
+          appBlock.addEventListener('click', handleClick);
+
+          cell.appendChild(appBlock);
+        });
+      });;
     }
 
-    function renderAgendaWeek() {
-      return renderAgendaWeekModule(agendaCtx());
+    function updateAgendaDragHighlight() {
+      document.querySelectorAll('.agenda-slot-selected').forEach(el => {
+        el.classList.remove('agenda-slot-selected');
+      });
+      if (!agendaDrag.start || !agendaDrag.end) return;
+      if (agendaDrag.start.date !== agendaDrag.end.date) return;
+
+      const date = agendaDrag.start.date;
+      const mStart = Math.min(agendaDrag.start.minutes, agendaDrag.end.minutes);
+      const mEnd   = Math.max(agendaDrag.start.minutes, agendaDrag.end.minutes);
+
+      document.querySelectorAll(`.agenda-slot[data-date="${date}"]`).forEach(slot => {
+        const m = parseInt(slot.dataset.minutes || '0', 10);
+        if (m >= mStart && m <= mEnd) {
+          slot.classList.add('agenda-slot-selected');
+        }
+      });
+    }
+
+function clearAgendaDragHighlight() {
+      document.querySelectorAll('.agenda-slot').forEach(slot => {
+        slot.classList.remove('agenda-slot-selected');
+      });
     }
 
     // Dialog per creare appuntamento su intervallo
+    
+    
     function openAgendaRangeDialog(dateIso, minutesStart, minutesEnd) {
       const pad = n => String(n).padStart(2,'0');
       const staffId = (staff[0] && staff[0].id) || null;
@@ -769,14 +1080,171 @@ function creaNuovoAppuntamentoDaBottone() {
     }
 
 function renderAgendaMonth() {
-      return renderAgendaMonthModule(agendaCtx());
+      const cont = document.getElementById("agenda-month-summary");
+      if (!cont) return;
+
+      cont.innerHTML = "";
+
+      const oggi = new Date();
+      const year = oggi.getFullYear();
+      const month = oggi.getMonth();
+
+      const first = new Date(year, month, 1);
+      const last = new Date(year, month + 1, 0);
+
+      // offset lunedì=0 ... domenica=6
+      let startOffset = first.getDay() - 1;
+      if (startOffset < 0) startOffset = 6;
+
+      const daysInMonth = last.getDate();
+      const totalCells = Math.ceil((startOffset + daysInMonth) / 7) * 7;
+      const weeks = totalCells / 7;
+
+      // Wrapper tabellare: colonne = giorni, righe = settimane
+      const table = document.createElement("table");
+      table.className = "agenda-month-table";
+      table.style.width = "100%";
+      table.style.borderCollapse = "separate";
+      table.style.borderSpacing = "6px";
+      table.style.tableLayout = "fixed";
+
+      const thead = document.createElement("thead");
+      const trHead = document.createElement("tr");
+      const dayNames = ["Lun", "Mar", "Mer", "Gio", "Ven", "Sab", "Dom"];
+
+      dayNames.forEach(name => {
+        const th = document.createElement("th");
+        th.className = "muted";
+        th.style.fontSize = "11px";
+        th.style.fontWeight = "600";
+        th.style.textTransform = "uppercase";
+        th.style.letterSpacing = "0.08em";
+        th.style.padding = "0 6px";
+        th.style.textAlign = "left";
+        th.textContent = name;
+        trHead.appendChild(th);
+      });
+
+      thead.appendChild(trHead);
+      table.appendChild(thead);
+
+      const tbody = document.createElement("tbody");
+
+      for (let w = 0; w < weeks; w++) {
+        const tr = document.createElement("tr");
+
+        for (let d = 0; d < 7; d++) {
+          const td = document.createElement("td");
+          td.style.verticalAlign = "top";
+          td.style.padding = "0";
+
+          const cell = document.createElement("div");
+          cell.className = "metric agenda-month-day";
+          cell.style.minHeight = "80px";
+          cell.style.borderRadius = "6px";
+          cell.style.display = "flex";
+          cell.style.flexDirection = "column";
+          cell.style.justifyContent = "flex-start";
+          cell.style.padding = "6px 8px";
+          cell.style.cursor = "pointer";
+
+          const i = w * 7 + d;
+          const dayNum = i - startOffset + 1;
+
+          if (dayNum > 0 && dayNum <= daysInMonth) {
+            const dateObj = new Date(year, month, dayNum);
+            const iso = year + '-' + String(month + 1).padStart(2,'0') + '-' + String(dayNum).padStart(2,'0');
+
+            // numero giorno
+            const num = document.createElement("div");
+            num.textContent = dayNum;
+            num.style.fontWeight = "700";
+            num.style.marginBottom = "6px";
+            cell.appendChild(num);
+
+            // contatore appuntamenti del giorno
+            const count = (attivita || []).filter(a => a && a.tipo === "appuntamento" && a.data === iso).length;
+
+            const counter = document.createElement("div");
+            counter.style.marginTop = "auto";
+            counter.style.display = "flex";
+            counter.style.justifyContent = "flex-end";
+
+            if (count > 0) {
+              const badge = document.createElement("span");
+              badge.className = "tag";
+              badge.style.borderColor = "rgba(34,197,94,0.35)";
+              badge.style.background = "rgba(34,197,94,0.10)";
+              badge.style.color = "var(--text-main)";
+              badge.textContent = `${count} app.`;
+              counter.appendChild(badge);
+            } else {
+              const muted = document.createElement("span");
+              muted.className = "muted";
+              muted.style.fontSize = "11px";
+              muted.textContent = "0 app.";
+              counter.appendChild(muted);
+            }
+            cell.appendChild(counter);
+
+            // click: vai alla settimana del giorno
+            cell.addEventListener("click", () => {
+              agendaWeekAnchor = startOfWeek(dateObj);
+              setView("agenda");
+
+              const gridWeekly = document.getElementById("agenda-week-grid");
+              if (gridWeekly) {
+                gridWeekly.scrollIntoView({ behavior: "smooth", block: "start" });
+              }
+
+              cell.classList.add("agenda-month-day-click");
+              setTimeout(() => cell.classList.remove("agenda-month-day-click"), 180);
+            });
+          } else {
+            cell.style.opacity = "0.25";
+            cell.style.cursor = "default";
+            // celle vuote: nessuna azione
+            cell.addEventListener("click", (e) => e.preventDefault());
+          }
+
+          td.appendChild(cell);
+          tr.appendChild(td);
+        }
+
+        tbody.appendChild(tr);
+      }
+
+      table.appendChild(tbody);
+      cont.appendChild(table);
     }
 
-    // Bind una sola volta: navigazione settimana + filtri Agenda
-    try { bindAgendaNavAndFiltersModule(agendaCtx()); } catch {}
 
-    // Delego anche binding di navigazione/filtri al modulo Agenda (una sola volta)
-    bindAgendaNavAndFiltersModule(agendaCtx());
+
+    // navigazione settimana + filtri
+    document.getElementById('agenda-prev-week')?.addEventListener('click', () => {
+      agendaWeekAnchor = addDays(agendaWeekAnchor, -7);
+      renderAgendaWeek();
+    });
+    document.getElementById('agenda-next-week')?.addEventListener('click', () => {
+      agendaWeekAnchor = addDays(agendaWeekAnchor, 7);
+      renderAgendaWeek();
+    });
+    document.getElementById('agenda-today-week')?.addEventListener('click', () => {
+      agendaWeekAnchor = startOfWeek(new Date());
+      renderAgendaWeek();
+    });
+    document.getElementById('agenda-type-filter')?.addEventListener('change', renderAgendaWeek);
+    document.getElementById('agenda-staff-filter')?.addEventListener('change', renderAgendaWeek);
+    document.getElementById('agenda-new-appointment')?.addEventListener('click', () => {
+      creaNuovoAppuntamentoDaBottone();
+    });
+
+    // in caso rilasci mouse fuori dalla griglia
+    document.addEventListener('mouseup', () => {
+      if (!agendaDrag.isDragging) return;
+      agendaDrag.isDragging = false;
+      clearAgendaDragHighlight();
+    });
 
   /* ====== IMMOBILI ====== */
 
@@ -1736,11 +2204,23 @@ const editBtn = e.target.closest?.('[data-not-edit]');
     }
   });
 }
-bindNotizieModalUI();
 
-document.getElementById('not-new-btn')?.addEventListener('click', () => {
-  openNotiziaModal(null);
-});
+// Espone API Notizie del legacy per i moduli (bridge temporaneo)
+window.__LEGACY_API__ = window.__LEGACY_API__ || {};
+window.__LEGACY_API__.notizie = {
+  renderNotizie,
+  openNotiziaModal,
+  closeNotiziaModal,
+  bindNotizieModalUI
+};
+
+if (ENABLE_LEGACY_NOTIZIE) bindNotizieModalUI();
+
+if (ENABLE_LEGACY_NOTIZIE) {
+  document.getElementById('not-new-btn')?.addEventListener('click', () => {
+    openNotiziaModal(null);
+  });
+}
 
 /* ====== RUBRICA / CONTATTI ====== */
 
@@ -6741,24 +7221,6 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
 })();
-
-
-// === Bridge per moduli (Agenda + lettura stato) ===
-try {
-  window.CRMState = function() {
-    return { attivita: (typeof attivita!=='undefined'?attivita:[]), staff: (typeof staff!=='undefined'?staff:[]) };
-  };
-} catch {}
-
-try {
-  window.AgendaLegacy = {
-    getWeekAnchor: () => (typeof agendaWeekAnchor!=='undefined' ? agendaWeekAnchor : new Date()),
-    setWeekAnchor: (d) => { try { agendaWeekAnchor = d; } catch {} },
-    renderWeek: () => { try { renderAgendaWeek && renderAgendaWeek(); } catch(e){ console.warn('renderAgendaWeek fail', e);} },
-    renderMonth: () => { try { renderAgendaMonth && renderAgendaMonth(); } catch(e){ console.warn('renderAgendaMonth fail', e);} },
-    newAppointment: () => { try { creaNuovoAppuntamentoDaBottone && creaNuovoAppuntamentoDaBottone(); } catch(e){} }
-  };
-} catch {}
 
 // === ES module boundary (bootstrap) ===
 // Espone solo le funzioni richiamate da attributi HTML inline (index.html).

@@ -1,7 +1,9 @@
 // crm-app.js (module entrypoint)
-// Boots the app and delegates features to small modules.
-
-import { initAgenda } from './modules/agenda/index.js';
+// Boots the legacy app (which mounts UI + listeners) and keeps the rest of the project structure intact.
 import './modules/legacy/crm-app.legacy.js';
+import { initNotizie } from './modules/notizie/index.js';
 
-try { initAgenda(); } catch (e) { console.warn('[BOOT] initAgenda failed', e); }
+// init moduli (listener UI) – il legacy mantiene ancora la logica interna
+document.addEventListener('DOMContentLoaded', () => {
+  try { initNotizie(); } catch (e) { console.warn('[BOOT] initNotizie error', e); }
+});
