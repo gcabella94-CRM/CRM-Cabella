@@ -83,3 +83,45 @@ export function minutesSinceMidnight(date) {
   if (!d) return 0;
   return d.getHours() * 60 + d.getMinutes();
 }
+
+
+export function startOfWeek(date, weekStartsOnMonday = true) {
+  const d = date instanceof Date ? new Date(date) : (parseDateTimeAny(date) || new Date());
+  const day = d.getDay(); // 0=Sun
+  const offset = weekStartsOnMonday ? (day + 6) % 7 : day;
+  d.setDate(d.getDate() - offset);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+export function addDays(date, n) {
+  const d = date instanceof Date ? new Date(date) : (parseDateTimeAny(date) || new Date());
+  d.setDate(d.getDate() + (Number(n) || 0));
+  return d;
+}
+
+// HH:MM + minutes, returns HH:MM (wraps across midnight)
+export function addMinutesToTimeSafe(timeStr, minutes) {
+  if (!timeStr || typeof timeStr !== 'string') return timeStr || '';
+  const parts = timeStr.split(':');
+  if (parts.length < 2) return timeStr;
+  const h = parseInt(parts[0], 10);
+  const m = parseInt(parts[1], 10);
+  if (isNaN(h) || isNaN(m)) return timeStr;
+
+  const d = new Date(2000, 0, 1, h, m, 0, 0);
+  d.setMinutes(d.getMinutes() + (Number(minutes) || 0));
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  return `${hh}:${mm}`;
+}
+
+
+export function toLocalISODate(date) {
+  const d = date instanceof Date ? date : (parseDateTimeAny(date) || null);
+  if (!d) return '';
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+export function addMinutesToTime(timeStr, minutes) { return addMinutesToTimeSafe(timeStr, minutes); }
