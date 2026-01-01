@@ -147,3 +147,15 @@ export function formatDateTimeIT(dateLike) {
   const time = d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
   return `${date} ${time}`;
 }
+// Chiave stabile in locale: "YYYY-MM-DD_HH:MM"
+// Utile per deduplicare alert collisioni / raggruppamenti.
+export function toLocalDateTimeKey(dateLike) {
+  const d = (dateLike instanceof Date) ? dateLike : new Date(dateLike);
+  if (isNaN(d)) return "";
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const da = String(d.getDate()).padStart(2, "0");
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  return `${y}-${m}-${da}_${hh}:${mm}`;
+}
