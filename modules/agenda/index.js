@@ -1,77 +1,64 @@
 // modules/agenda/index.js
 // PROXY -> Legacy Agenda (crm-app.legacy.js)
-// Scopo: mantenere compatibilità con import { initAgenda } ... dai moduli,
-// ma delegare tutto al legacy, evitando doppioni di rendering/listeners.
+//
+// Scopo: crm-app.js importa initAgenda dai moduli.
+// Noi manteniamo quell'API, ma demandiamo tutto al legacy,
+// evitando doppioni di rendering/listeners.
+//
+// In più, importiamo overlap.js così espone window.AgendaOverlap (usato dal legacy).
+import './overlap.js';
 
-function legacy() {
+function L() {
   return (typeof window !== 'undefined') ? window.AgendaLegacy : null;
 }
 
-/**
- * Entry point richiesto da crm-app.js (modulare):
- * deve esistere come named export.
- * Qui inizializziamo l'Agenda legacy in modo idempotente.
- */
 export function initAgenda() {
-  try {
-    const L = legacy();
-    if (!L) return;
+  const legacy = L();
+  if (!legacy) return;
 
-    // Se il legacy espone initAgenda/init, usalo
-    if (typeof L.initAgenda === 'function') { L.initAgenda(); return; }
-    if (typeof L.init === 'function') { L.init(); return; }
+  // init idempotente
+  if (typeof legacy.init === 'function') legacy.init();
 
-    // Fallback: render e bind minimi se disponibili
-    if (typeof L.ensureHooks === 'function') L.ensureHooks();
-    if (typeof L.renderWeek === 'function') L.renderWeek();
-    else if (typeof L.renderAgendaWeek === 'function') L.renderAgendaWeek();
-
-    if (typeof L.renderMonth === 'function') L.renderMonth();
-    else if (typeof L.renderAgendaMonth === 'function') L.renderAgendaMonth();
-
-  } catch (e) {
-    // non rilanciare: questo file deve essere "safe"
-    console.warn('[agenda proxy] initAgenda failed:', e);
-  }
+  // Render iniziale (week come default)
+  if (typeof legacy.renderWeek === 'function') legacy.renderWeek();
+  else if (typeof legacy.renderAgendaWeek === 'function') legacy.renderAgendaWeek();
 }
 
-// ---- Proxy API (usata da altre parti del codice) ----
-export function setAgendaWeekAnchor(dateLike) {
-  try { legacy()?.setWeekAnchor?.(dateLike); } catch {}
+export function setAgendaWeekAnchor(dateStr) {
+  const legacy = L();
+  if (!legacy) return;
+  if (typeof legacy.setWeekAnchor === 'function') legacy.setWeekAnchor(dateStr);
+  else legacy._weekAnchor = dateStr;
 }
 
 export function getAgendaWeekAnchor() {
-  try { return legacy()?.getWeekAnchor?.() ?? null; } catch { return null; }
+  const legacy = L();
+  if (!legacy) return '';
+  if (typeof legacy.getWeekAnchor === 'function') return legacy.getWeekAnchor() || '';
+  return legacy._weekAnchor || '';
 }
 
 export function renderAgendaWeek() {
-  try {
-    const L = legacy();
-    if (L?.renderWeek) return L.renderWeek();
-    return L?.renderAgendaWeek?.();
-  } catch {}
+  const legacy = L();
+  if (!legacy) return;
+  if (typeof legacy.renderWeek === 'function') legacy.renderWeek();
+  else if (typeof legacy.renderAgendaWeek === 'function') legacy.renderAgendaWeek();
 }
 
 export function renderAgendaMonth() {
-  try {
-    const L = legacy();
-    if (L?.renderMonth) return L.renderMonth();
-    return L?.renderAgendaMonth?.();
-  } catch {}
+  const legacy = L();
+  if (!legacy) return;
+  if (typeof legacy.renderMonth === 'function') legacy.renderMonth();
+  else if (typeof legacy.renderAgendaMonth === 'function') legacy.renderAgendaMonth();
 }
 
-export function openAgendaWeekFromDate(dateLike) {
-  try {
-    const L = legacy();
-    if (L?.openWeekFromDate) return L.openWeekFromDate(dateLike);
-    // fallback semplice
-    L?.setWeekAnchor?.(dateLike);
-    if (L?.renderWeek) L.renderWeek(); else L?.renderAgendaWeek?.();
-    L?.scrollToWeek?.();
-  } catch {}
+export function openAgendaWeekFromDate(dateStr) {
+  const legacy = L();
+  if (!legacy) return;
+  if (typeof legacy.openWeekFromDate === 'function') legacy.openWeekFromDate(dateStr);
+  else if (typeof legacy.openAgendaWeekFromDate === 'function') legacy.openAgendaWeekFromDate(dateStr);
 }
 
-// opzionale: default export per chi lo usa
 export default {
   initAgenda,
   setAgendaWeekAnchor,

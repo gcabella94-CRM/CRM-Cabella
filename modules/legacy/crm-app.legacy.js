@@ -852,29 +852,31 @@ addInterazione({
         // ordina per inizio
         dayApps.sort((a,b) => a._startMin - b._startMin || a._endMin - b._endMin);
 
-        dayApps.forEach(a => {
-          let col = 0;
-          while (col < colEnd.length && a._startMin < colEnd[col]) {
-            col++;
-          }
-          colEnd[col] = a._endMin;
-          a._colIndex = col;
-          if (col + 1 > maxCols) maxCols = col + 1;
-        });
-
-        // calcola quante colonne servono *per ciascun appuntamento* (solo se è davvero in contemporanea)
-        // Evita l'effetto "tutto al 50%" quando in quella giornata c'è stata una collisione in un altro orario.
-        dayApps.forEach(a => {
-          let localMaxCols = (a._colIndex || 0) + 1;
-          dayApps.forEach(b => {
-            if (a === b) return;
-            // overlap reale sugli intervalli [start,end)
-            if (a._startMin < b._endMin && b._startMin < a._endMin) {
-              localMaxCols = Math.max(localMaxCols, (b._colIndex || 0) + 1);
-            }
+                // Colonne/overlap: demandiamo al modulo se disponibile (source of truth),
+        // altrimenti usiamo un fallback locale (compat legacy).
+        if (window.AgendaOverlap && typeof window.AgendaOverlap.assignColumnsInPlace === 'function') {
+          window.AgendaOverlap.assignColumnsInPlace(dayApps);
+        } else {
+          const colEnd = [];
+          dayApps.forEach(a => {
+            let col = 0;
+            while (col < colEnd.length && a._startMin < colEnd[col]) col++;
+            colEnd[col] = a._endMin;
+            a._colIndex = col;
           });
-          a._colCount = Math.max(1, localMaxCols);
-        });
+
+          dayApps.forEach(a => {
+            let localMaxCols = (a._colIndex || 0) + 1;
+            dayApps.forEach(b => {
+              if (a === b) return;
+              // overlap reale sugli intervalli [start,end)
+              if (a._startMin < b._endMin && b._startMin < a._endMin) {
+                localMaxCols = Math.max(localMaxCols, (b._colIndex || 0) + 1);
+              }
+            });
+            a._colCount = Math.max(1, localMaxCols);
+          });
+        }
 
 
         // mappa staff per recuperare velocemente il nome del responsabile
