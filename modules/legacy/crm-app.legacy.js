@@ -6,10 +6,6 @@ import { openNotiziaDetail as openNotiziaDetailDrawer } from '../notizie/notizia
 */
 window.__CRM_APP_LOADED__ = true;
 
-// Toggle per migrazione moduli (legacy -> modules)
-const ENABLE_LEGACY_NOTIZIE = false;
-
-
 // ===============================
 // cssEscape – global safe helper
 // ===============================
@@ -1187,9 +1183,8 @@ function renderAgendaMonth() {
             }
             cell.appendChild(counter);
 
-            // click: vai alla settimana del giorno
-            cell.addEventListener("click", () => {
-              agendaWeekAnchor = startOfWeek(dateObj);
+            // click (delegato a modules/agenda): set dataset per listener delegato
+try { cell.dataset.date = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`; } catch {}
               setView("agenda");
 
               const gridWeekly = document.getElementById("agenda-week-grid");
@@ -2204,23 +2199,11 @@ const editBtn = e.target.closest?.('[data-not-edit]');
     }
   });
 }
+bindNotizieModalUI();
 
-// Espone API Notizie del legacy per i moduli (bridge temporaneo)
-window.__LEGACY_API__ = window.__LEGACY_API__ || {};
-window.__LEGACY_API__.notizie = {
-  renderNotizie,
-  openNotiziaModal,
-  closeNotiziaModal,
-  bindNotizieModalUI
-};
-
-if (ENABLE_LEGACY_NOTIZIE) bindNotizieModalUI();
-
-if (ENABLE_LEGACY_NOTIZIE) {
-  document.getElementById('not-new-btn')?.addEventListener('click', () => {
-    openNotiziaModal(null);
-  });
-}
+document.getElementById('not-new-btn')?.addEventListener('click', () => {
+  openNotiziaModal(null);
+});
 
 /* ====== RUBRICA / CONTATTI ====== */
 
