@@ -1051,6 +1051,23 @@ function clearAgendaDragHighlight() {
       openAppuntamentoDialog(app);
     }
 
+// ====== AGENDA BRIDGE (modules-friendly) ======
+// Espone API minime per permettere ai moduli di pilotare il salto mese→settimana
+// senza toccare variabili interne del legacy.
+try {
+  window.AgendaLegacy = window.AgendaLegacy || {};
+  window.AgendaLegacy.setWeekAnchor = (dateLike) => {
+    try {
+      const d = (dateLike instanceof Date) ? dateLike : new Date(dateLike);
+      if (!isNaN(d)) agendaWeekAnchor = startOfWeek(d);
+    } catch {}
+  };
+  window.AgendaLegacy.getWeekAnchor = () => agendaWeekAnchor;
+  window.AgendaLegacy.renderWeek = () => { try { renderAgendaWeek(); } catch {} };
+  window.AgendaLegacy.scrollToWeek = () => {
+    try { document.getElementById('agenda-week-grid')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch {}
+  };
+} catch {}
 
 function creaNuovoAppuntamentoDaBottone() {
       const today = new Date();
@@ -1184,7 +1201,7 @@ function renderAgendaMonth() {
             cell.appendChild(counter);
 
             // click (delegato a modules/agenda): set dataset per listener delegato
-try { cell.dataset.date = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`; } catch {}
+try { cell.dataset.date = `${year}-${String(month+1).padStart(2,'0')}-${String(dayNum).padStart(2,'0')}`; } catch {}
           } else {
             cell.style.opacity = "0.25";
             cell.style.cursor = "default";
