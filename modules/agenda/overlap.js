@@ -1,112 +1,174 @@
 // modules/agenda/overlap.js
-// Overlap + colonne (NO maxCols globale).
+// Overlap + colonne (NO "maxCols globale").
 // Obiettivo: le colonne si applicano SOLO dentro un gruppo di sovrapposizione reale,
 // evitando l'effetto "tutto al 50%" anche sugli eventi successivi.
-
-function overlaps(a, b) {
-  return (a._startMin < b._endMin) && (b._startMin < a._endMin);
-}
+//
+// API (usata dai moduli):
+// - assignColumns(dayApps) -> NEW array (shallow copies) con _colIndex/_colCount
+// - computeColumnsForEvent(a, dayApps) -> { cols, index, overlaps }
+// - getOverlaps(a, dayApps)
+// - hasSameResponsabileOverlap(a, overlaps)
+//
+// API (usata dal legacy, via window.AgendaOverlap):
+// - assignColumnsInPlace(dayApps) -> muta gli oggetti in input (se possibile)
 
 export function getOverlaps(a, dayApps) {
-  return (dayApps || []).filter(ev => {
+  const list = dayApps || [];
+  if (!a) return [];
+  const s = Number(a._startMin);
+  const e = Number(a._endMin);
+  if (!Number.isFinite(s) || !Number.isFinite(e)) return [];
+  return list.filter(ev => {
     if (!ev || ev === a) return false;
-    return overlaps(ev, a);
+    const es = Number(ev._startMin);
+    const ee = Number(ev._endMin);
+    if (!Number.isFinite(es) || !Number.isFinite(ee)) return false;
+    return (es < e) && (ee > s);
   });
 }
 
-// Assegna colonne IN PLACE (mutando gli oggetti originali).
-// Richiede che ogni evento abbia già:
-// - _startMin (minuti da 00:00)
-// - _endMin
-export function assignColumnsInPlace(dayApps) {
-  const apps = (dayApps || []).filter(Boolean);
+// Greedy column assignment within each overlap-group.
+// Returns NEW shallow copies (does not mutate the original array elements).
+export function assignColumns(dayApps = []) {
+  const apps = (dayApps || [])
+    .filter(Boolean)
+    .map(ev => ({ ...ev })) // shallow copy
+    .sort((a, b) => (a._startMin - b._startMin) || (a._endMin - b._endMin));
 
-  // Reset difensivo
-  apps.forEach(a => {
-    a._colIndex = 0;
-    a._colCount = 1;
-  });
-
-  // Ordina per inizio (poi fine)
-  const sorted = [...apps].sort((a, b) => (a._startMin - b._startMin) || (a._endMin - b._endMin));
-
-  // Costruisci gruppi di sovrapposizione reale
   let group = [];
-  let groupEnd = -1;
+  let groupMaxEnd = -1;
 
-  function flushGroup() {
-    if (!group.length) return;
+  function finalizeGroup(g) {
+    if (!g || g.length === 0) return;
 
-    // greedy columns dentro il gruppo
-    const colEnd = [];
-    group.sort((a, b) => (a._startMin - b._startMin) || (a._endMin - b._endMin));
-    group.forEach(ev => {
-      let col = 0;
-      while (col < colEnd.length && ev._startMin < colEnd[col]) col++;
-      colEnd[col] = ev._endMin;
+    // Active columns (each entry = last endMin of that column)
+    const colEnds = [];
+    // For tracking the max simultaneous columns in this group
+    let maxCols = 1;
+
+    // Sort again by start then longer first (helps stability)
+    g.sort((a, b) => (a._startMin - b._startMin) || (b._endMin - a._endMin));
+
+    for (const ev of g) {
+      // find first free column
+      let col = -1;
+      for (let i = 0; i < colEnds.length; i++) {
+        if (colEnds[i] <= ev._startMin) { col = i; break; }
+      }
+      if (col === -1) {
+        col = colEnds.length;
+        colEnds.push(ev._endMin);
+      } else {
+        colEnds[col] = ev._endMin;
+      }
+
       ev._colIndex = col;
-    });
+      // Temporary: group size will be set after we know maxCols
+      maxCols = Math.max(maxCols, colEnds.length);
+    }
 
-    const cols = Math.max(1, colEnd.length);
-    group.forEach(ev => { ev._colCount = cols; });
-
-    group = [];
-    groupEnd = -1;
+    // assign group column count
+    for (const ev of g) ev._colCount = maxCols;
   }
 
-  sorted.forEach(ev => {
-    if (!group.length) {
-      group = [ev];
-      groupEnd = ev._endMin;
-      return;
+  for (const ev of apps) {
+    const s = Number(ev._startMin);
+    const e = Number(ev._endMin);
+
+    // if invalid times, treat as isolated
+    if (!Number.isFinite(s) || !Number.isFinite(e)) {
+      finalizeGroup(group);
+      group = [];
+      groupMaxEnd = -1;
+      ev._colIndex = 0;
+      ev._colCount = 1;
+      continue;
     }
 
-    // Se non sovrappone al gruppo corrente, chiudi gruppo e aprine uno nuovo
-    if (ev._startMin >= groupEnd) {
-      flushGroup();
-      group = [ev];
-      groupEnd = ev._endMin;
-      return;
+    if (group.length === 0) {
+      group.push(ev);
+      groupMaxEnd = e;
+      continue;
     }
 
-    // Altrimenti entra nel gruppo e aggiorna fine del gruppo
-    group.push(ev);
-    if (ev._endMin > groupEnd) groupEnd = ev._endMin;
-  });
+    // If current event starts after groupMaxEnd, no overlap-chain continuation -> close group
+    if (s >= groupMaxEnd) {
+      finalizeGroup(group);
+      group = [ev];
+      groupMaxEnd = e;
+    } else {
+      group.push(ev);
+      groupMaxEnd = Math.max(groupMaxEnd, e);
+    }
+  }
+  finalizeGroup(group);
 
-  flushGroup();
   return apps;
 }
 
-// Variante non mutante (ritorna copie shallow)
-export function assignColumns(dayApps) {
-  const cloned = (dayApps || []).filter(Boolean).map(ev => ({ ...ev }));
-  assignColumnsInPlace(cloned);
-  return cloned;
+// In-place version for legacy usage.
+// Mutates provided objects when possible (fallback: no-op if array invalid).
+export function assignColumnsInPlace(dayApps = []) {
+  const assigned = assignColumns(dayApps || []);
+  // Map by stable identity if possible (id), else by start/end and titolo
+  const byId = new Map();
+  for (const ev of assigned) {
+    if (ev && (ev.id || ev._id)) byId.set(ev.id || ev._id, ev);
+  }
+
+  for (const orig of (dayApps || [])) {
+    if (!orig) continue;
+    const key = orig.id || orig._id;
+    let src = key ? byId.get(key) : null;
+
+    if (!src) {
+      // fallback match
+      src = assigned.find(e =>
+        e &&
+        e._startMin === orig._startMin &&
+        e._endMin === orig._endMin &&
+        String(e.titolo || e.descrizione || '') === String(orig.titolo || orig.descrizione || '')
+      );
+    }
+
+    if (src) {
+      orig._colIndex = src._colIndex;
+      orig._colCount = src._colCount;
+    } else {
+      // safe defaults
+      orig._colIndex = 0;
+      orig._colCount = 1;
+    }
+  }
+  return dayApps;
 }
 
-// Dati layout per un singolo evento (cols/index/overlaps)
-export function getPlacement(a, dayApps) {
-  const overlapsList = getOverlaps(a, dayApps);
+export function computeColumnsForEvent(a, dayApps) {
+  const overlaps = getOverlaps(a, dayApps);
 
-  // Se assignColumns è stato applicato, a._colCount è affidabile.
-  const cols = Math.max(1, a?._colCount || (overlapsList.length + 1));
-  const index = Math.min(a?._colIndex || 0, cols - 1);
-  return { cols, index, overlaps: overlapsList };
+  // If columns already assigned, trust them
+  const cols = Math.max(1, Number(a?._colCount) || 0, overlaps.length + 1);
+  const index = Math.min(Math.max(0, Number(a?._colIndex) || 0), cols - 1);
+
+  return { cols, index, overlaps };
 }
 
-export function hasSameResponsabileOverlap(a, overlapsList) {
-  if (!a?.responsabileId) return false;
-  return (overlapsList || []).some(ev => ev?.responsabileId === a.responsabileId);
+export function hasSameResponsabileOverlap(a, overlaps) {
+  const rid = a?.responsabileId;
+  if (!rid) return false;
+  return (overlaps || []).some(ev => ev?.responsabileId === rid);
 }
 
-// Bridge: rende disponibili le funzioni anche al legacy (non-module).
-// Nota: questo file è un ES module, ma l'assegnazione a window funziona comunque quando caricato dal bundle/app.
-if (typeof window !== 'undefined') {
-  window.AgendaOverlap = window.AgendaOverlap || {};
-  window.AgendaOverlap.getOverlaps = getOverlaps;
-  window.AgendaOverlap.assignColumnsInPlace = assignColumnsInPlace;
-  window.AgendaOverlap.assignColumns = assignColumns;
-  window.AgendaOverlap.getPlacement = getPlacement;
-  window.AgendaOverlap.hasSameResponsabileOverlap = hasSameResponsabileOverlap;
+// Bridge for legacy (global access)
+try {
+  if (typeof window !== 'undefined') {
+    window.AgendaOverlap = window.AgendaOverlap || {};
+    window.AgendaOverlap.getOverlaps = getOverlaps;
+    window.AgendaOverlap.assignColumns = assignColumns;
+    window.AgendaOverlap.assignColumnsInPlace = assignColumnsInPlace;
+    window.AgendaOverlap.computeColumnsForEvent = computeColumnsForEvent;
+    window.AgendaOverlap.hasSameResponsabileOverlap = hasSameResponsabileOverlap;
+  }
+} catch (_) {
+  // ignore
 }
