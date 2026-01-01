@@ -1185,16 +1185,6 @@ function renderAgendaMonth() {
 
             // click (delegato a modules/agenda): set dataset per listener delegato
 try { cell.dataset.date = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`; } catch {}
-              setView("agenda");
-
-              const gridWeekly = document.getElementById("agenda-week-grid");
-              if (gridWeekly) {
-                gridWeekly.scrollIntoView({ behavior: "smooth", block: "start" });
-              }
-
-              cell.classList.add("agenda-month-day-click");
-              setTimeout(() => cell.classList.remove("agenda-month-day-click"), 180);
-            });
           } else {
             cell.style.opacity = "0.25";
             cell.style.cursor = "default";
