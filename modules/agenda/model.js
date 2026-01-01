@@ -76,3 +76,46 @@ export function snapTo15(minFromMidnight) {
   const m = Math.max(0, Number(minFromMidnight) || 0);
   return Math.round(m / 15) * 15;
 }
+
+// --- Legacy Week Grid normalization ---
+// Input attivita/appuntamento usa campi: data (YYYY-MM-DD), ora (HH:MM), oraFine (HH:MM)
+// Output: _startMin/_endMin snap 15', coerenti con minStart/minEnd.
+export function normalizeAgendaEvent(raw = {}, { minStart = 8 * 60, minEnd = 20 * 60, slotSize = 15 } = {}) {
+  const a = { ...raw };
+  // Assicura tipo coerente
+  a.tipo = a.tipo || 'appuntamento';
+  a.tipoDettaglio = (a.tipoDettaglio || a.tipo || 'generico').toString();
+
+  const startParts = (a.ora || '09:00').split(':');
+  const endParts = (a.oraFine || a.ora || '10:00').split(':');
+
+  let startMin = parseInt(startParts[0] || '0', 10) * 60 + parseInt(startParts[1] || '0', 10);
+  let endMin = parseInt(endParts[0] || '0', 10) * 60 + parseInt(endParts[1] || '0', 10);
+
+  // snap a 15'
+  startMin = Math.max(minStart, Math.floor(startMin / slotSize) * slotSize);
+  endMin = Math.min(minEnd, Math.ceil(endMin / slotSize) * slotSize);
+  if (endMin <= startMin) endMin = startMin + slotSize;
+
+  // Durata default: telefonate 15', altro 60' (ma non sovrascrive oraFine se esiste)
+  if (!raw.oraFine) {
+    const isTel = ['telefonico', 'telefonata'].includes(String(a.tipoDettaglio).toLowerCase());
+    const durata = isTel ? 15 : 60;
+    endMin = Math.min(minEnd, startMin + durata);
+    if (endMin <= startMin) endMin = startMin + slotSize;
+    a.oraFine = addMinutesToTime(a.ora || '09:00', durata);
+  }
+
+  a._startMin = startMin;
+  a._endMin = endMin;
+  return a;
+}
+
+// local helper (evita dipendenze circolari sul core per una singola funzione)
+function addMinutesToTime(timeStr, minutesToAdd) {
+  const [h, m] = String(timeStr || '00:00').split(':').map(x => parseInt(x, 10) || 0);
+  const total = (h * 60 + m + (Number(minutesToAdd) || 0) + 24 * 60) % (24 * 60);
+  const hh = String(Math.floor(total / 60)).padStart(2, '0');
+  const mm = String(total % 60).padStart(2, '0');
+  return `${hh}:${mm}`;
+}

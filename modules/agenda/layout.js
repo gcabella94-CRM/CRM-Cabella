@@ -1,5 +1,5 @@
 // modules/agenda/layout.js
-import { computeColumnsForEvent } from './overlap.js';
+import { computeColumnsForEvent, assignColumns } from './overlap.js';
 
 export function applyBlockLayout(block, a, dayApps) {
   const { cols, index } = computeColumnsForEvent(a, dayApps);
@@ -13,4 +13,10 @@ export function applyBlockLayout(block, a, dayApps) {
     block.style.left = leftPercent + '%';
     block.style.width = widthPercent + '%';
   }
+}
+
+// Utility opzionale: assicura che gli eventi abbiano _colIndex/_colCount coerenti
+// prima di chiamare applyBlockLayout() (anti regressione "tutto al 50%").
+export function ensureDayLayout(dayApps) {
+  return assignColumns(dayApps || []);
 }
