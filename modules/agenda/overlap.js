@@ -1,106 +1,51 @@
 // modules/agenda/overlap.js
-// Robust overlap + column assignment for a single day.
-// Goal: avoid the classic bug "two overlaps -> everything after stays 50%".
-// We do a sweep-line column assignment per connected overlap group.
+// Calcolo sovrapposizioni reali e colonne per un evento (NO maxCols globale)
+// Obiettivo: niente effetto "tutto al 50%" fuori dal gruppo di overlap.
 
-import { clamp } from '../core/utils.js';
-
-function overlaps(a, b) {
-  return a._startMin < b._endMin && b._startMin < a._endMin;
+export function getOverlaps(a, dayApps) {
+  return (dayApps || []).filter(ev => {
+    if (!ev || ev === a) return false;
+    return (ev._startMin < a._endMin) && (ev._endMin > a._startMin);
+  });
 }
 
-export function buildOverlapLayout(dayApps) {
-  const apps = (dayApps || []).filter(Boolean);
+// Assegna colonne con algoritmo greedy (sweep-line) su eventi già normalizzati (_startMin/_endMin).
+// Restituisce una nuova lista di eventi con _colIndex e _colCount coerenti per il loro gruppo di overlap.
+export function assignColumns(dayApps) {
+  const apps = (dayApps || []).filter(Boolean).slice().sort((a,b) => a._startMin - b._startMin || a._endMin - b._endMin);
 
-  // Ensure _startMin/_endMin exist
+  // colEnd[i] = minuto di fine dell'evento attualmente nella colonna i
+  const colEnd = [];
   apps.forEach(a => {
-    a._startMin = Number.isFinite(a._startMin) ? a._startMin : 0;
-    a._endMin = Number.isFinite(a._endMin) ? a._endMin : a._startMin + 15;
+    let col = 0;
+    while (col < colEnd.length && a._startMin < colEnd[col]) col++;
+    colEnd[col] = a._endMin;
+    a._colIndex = col;
   });
 
-  // Sort by start, then longer first (helps stable packing)
-  const sorted = apps.slice().sort((a, b) => (a._startMin - b._startMin) || (b._endMin - a._endMin));
-
-  // Assign columns using sweep-line:
-  // Maintain active columns with their current ending time.
-  const colEnd = []; // endMin per column (for current group)
-  const active = []; // list of active events in current group
-  const groupEvents = []; // current connected component events
-  let groupMaxCols = 1;
-
-  function flushGroup() {
-    if (groupEvents.length === 0) return;
-    // Apply groupMaxCols to every event in group
-    groupEvents.forEach(ev => {
-      ev._layout = ev._layout || {};
-      ev._layout.cols = groupMaxCols;
-    });
-    // reset
-    colEnd.length = 0;
-    active.length = 0;
-    groupEvents.length = 0;
-    groupMaxCols = 1;
-  }
-
-  for (const ev of sorted) {
-    // If no active events, start a new group
-    if (active.length === 0) {
-      flushGroup();
-    } else {
-      // If ev does not overlap ANY active, then previous group ended
-      const touchesGroup = active.some(a => overlaps(a, ev));
-      if (!touchesGroup) {
-        flushGroup();
-      }
-    }
-
-    // Remove finished from active + free columns
-    for (let i = active.length - 1; i >= 0; i--) {
-      if (active[i]._endMin <= ev._startMin) {
-        active.splice(i, 1);
-      }
-    }
-    // rebuild colEnd based on current active assignments
-    // (colEnd is per column; we keep it updated lazily)
-    // We'll keep colEnd entries and just ensure we find a free one.
-
-    // Find first free column (colEnd[c] <= ev.start)
-    let col = -1;
-    for (let c = 0; c < colEnd.length; c++) {
-      if (colEnd[c] <= ev._startMin) { col = c; break; }
-    }
-    if (col === -1) {
-      col = colEnd.length;
-      colEnd.push(0);
-    }
-
-    ev._layout = ev._layout || {};
-    ev._layout.index = col;
-
-    colEnd[col] = ev._endMin;
-    active.push(ev);
-    groupEvents.push(ev);
-    groupMaxCols = Math.max(groupMaxCols, colEnd.length);
-  }
-
-  flushGroup();
-
-  // Safety clamp for layout index
-  apps.forEach(ev => {
-    if (!ev._layout) ev._layout = { cols: 1, index: 0 };
-    ev._layout.cols = Math.max(1, Number(ev._layout.cols || 1));
-    ev._layout.index = clamp(Number(ev._layout.index || 0), 0, ev._layout.cols - 1);
+  // per ciascun evento calcolo quante colonne servono davvero nel suo gruppo di overlap
+  apps.forEach(a => {
+    const overlaps = getOverlaps(a, apps);
+    const cols = overlaps.length === 0 ? 1 : (overlaps.length + 1);
+    // attenzione: se i overlaps includono eventi con colIndex alto, garantisco che colCount copra anche loro
+    let maxIdx = a._colIndex || 0;
+    overlaps.forEach(o => { maxIdx = Math.max(maxIdx, o._colIndex || 0); });
+    a._colCount = Math.max(cols, maxIdx + 1);
   });
 
   return apps;
 }
 
-export function getOverlapsForEvent(a, dayApps) {
-  if (!a) return [];
-  return (dayApps || []).filter(ev => ev && ev !== a && overlaps(ev, a));
+export function computeColumnsForEvent(a, dayApps) {
+  const overlaps = getOverlaps(a, dayApps);
+  if (overlaps.length === 0) return { cols: 1, index: 0, overlaps };
+  // colCount è già calcolato dal legacy (a._colCount) o da assignColumns
+  const cols = Math.max(1, a._colCount || (overlaps.length + 1));
+  const index = Math.min(a._colIndex || 0, cols - 1);
+  return { cols, index, overlaps };
 }
 
-export function hasSameResponsabileOverlap(a, overlapsList) {
+export function hasSameResponsabileOverlap(a, overlaps) {
   if (!a?.responsabileId) return false;
-  return (overlapsList || []).some(ev => ev?.responsabileId && ev.responsabileId === a.responsabileId);
+  return (overlaps || []).some(ev => ev?.responsabileId === a.responsabileId);
 }
