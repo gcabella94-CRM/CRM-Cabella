@@ -1,5 +1,6 @@
 import { applyBlockLayout } from '../agenda/layout.js';
 import { getOverlaps, hasSameResponsabileOverlap } from '../agenda/overlap.js';
+import { detectCollisionForEvent, shouldAlertCollision, alertCollision } from '../agenda/listeners.js';
 import { openNotiziaDetail as openNotiziaDetailDrawer } from '../notizie/notiziaDrawer.js';
 /* CRM-Cabella crm-app.js (FINAL) — generated 2025-12-17 18:20:08
    If you see this line in Sources, you have the right file.
@@ -985,16 +986,31 @@ addInterazione({
           appBlock.style.width = widthPercent + '%';
 
           // collisione non bloccante: stesso responsabile che si sovrappone a un altro evento
+          // - evidenzia (classe + title)
+          // - mostra popup SOLO quando rileviamo una NUOVA collisione (per evitare spam)
+          // - emette anche evento 'agenda:collision' (contract)
           try {
-            if (a && a.responsabileId) {
-              const hasCollision = (dayApps || []).some(b => {
-                if (!b || b === a) return false;
-                if (b.responsabileId !== a.responsabileId) return false;
-                return (a._startMin < b._endMin) && (b._startMin < a._endMin);
-              });
-              if (hasCollision) {
-                appBlock.classList.add('agenda-block-collision');
-                appBlock.title = "⚠️ Collisione responsabile\n" + (appBlock.title || "");
+            const seenMap = (window.__AGENDA_COLLISION_SEEN__ = window.__AGENDA_COLLISION_SEEN__ || new Map());
+            const { overlaps, sameResp } = (typeof detectCollisionForEvent === 'function')
+              ? detectCollisionForEvent(a, dayApps)
+              : { overlaps: [], sameResp: false };
+
+            if (sameResp && a && a.responsabileId) {
+              const overlapsSameResp = (overlaps || []).filter(o => o && o.responsabileId === a.responsabileId);
+
+              appBlock.classList.add('agenda-block-collision');
+              appBlock.title = "⚠️ Collisione responsabile
+" + (appBlock.title || "");
+
+              // popup non bloccante (solo new collision)
+              if (typeof shouldAlertCollision === 'function' && shouldAlertCollision(a, dayApps, seenMap)) {
+                try { if (typeof alertCollision === 'function') alertCollision(a, overlapsSameResp); } catch {}
+
+                try {
+                  window.dispatchEvent(new CustomEvent('agenda:collision', {
+                    detail: { evId: a.id || a._id || '', responsabileId: a.responsabileId || '', overlaps: overlapsSameResp.map(x => x.id || x._id || '').filter(Boolean) }
+                  }));
+                } catch {}
               }
             }
           } catch {}
