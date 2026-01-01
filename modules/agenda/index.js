@@ -445,3 +445,11 @@ function maybeAlertSameResponsabileCollision(dayApps) {
     return;
   }
 }
+// Facade init: entrypoint unico per l'isola Agenda
+export function initAgenda() {
+  // binding idempotente (deve già essere protetto da un flag interno)
+  bindAgendaNavAndFilters();
+
+  // opzionale: se vuoi che entrando in agenda faccia subito render
+  // renderAgendaWeek(new Date());
+}
