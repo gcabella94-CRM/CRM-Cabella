@@ -914,6 +914,7 @@ addInterazione({
           const cell = firstCell;
           cell.classList.add('agenda-slot-app-start');
 
+          cell.style.position = 'relative';
           const rangeLabel = `${a.ora || ''}${a.oraFine ? '–' + a.oraFine : ''}`.trim();
           const tipologia = (a.tipoDettaglio || a.tipo || '').toString();
 
@@ -941,7 +942,7 @@ addInterazione({
           }
 
           // crea il blocco interno
-          const block = document.createElement('div');
+          const appBlock = document.createElement('div');
           appBlock.className = 'agenda-block';
           // colore responsabile
           let respColor = '#22c55e';
@@ -977,12 +978,26 @@ addInterazione({
 
           appBlock.style.position = 'absolute';
           appBlock.style.top = '0';
-applyBlockLayout(block, a, dayApps);
-const overlaps = getOverlaps(a, dayApps);
-if (hasSameResponsabileOverlap(a, overlaps)) {
-  block.classList.add('agenda-block-collision');
-  block.title = ' Collisione responsabile\n' + (block.title || '');
-}
+          // posizionamento orizzontale: usa _colIndex/_colCount (anti regressione "tutto al 50%")
+          appBlock.style.left = leftPercent + '%';
+          appBlock.style.width = widthPercent + '%';
+
+          // collisione non bloccante: stesso responsabile che si sovrappone a un altro evento
+          try {
+            if (a && a.responsabileId) {
+              const hasCollision = (dayApps || []).some(b => {
+                if (!b || b === a) return false;
+                if (b.responsabileId !== a.responsabileId) return false;
+                return (a._startMin < b._endMin) && (b._startMin < a._endMin);
+              });
+              if (hasCollision) {
+                appBlock.classList.add('agenda-block-collision');
+                appBlock.title = '⚠️ Collisione responsabile
+' + (appBlock.title || '');
+              }
+            }
+          } catch {}
+
           appBlock.style.height = (slotPx * totalSlots - 2) + 'px';
 
           appBlock.addEventListener('click', handleClick);
@@ -1064,6 +1079,14 @@ try {
   };
   window.AgendaLegacy.getWeekAnchor = () => agendaWeekAnchor;
   window.AgendaLegacy.renderWeek = () => { try { renderAgendaWeek(); } catch {} };
+  window.AgendaLegacy.renderMonth = () => { try { renderAgendaMonth(); } catch {} };
+  window.AgendaLegacy.openWeekFromDate = (dateLike) => {
+    try {
+      window.AgendaLegacy.setWeekAnchor(dateLike);
+      window.AgendaLegacy.renderWeek();
+      window.AgendaLegacy.scrollToWeek();
+    } catch {}
+  };
   window.AgendaLegacy.scrollToWeek = () => {
     try { document.getElementById('agenda-week-grid')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch {}
   };
@@ -1200,8 +1223,21 @@ function renderAgendaMonth() {
             }
             cell.appendChild(counter);
 
-            // click (delegato a modules/agenda): set dataset per listener delegato
-try { cell.dataset.date = `${year}-${String(month+1).padStart(2,'0')}-${String(dayNum).padStart(2,'0')}`; } catch {}
+            // click: salto diretto mese → settimana corrispondente (compat versioni approvate)
+            const isoClick = `${year}-${String(month+1).padStart(2,'0')}-${String(dayNum).padStart(2,'0')}`;
+            try { cell.dataset.date = isoClick; } catch {}
+            cell.addEventListener('click', () => {
+              try {
+                agendaWeekAnchor = startOfWeek(new Date(isoClick));
+                // se non sei già in agenda, entra
+                if (typeof setView === 'function') setView('agenda');
+                else renderAgendaWeek();
+                // assicurati che la settimana sia renderizzata
+                try { renderAgendaWeek(); } catch {}
+                try { document.getElementById('agenda-week-grid')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch {}
+              } catch {}
+            });
+
           } else {
             cell.style.opacity = "0.25";
             cell.style.cursor = "default";
