@@ -942,32 +942,32 @@ addInterazione({
 
           // crea il blocco interno
           const block = document.createElement('div');
-          appBlock.className = 'agenda-block';
+          block.className = 'agenda-block';
           // colore responsabile
           let respColor = '#22c55e';
           if (respObj && (respObj.colore || respObj.color)) {
             respColor = respObj.colore || respObj.color;
           }
           /* gradient plastico più saturo */
-          appBlock.style.background = `linear-gradient(135deg, ${respColor}ee 0%, ${respColor}cc 45%, ${respColor}aa 100%)`;
-          appBlock.style.border = '3px solid ' + respColor;
+          block.style.background = `linear-gradient(135deg, ${respColor}ee 0%, ${respColor}cc 45%, ${respColor}aa 100%)`;
+          block.style.border = '3px solid ' + respColor;
 
           // glow e ombra dinamica in base alla durata
           const depth = Math.min(18, 4 + totalSlots * 1.2);
-          appBlock.style.boxShadow = `0 0 0 1px ${respColor}88, 0 4px ${depth}px rgba(0,0,0,0.45)`;
+          block.style.boxShadow = `0 0 0 1px ${respColor}88, 0 4px ${depth}px rgba(0,0,0,0.45)`;
 
           // contenuto testo + icona fiamma se bollente
           let labelText = text;
           if (a.bollente) {
             labelText = '🔥 ' + labelText;
-            appBlock.classList.add('agenda-block-hot');
+            block.classList.add('agenda-block-hot');
           }
-          appBlock.textContent = labelText;
-          appBlock.title = labelText;
+          block.textContent = labelText;
+          block.title = labelText;
 
           // evidenzia blocco appena creato
           if (lastCreatedAppId && a.id === lastCreatedAppId) {
-            appBlock.classList.add('agenda-block-new');
+            block.classList.add('agenda-block-new');
           }
 
           const colIndex = a._colIndex || 0;
@@ -975,19 +975,19 @@ addInterazione({
           const widthPercent = 100 / colCount;
           const leftPercent = widthPercent * colIndex;
 
-          appBlock.style.position = 'absolute';
-          appBlock.style.top = '0';
+          block.style.position = 'absolute';
+          block.style.top = '0';
 applyBlockLayout(block, a, dayApps);
 const overlaps = getOverlaps(a, dayApps);
 if (hasSameResponsabileOverlap(a, overlaps)) {
   block.classList.add('agenda-block-collision');
   block.title = ' Collisione responsabile\n' + (block.title || '');
 }
-          appBlock.style.height = (slotPx * totalSlots - 2) + 'px';
+          block.style.height = (slotPx * totalSlots - 2) + 'px';
 
-          appBlock.addEventListener('click', handleClick);
+          block.addEventListener('click', handleClick);
 
-          cell.appendChild(appBlock);
+          cell.appendChild(block);
         });
       });;
     }
