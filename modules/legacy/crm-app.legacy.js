@@ -6742,6 +6742,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
 })();
 
+
+// === Bridge per moduli (Agenda + lettura stato) ===
+try {
+  window.CRMState = function() {
+    return { attivita: (typeof attivita!=='undefined'?attivita:[]), staff: (typeof staff!=='undefined'?staff:[]) };
+  };
+} catch {}
+
+try {
+  window.AgendaLegacy = {
+    getWeekAnchor: () => (typeof agendaWeekAnchor!=='undefined' ? agendaWeekAnchor : new Date()),
+    setWeekAnchor: (d) => { try { agendaWeekAnchor = d; } catch {} },
+    renderWeek: () => { try { renderAgendaWeek && renderAgendaWeek(); } catch(e){ console.warn('renderAgendaWeek fail', e);} },
+    renderMonth: () => { try { renderAgendaMonth && renderAgendaMonth(); } catch(e){ console.warn('renderAgendaMonth fail', e);} },
+    newAppointment: () => { try { creaNuovoAppuntamentoDaBottone && creaNuovoAppuntamentoDaBottone(); } catch(e){} }
+  };
+} catch {}
+
 // === ES module boundary (bootstrap) ===
 // Espone solo le funzioni richiamate da attributi HTML inline (index.html).
 try {
