@@ -999,8 +999,7 @@ addInterazione({
               const overlapsSameResp = (overlaps || []).filter(o => o && o.responsabileId === a.responsabileId);
 
               appBlock.classList.add('agenda-block-collision');
-              appBlock.title = "⚠️ Collisione responsabile
-" + (appBlock.title || "");
+              appBlock.title = "⚠️ Collisione responsabile\n" + (appBlock.title || "");
 
               // popup non bloccante (solo new collision)
               if (typeof shouldAlertCollision === 'function' && shouldAlertCollision(a, dayApps, seenMap)) {
