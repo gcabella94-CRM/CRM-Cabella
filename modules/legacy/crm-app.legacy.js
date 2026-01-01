@@ -992,8 +992,7 @@ addInterazione({
               });
               if (hasCollision) {
                 appBlock.classList.add('agenda-block-collision');
-                appBlock.title = '⚠️ Collisione responsabile
-' + (appBlock.title || '');
+                appBlock.title = "⚠️ Collisione responsabile\n" + (appBlock.title || "");
               }
             }
           } catch {}
